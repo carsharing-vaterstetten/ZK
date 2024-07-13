@@ -7,6 +7,7 @@ NFC::NFC() : nfc(NFC_MISO, NFC_MOSI, NFC_SCLK, NFC_SS) {}
 
 void NFC::init()
 {
+    sleep(1);
     nfc.begin();
     sleep(1);
     uint32_t versiondata = nfc.getFirmwareVersion();
