@@ -1,5 +1,15 @@
 # ZK
 
+## Inhaltsverzeichnis
+
+- [Übersicht](#übersicht)
+- [Hardware](#hardware)
+  - [Pinbelegung](#pinbelegung)
+- [Software](#software)
+  - [Abhängigkeiten](#abhängigkeiten)
+- [Installation und Einrichtung](#installation-und-einrichtung)
+- [Change Log](#change-log)
+
 ## Übersicht
 
 Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP32-Boards. Es ermöglicht das Scannen von RFID-Tags und überprüft, ob diese in einer gespeicherten Liste von autorisierten Tags enthalten sind. Wenn ein autorisierter Tag erkannt wird, wird der Zugang gewährt oder verweigert.
@@ -25,6 +35,10 @@ Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP3
   - `NFC_SCLK`: 23
   - `NFC_SS`: 5
 
+- **LED Pins**:
+  - `LED_PIN`: 12
+  - `LED_COUNT`: 3
+
 ## Software
 
 ### Abhängigkeiten
@@ -35,6 +49,7 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 - `ArduinoHttpClient`
 - `ArduinoJson`
 - `Adafruit PN532`
+- `Adafruit NeoPixel`
 
 ## Installation und Einrichtung
 
@@ -43,3 +58,12 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 3. **Konfiguration anpassen**: Bearbeiten Sie die `include/Config.h` Datei, um die Serverinformationen und andere Konfigurationen anzupassen.
 4. **Server einrichten**: Richten Sie einen Server ein, der die RFID-Liste hostet und die Liste über eine HTTPS-Schnittstelle aktualisieren kann.
 5. **Projekt kompilieren und hochladen**: Kompilieren Sie das Projekt und laden Sie es auf das ESP32-Board hoch.
+
+## Change Log
+
+### [0.0.2]
+
+#### Hinzugefügt
+
+- `Adafruit NeoPixel` Bibliothek und Funktionen für die LED-Steuerung.
+  - Nach dem Scannen eines RFID-Tags wird die LED grün oder rot beleuchtet.

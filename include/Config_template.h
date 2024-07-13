@@ -6,6 +6,11 @@
 #define TINY_GSM_MODEM_SIM7000SSL
 #define TINY_GSM_RX_BUFFER 1024 // 1Kb
 
+// LED Pin
+#define LED_PIN 12
+// Anzahl die LEDs
+#define LED_COUNT 3
+
 // Modem Pins
 #define PIN_TX 27
 #define PIN_RX 26

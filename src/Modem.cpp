@@ -44,7 +44,9 @@ String *Modem::getRfids(int &arraySize)
     SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
 
     SerialMon.println("Initializing modem...");
+    sleep(1);
     modem.init();
+    sleep(1);
 
     String modemInfo = modem.getModemInfo();
     SerialMon.print("Modem Info: ");
