@@ -39,6 +39,11 @@ Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP3
   - `LED_PIN`: 12
   - `LED_COUNT`: 3
 
+- **Schlüssel Pins**:
+  - `OPEN_KEY`: 15
+  - `CLOSE_KEY`: 14
+  > An diese Pins werden nach dem Lesen eines RFID-Tags Signale gesendet, um den Zugang zu gewähren oder zu verweigern.
+
 ## Software
 
 ### Abhängigkeiten
@@ -60,6 +65,13 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 5. **Projekt kompilieren und hochladen**: Kompilieren Sie das Projekt und laden Sie es auf das ESP32-Board hoch.
 
 ## Change Log
+
+### [0.0.3]
+
+#### Hinzugefügt
+
+- Aktuelle Firmware-Version wird jetzt in `Intern.h` definiert.
+- Nach auf und zu Sperren werden an die definierten Pins (`OPEN_KEY` und `CLOSE_KEY`) Signale gesendet.
 
 ### [0.0.2]
 

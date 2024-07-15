@@ -14,6 +14,12 @@ Modem modem;
 NFC nfc;
 LED LED_Strip;
 
+void initKeyPins()
+{
+    pinMode(OPEN_KEY, INPUT);
+    pinMode(CLOSE_KEY, INPUT);
+}
+
 // Funktion überprüft, ob die gescannte Karte in der Speicherdatei vorhanden ist.
 // Wenn ja, wird je nach Zustand loggedIn auf true oder false gesetzt.
 void checkNFCTag()
@@ -25,7 +31,20 @@ void checkNFCTag()
         if (SPIFFSUtils::isRfidInSPIFFS(readValue))
         {
             loggedIn = !loggedIn;
-            loggedIn ? LED_Strip.setStaticColor("green") : LED_Strip.setStaticColor("red");
+            if (loggedIn)
+            {
+                digitalWrite(OPEN_KEY, HIGH);
+                LED_Strip.setStaticColor("green");
+                SerialMon.println("AUF");
+                digitalWrite(OPEN_KEY, LOW);
+            }
+            else
+            {
+                digitalWrite(CLOSE_KEY, HIGH);
+                LED_Strip.setStaticColor("red");
+                SerialMon.println("ZU");
+                digitalWrite(CLOSE_KEY, LOW);
+            }
             delay(2000);
         }
         else
@@ -44,6 +63,8 @@ void checkNFCTag()
 void setup()
 {
     SerialMon.begin(UART_BAUD);
+
+    initKeyPins();
 
     LED_Strip.init();
     LED_Strip.setStaticColor("orange");

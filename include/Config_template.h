@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <Intern.h>
+
 #define UART_BAUD 115200
 
 #define TINY_GSM_MODEM_SIM7000SSL
@@ -10,6 +12,10 @@
 #define LED_PIN 12
 // Anzahl die LEDs
 #define LED_COUNT 3
+
+// Schlüssel knopfe
+#define OPEN_KEY 15
+#define CLOSE_KEY 14
 
 // Modem Pins
 #define PIN_TX 27
