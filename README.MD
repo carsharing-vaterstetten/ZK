@@ -66,6 +66,12 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.0.4]
+
+#### Bugfix
+
+- Fehler behoben, bei der Abfrage der RFID-Liste vom Server war die Antwort manchmal leer.
+
 ### [0.0.3]
 
 #### Hinzugefügt
