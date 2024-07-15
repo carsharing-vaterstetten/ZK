@@ -103,16 +103,32 @@ String *Modem::getRfids(int &arraySize)
         String headerValue = http.readHeaderValue();
         SerialMon.println("    " + headerName + " : " + headerValue);
     }
+    int contentLength = http.contentLength();
+    String responseBody = "";
+    if (contentLength > 0)
+    {
+        int readBytes = 0;
+        char buffer[128];
+        while (readBytes < contentLength)
+        {
+            int bytesToRead = http.readBytes(buffer, sizeof(buffer) - 1);
+            readBytes += bytesToRead;
+            buffer[bytesToRead] = '\0';
+            responseBody += buffer;
+        }
+    }
 
-    String body = http.responseBody();
-    SerialMon.println(F("Response:"));
-    SerialMon.println(body);
+    SerialMon.println(F("Response Body:"));
+    SerialMon.println(responseBody);
 
-    SerialMon.print(F("Body length is: "));
-    SerialMon.println(body.length());
-
-    DynamicJsonDocument doc(1024);
-    deserializeJson(doc, body);
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, responseBody);
+    if (error)
+    {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return nullptr;
+    }
     JsonArray array = doc.as<JsonArray>();
 
     arraySize = array.size();
