@@ -7,15 +7,18 @@
 #include <TinyGsmClient.h>
 #include <ArduinoJson.h>
 #include <ArduinoHttpClient.h>
+#include <SPIFFSUtils.h>
+#include <WiFi.h>
 
 class Modem
 {
 public:
     Modem();
-    void powerOn();
-    void powerOff();
-    void restart();
+    bool init(bool secoundTry = false);
+    void end();
+    int sendRequest(String path, String method, String body = "");
     String *getRfids(int &arraySize);
+    void firmwareCheckAndUpdateIfNeeded();
 
 private:
     TinyGsm modem;

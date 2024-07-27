@@ -66,6 +66,14 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.1.0]
+
+#### Hinzugefügt
+
+- Neue Firmware-Version wird vom Server heruntergeladen und installiert
+  - Über die Mac-Adresse wird die eingetragene Firmware-Version ermittelt.
+- Neue Farben für die LED-Steuerung hinzugefügt
+
 ### [0.0.5]
 
 #### Bugfix
