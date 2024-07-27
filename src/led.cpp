@@ -36,6 +36,14 @@ void LED::setStaticColor(String color)
     {
         colorValue = led_strip.Color(255, 165, 0);
     }
+    else if (color == "purple")
+    {
+        colorValue = led_strip.Color(128, 0, 128);
+    }
+    else if (color == "white")
+    {
+        colorValue = led_strip.Color(255, 255, 255);
+    }
     for (int i = 0; i < LED_COUNT; i++)
     {
         led_strip.setPixelColor(i, colorValue);

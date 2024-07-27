@@ -63,13 +63,20 @@ void checkNFCTag()
 void setup()
 {
     SerialMon.begin(UART_BAUD);
+    while (!SerialMon) {};
 
     initKeyPins();
 
     LED_Strip.init();
-    LED_Strip.setStaticColor("orange");
+    LED_Strip.setStaticColor("white");
 
-    modem.powerOn();
+    modem.init();
+
+    LED_Strip.setStaticColor("purple");
+
+    modem.firmwareCheckAndUpdateIfNeeded();
+
+    LED_Strip.setStaticColor("orange");
 
     int arraySize;
     String *rfids = modem.getRfids(arraySize);

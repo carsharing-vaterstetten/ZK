@@ -19,7 +19,7 @@ void SPIFFSUtils::saveRfidsToSPIFFS(String *rfids, int arraySize)
         }
     }
 
-    File file = SPIFFS.open("/rfids.txt", FILE_WRITE);
+    File file = SPIFFS.open(RFID_FILE_NAME, FILE_WRITE);
     if (!file)
     {
         SerialMon.println("Failed to open file for writing");
@@ -52,7 +52,7 @@ bool SPIFFSUtils::isRfidInSPIFFS(String rfid)
         }
     }
 
-    File file = SPIFFS.open("/rfids.txt", FILE_READ);
+    File file = SPIFFS.open(RFID_FILE_NAME, FILE_READ);
     if (!file)
     {
         SerialMon.println("Failed to open file for reading");
@@ -75,4 +75,46 @@ bool SPIFFSUtils::isRfidInSPIFFS(String rfid)
 
     file.close();
     return false;
+}
+
+void SPIFFSUtils::performOTAUpdateFromSPIFFS()
+{
+    // Open the firmware file in SPIFFS for reading
+    Serial.println("Starting OTA update from SPIFFS");
+    File file = SPIFFS.open(FIRMWARE_FILE_NAME, FILE_READ);
+    if (!file)
+    {
+        Serial.println("Failed to open file for reading");
+        return;
+    }
+
+    Serial.println("Starting update..");
+    size_t fileSize = file.size(); 
+    Serial.println(fileSize);
+
+    // Begin OTA update process with specified size and flash destination
+    if (!Update.begin(fileSize, U_FLASH))
+    {
+        Serial.println("Cannot do the update");
+        return;
+    }
+
+    // Write firmware data from file to OTA update
+    Update.writeStream(file);
+
+    // Complete the OTA update process
+    if (Update.end())
+    {
+        Serial.println("Successful update");
+    }
+    else
+    {
+        Serial.println("Error Occurred:" + String(Update.getError()));
+        return;
+    }
+
+    file.close(); // Close the file
+    Serial.println("Reset in 4 seconds....");
+    delay(4000);
+    ESP.restart(); // Restart ESP32 to apply the update
 }
