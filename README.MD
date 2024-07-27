@@ -72,6 +72,10 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 - Fix Pin-Modus für `OPEN_KEY` und `CLOSE_KEY`
 
+#### Verändert
+
+- Pinbelegung für NFC-Modul
+
 ### [0.0.4]
 
 #### Bugfix

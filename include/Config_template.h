@@ -46,9 +46,9 @@ const char gprsPass[] = "";
 #define GSM_PIN ""
 
 // NFC Modul Pins
-#define NFC_MISO 18
-#define NFC_MOSI 19
-#define NFC_SCLK 23
+#define NFC_MOSI 23
+#define NFC_MISO 19
+#define NFC_SCLK 18
 #define NFC_SS 5
 
 // Server Daten für abholen der RFID's usw.
