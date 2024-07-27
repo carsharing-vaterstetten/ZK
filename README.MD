@@ -66,6 +66,12 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.0.5]
+
+#### Bugfix
+
+- Fix Pin-Modus für `OPEN_KEY` und `CLOSE_KEY`
+
 ### [0.0.4]
 
 #### Bugfix
