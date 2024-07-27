@@ -3,7 +3,7 @@
 
 #define SerialMon Serial
 
-NFC::NFC() : nfc(NFC_MISO, NFC_MOSI, NFC_SCLK, NFC_SS) {}
+NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS) {}
 
 void NFC::init()
 {

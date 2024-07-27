@@ -4,8 +4,6 @@
 #include <SPIFFSUtils.h>
 #include <LED.h>
 
-#define FIRMWARE_VERSION "0.0.2"
-
 #define SerialMon Serial
 
 bool loggedIn = false;
@@ -16,8 +14,8 @@ LED LED_Strip;
 
 void initKeyPins()
 {
-    pinMode(OPEN_KEY, INPUT);
-    pinMode(CLOSE_KEY, INPUT);
+    pinMode(OPEN_KEY, OUTPUT);
+    pinMode(CLOSE_KEY, OUTPUT);
 }
 
 // Funktion überprüft, ob die gescannte Karte in der Speicherdatei vorhanden ist.
@@ -34,6 +32,7 @@ void checkNFCTag()
             if (loggedIn)
             {
                 digitalWrite(OPEN_KEY, HIGH);
+                delay(200);
                 LED_Strip.setStaticColor("green");
                 SerialMon.println("AUF");
                 digitalWrite(OPEN_KEY, LOW);
@@ -41,6 +40,7 @@ void checkNFCTag()
             else
             {
                 digitalWrite(CLOSE_KEY, HIGH);
+                delay(200);
                 LED_Strip.setStaticColor("red");
                 SerialMon.println("ZU");
                 digitalWrite(CLOSE_KEY, LOW);
