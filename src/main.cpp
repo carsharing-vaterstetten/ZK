@@ -7,6 +7,8 @@
 #define SerialMon Serial
 
 bool loggedIn = false;
+unsigned long targetMillis;  
+const unsigned long dayMillis = 24 * 60 * 60 * 1000;  // Ein Tag in Millisekunden
 
 Modem modem;
 NFC nfc;
@@ -60,16 +62,51 @@ void checkNFCTag()
     }
 }
 
+void initTime(){
+
+    String time = modem.getLocalTime();
+    Serial.println("Local Time: " + time);
+
+    // Zeitformat "HH:MM:SS+TZ".
+    String hourStr = time.substring(0, 2);
+    String minStr  = time.substring(3, 5);
+    String secStr  = time.substring(6, 8);
+
+    int hour   = hourStr.toInt();
+    int minute = minStr.toInt();
+    int second = secStr.toInt();
+
+    // Berechne die Millisekunden seit Mitternacht
+    unsigned long currentMillis = (hour * 3600 + minute * 60 + second) * 1000;
+
+    // Berechne die verbleibende Zeit bis 4 Uhr morgens in Millisekunden
+    if (currentMillis < targetTimeToRestartESP32) {
+        targetMillis = targetTimeToRestartESP32 - currentMillis;
+    } else {
+        targetMillis = dayMillis - (currentMillis - targetTimeToRestartESP32);  // Nächster Tag 4 Uhr
+    }
+
+    targetMillis += millis();  // Setze Zielzeit relativ zu millis()    
+}
+
 void setup()
 {
     SerialMon.begin(UART_BAUD);
+    while (!SerialMon) {};
 
     initKeyPins();
 
     LED_Strip.init();
-    LED_Strip.setStaticColor("orange");
+    LED_Strip.setStaticColor("white");
 
-    modem.powerOn();
+    modem.init();
+    initTime();
+
+    LED_Strip.setStaticColor("purple");
+
+    modem.firmwareCheckAndUpdateIfNeeded();
+
+    LED_Strip.setStaticColor("orange");
 
     int arraySize;
     String *rfids = modem.getRfids(arraySize);
@@ -86,5 +123,9 @@ void setup()
 
 void loop()
 {
+    if (millis() >= targetMillis) {
+        Serial.println("Target time reached. Restarting ESP32...");
+        ESP.restart();  // ESP32 neustarten
+    }
     checkNFCTag();
 }

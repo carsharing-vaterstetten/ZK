@@ -8,6 +8,7 @@
 - [Software](#software)
   - [Abhängigkeiten](#abhängigkeiten)
 - [Installation und Einrichtung](#installation-und-einrichtung)
+- [LED Bedeutung](#led-bedeutung)
 - [Change Log](#change-log)
 
 ## Übersicht
@@ -64,7 +65,22 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 4. **Server einrichten**: Richten Sie einen Server ein, der die RFID-Liste hostet und die Liste über eine HTTPS-Schnittstelle aktualisieren kann.
 5. **Projekt kompilieren und hochladen**: Kompilieren Sie das Projekt und laden Sie es auf das ESP32-Board hoch.
 
+## LED Bedeutung
+
+- **Weiß**: Das ESP32-Board wurde gerade gestartet und wird initialisiert.
+- **Lila**: Es wird nach Firmware-Updates gesucht und diese werden ggf. installiert.
+- **Orange**: Die Zugangskarten werden aktualisiert.
+
 ## Change Log
+
+### [0.1.0]
+
+#### Hinzugefügt
+
+- Eine neue Firmware-Version kann vom Server heruntergeladen und installiert werden.
+  - Über die Mac-Adresse wird die zugehörige Firmware-Version ermittelt.
+- Neue Farben für die LED-Steuerung wurden hinzugefügt.
+- Das ESP32 wird zur definierten Uhrzeit `targetTimeToRestartESP32` neu gestartet, um die RFID-Liste zu aktualisieren und neue Firmware-Versionen zu installieren.
 
 ### [0.0.5]
 

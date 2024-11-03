@@ -57,4 +57,7 @@ const int port = 443;
 const char username[] = "";
 const char password[] = "";
 
+// ESP32 startet sich jeden tag um die Uhrzeit neu
+const unsigned long targetTimeToRestartESP32 = (19 * 3600 + 30 * 60) * 1000; // 19:30 Uhr
+
 #endif
