@@ -6,6 +6,8 @@
 #include "SPIFFS.h"
 #include <Intern.h>
 #include <Update.h>
+#include <ArduinoJson.h>
+#include <Modem.h>
 
 class SPIFFSUtils
 {
@@ -13,6 +15,7 @@ public:
     static void saveRfidsToSPIFFS(String *rfids, int arraySize);
     static bool isRfidInSPIFFS(String rfid);
     static void performOTAUpdateFromSPIFFS();
+    static void addLogEntry(const String& logText);
 };
 
 #endif

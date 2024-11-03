@@ -54,6 +54,7 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 - `TinyGSM`
 - `ArduinoHttpClient`
 - `ArduinoJson`
+  - Um das Programm einfach zu testen, siehe Website [ArduinoJson Assistant](https://arduinojson.org/v7/assistant/)
 - `Adafruit PN532`
 - `Adafruit NeoPixel`
 
@@ -70,8 +71,15 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 - **Weiß**: Das ESP32-Board wurde gerade gestartet und wird initialisiert.
 - **Lila**: Es wird nach Firmware-Updates gesucht und diese werden ggf. installiert.
 - **Orange**: Die Zugangskarten werden aktualisiert.
+- **Blau**: Logs werden auf den Server hochgeladen.
 
 ## Change Log
+
+### [0.2.0]
+
+#### Hinzugefügt
+
+- Wichtige Prozesse (z. B. das Auf- und Zusperren des Autos oder der Neustart des ESP32) werden in einer Log-Datei gespeichert und einmal täglich auf den Server hochgeladen.
 
 ### [0.1.0]
 

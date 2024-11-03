@@ -1,20 +1,11 @@
 // Modem.cpp
+
 #include "Modem.h"
 
 #define SerialMon Serial
 #define SerialAT Serial1
 
 Modem::Modem() : modem(SerialAT), client(modem), http(client, server, port) {}
-
-String toUpperCase(const String &str)
-{
-    String upperStr = str;
-    for (int i = 0; i < upperStr.length(); i++)
-    {
-        upperStr[i] = toupper(upperStr[i]);
-    }
-    return upperStr;
-}
 
 bool Modem::init(bool secoundTry)
 {
@@ -79,20 +70,33 @@ int Modem::sendRequest(String path, String method, String body)
     if (method == "GET")
     {
         err = http.get(path);
+        http.sendBasicAuth(username, password);
     }
     else if (method == "POST")
     {
-        err = http.post(path, "application/json", body);
+        err = http.post(path);
+        http.sendBasicAuth(username, password);
+        http.sendHeader("Content-Type", "application/json");
+        http.sendHeader("Content-Length", body.length());
+        http.beginBody();
+
+        const size_t chunkSize = 512; 
+        size_t bodyLength = body.length();
+        for (size_t i = 0; i < bodyLength; i += chunkSize) {
+            String chunk = body.substring(i, min(i + chunkSize, bodyLength));
+            http.print(chunk); 
+        }
+
     }
-    http.sendBasicAuth(username, password);
     http.endRequest();
     return err;
 }
 
 // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
+// @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
 String Modem::getLocalTime()
 {
-    String time = modem.getGSMDateTime(DATE_TIME);
+    String time = modem.getGSMDateTime(DATE_FULL);
     return time;
 }
 
@@ -166,7 +170,7 @@ String *Modem::getRfids(int &arraySize)
 
     for (int i = 0; i < arraySize; i++)
     {
-        rfidArray[i] = toUpperCase(array[i]["rfid"].as<String>());
+        rfidArray[i] = HelperUtils::toUpperCase(array[i]["rfid"].as<String>());
     }
 
     return rfidArray;
@@ -184,25 +188,8 @@ void printPercent(uint32_t readLength, uint32_t contentLength) {
 
 void Modem::firmwareCheckAndUpdateIfNeeded()
 {
-    byte mac[6];
-    WiFi.macAddress(mac);
-    String macStr = "";
-    for (int i = 0; i < 6; i++)
-    {
-        if (mac[i] < 0x10)
-        {
-            macStr += '0';
-        }
-        macStr += String(mac[i], HEX);
-        if (i < 5)
-        {
-            macStr += ':';
-        }
-    }
-    macStr = toUpperCase(macStr);
-
     JsonDocument body;
-    body["mac_address"] = macStr;
+    body["mac_address"] = MAC_ADDRESS;
     body["firmware_version"] = FIRMWARE_VERSION;
     serializeJsonPretty(body, SerialMon);
 
@@ -222,6 +209,12 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
     if (!status)
     {
         SerialMon.println(F("no response"));
+        http.stop();
+        return;
+    }
+    if (status == 200)
+    {
+        SerialMon.println("kein Update notwendig");
         http.stop();
         return;
     }
@@ -284,3 +277,75 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
     }
 }
 
+// liefert immer true zurück
+// rückgabe ist nur dafür da, damit der loop auf die funktion warten kann
+bool Modem::uploadLogs(){
+    if (!SPIFFS.begin())
+    {
+        SerialMon.println("SPIFFS Mount Failed.");
+        return true;
+    }
+
+    File file = SPIFFS.open(LOG_FILE_NAME, FILE_READ);
+    if (!file)
+    {
+        SerialMon.println("File doesn't exist. Creating a new one.");
+        return true;
+    }
+
+    int contentLength = file.size();
+    if (contentLength == 0)
+    {
+        SerialMon.println("File is empty");
+        return true;
+    }
+    SerialMon.print("File size: ");
+    SerialMon.println(contentLength);
+
+    SerialMon.println("Uploading logs to server...");
+    int err = sendRequest("/logs/", "POST", file.readString());
+    if (err != 0)
+    {
+        SerialMon.println(F("failed to connect 'logs'"));
+        SerialMon.println(err);
+        return true;
+    }
+
+    int status = http.responseStatusCode();
+    SerialMon.print(F("Response status code: "));
+    SerialMon.println(status);
+
+    if (!status)
+    {
+        SerialMon.println(F("no response"));
+        http.stop();
+        return true;
+    }
+
+    if (status != 201)
+    {
+        SerialMon.println("unerwartete Antwort");
+        http.stop();
+        return true;
+    }
+
+    SerialMon.println(F("Response Headers:"));
+    while (http.headerAvailable())
+    {
+        String headerName = http.readHeaderName();
+        String headerValue = http.readHeaderValue();
+        SerialMon.println("    " + headerName + " : " + headerValue);
+    }
+
+    SerialMon.println(F("Response Body:"));
+    while (http.available())
+    {
+        SerialMon.write(http.read());
+    }
+
+    http.stop();
+    file.close();
+    SPIFFS.remove(LOG_FILE_NAME);
+    SerialMon.println("Logs uploaded successfully");
+    return true;
+}

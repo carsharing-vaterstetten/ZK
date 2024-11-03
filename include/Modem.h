@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 #include <ArduinoHttpClient.h>
 #include <SPIFFSUtils.h>
-#include <WiFi.h>
+#include <HelperUtils.h>
 
 class Modem
 {
@@ -20,6 +20,7 @@ public:
     int sendRequest(String path, String method, String body = "");
     String *getRfids(int &arraySize);
     void firmwareCheckAndUpdateIfNeeded();
+    bool uploadLogs();
 
 private:
     TinyGsm modem;
