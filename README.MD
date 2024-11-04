@@ -75,6 +75,14 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.3.0]
+
+#### Breaking Changes
+
+- Die Einstellung zum Verbinden mit dem Server wurde von `Config.h` entfernt. Nun muss beim erste initialiserung des ESP32 folgende Zeichenkette in Serial Monitor eingegeben werden:
+  - `apn="";gprsUser="";gprsPass="";GSM_PIN="";server="";port=;username="";password="";`
+
+
 ### [0.2.0]
 
 #### Hinzugefügt
