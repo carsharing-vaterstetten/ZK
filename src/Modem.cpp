@@ -5,7 +5,9 @@
 #define SerialMon Serial
 #define SerialAT Serial1
 
-Modem::Modem() : modem(SerialAT), client(modem), http(client, server, port) {}
+extern Config config;
+
+Modem::Modem() : modem(SerialAT), client(modem), http(client, config.server, port) {}
 
 bool Modem::init(bool secoundTry)
 {
@@ -24,12 +26,12 @@ bool Modem::init(bool secoundTry)
     String modemInfo = modem.getModemInfo();
     SerialMon.println("Modem Info: " + modemInfo);
 
-    if (GSM_PIN && modem.getSimStatus() != 3)
+    if (config.GSM_PIN && modem.getSimStatus() != 3)
     {
-        modem.simUnlock(GSM_PIN);
+        modem.simUnlock(config.GSM_PIN);
     }
 
-    modem.gprsConnect(apn, gprsUser, gprsPass);
+    modem.gprsConnect(config.apn, config.gprsUser, config.gprsPass);
 
     SerialMon.print("Network status: ");
     if (!modem.waitForNetwork())
@@ -70,23 +72,23 @@ int Modem::sendRequest(String path, String method, String body)
     if (method == "GET")
     {
         err = http.get(path);
-        http.sendBasicAuth(username, password);
+        http.sendBasicAuth(config.username, config.password);
     }
     else if (method == "POST")
     {
         err = http.post(path);
-        http.sendBasicAuth(username, password);
+        http.sendBasicAuth(config.username, config.password);
         http.sendHeader("Content-Type", "application/json");
         http.sendHeader("Content-Length", body.length());
         http.beginBody();
 
-        const size_t chunkSize = 512; 
+        const size_t chunkSize = 512;
         size_t bodyLength = body.length();
-        for (size_t i = 0; i < bodyLength; i += chunkSize) {
+        for (size_t i = 0; i < bodyLength; i += chunkSize)
+        {
             String chunk = body.substring(i, min(i + chunkSize, bodyLength));
-            http.print(chunk); 
+            http.print(chunk);
         }
-
     }
     http.endRequest();
     return err;
@@ -129,7 +131,7 @@ String *Modem::getRfids(int &arraySize)
         http.stop();
         return nullptr;
     }
-    
+
     SerialMon.println(F("Response Headers:"));
     while (http.headerAvailable())
     {
@@ -176,14 +178,18 @@ String *Modem::getRfids(int &arraySize)
     return rfidArray;
 }
 
-void printPercent(uint32_t readLength, uint32_t contentLength) {
-  if (contentLength != (uint32_t)-1) {
-    SerialMon.print("\r ");
-    SerialMon.print((100.0 * readLength) / contentLength);
-    SerialMon.print('%');
-  } else {
-    SerialMon.println(readLength);
-  }
+void printPercent(uint32_t readLength, uint32_t contentLength)
+{
+    if (contentLength != (uint32_t)-1)
+    {
+        SerialMon.print("\r ");
+        SerialMon.print((100.0 * readLength) / contentLength);
+        SerialMon.print('%');
+    }
+    else
+    {
+        SerialMon.println(readLength);
+    }
 }
 
 void Modem::firmwareCheckAndUpdateIfNeeded()
@@ -262,7 +268,7 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
             {
                 size_t bytesRead = http.readBytes(buffer, bufferSize);
                 file.write(buffer, bytesRead);
-                totalBytesRead += bytesRead; 
+                totalBytesRead += bytesRead;
                 float percentage = ((float)totalBytesRead * 100) / contentLength;
                 unsigned long elapsedTime = millis() - startTime;
                 SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
@@ -279,7 +285,8 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
 
 // liefert immer true zurück
 // rückgabe ist nur dafür da, damit der loop auf die funktion warten kann
-bool Modem::uploadLogs(){
+bool Modem::uploadLogs()
+{
     if (!SPIFFS.begin())
     {
         SerialMon.println("SPIFFS Mount Failed.");

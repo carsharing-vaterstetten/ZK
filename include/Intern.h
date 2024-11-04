@@ -9,4 +9,24 @@
 
 extern String MAC_ADDRESS;
 
+#define CONFIG_START_ADDRESS 0
+#define CONFIG_VERSION 1
+
+// FIXME: Port aus config lesen hat beim http(client, config.server, config.port) nicht funktioniert...
+// Ersmal als globale Variable speichern.
+const int port = 8080; 
+
+struct Config
+{
+  uint8_t version; // Wird verwendet, um eine Versionsnummer oder Signatur zu speichern
+  char apn[32];
+  char gprsUser[32];
+  char gprsPass[32];
+  char GSM_PIN[16];
+  char server[64];
+  int port;
+  char username[32];
+  char password[64];
+};
+
 #endif

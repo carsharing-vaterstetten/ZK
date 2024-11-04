@@ -5,16 +5,15 @@
 #include <HelperUtils.h>
 #include <LED.h>
 
-#define SerialMon Serial
-
 bool loggedIn = false;
-unsigned long targetMillis;  
-const unsigned long dayMillis = 24 * 60 * 60 * 1000;  // Ein Tag in Millisekunden
+unsigned long targetMillis;
+const unsigned long dayMillis = 24 * 60 * 60 * 1000; // Ein Tag in Millisekunden
 String MAC_ADDRESS;
 
 Modem modem;
 NFC nfc;
 LED LED_Strip;
+Config config;
 
 void initKeyPins()
 {
@@ -29,7 +28,7 @@ void checkNFCTag()
     char *readValue = nfc.readTag();
     if (strcmp(readValue, "") != 0)
     {
-        SerialMon.println(readValue);
+        Serial.println(readValue);
         if (SPIFFSUtils::isRfidInSPIFFS(readValue))
         {
             loggedIn = !loggedIn;
@@ -38,7 +37,6 @@ void checkNFCTag()
                 digitalWrite(OPEN_KEY, HIGH);
                 delay(200);
                 LED_Strip.setStaticColor("green");
-                SerialMon.println("AUF");                
                 digitalWrite(OPEN_KEY, LOW);
                 SPIFFSUtils::addLogEntry("Auto aufgesperrt");
             }
@@ -47,7 +45,6 @@ void checkNFCTag()
                 digitalWrite(CLOSE_KEY, HIGH);
                 delay(200);
                 LED_Strip.setStaticColor("red");
-                SerialMon.println("ZU");                
                 digitalWrite(CLOSE_KEY, LOW);
                 SPIFFSUtils::addLogEntry("Auto zugesperrt");
             }
@@ -67,36 +64,62 @@ void checkNFCTag()
     }
 }
 
-void initTime(){
+void initTime()
+{
 
     String time = modem.getLocalTime();
     Serial.println("Local Time: " + time);
 
     // Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-    String hourStr = time.substring(9, 11);  
-    String minStr  = time.substring(12, 14);
-    String secStr  = time.substring(15, 17);
+    String hourStr = time.substring(9, 11);
+    String minStr = time.substring(12, 14);
+    String secStr = time.substring(15, 17);
 
-    int hour   = hourStr.toInt();
+    int hour = hourStr.toInt();
     int minute = minStr.toInt();
     int second = secStr.toInt();
 
     // Berechne die Millisekunden seit Mitternacht
     unsigned long currentMillis = (hour * 3600 + minute * 60 + second) * 1000;
 
-    if (currentMillis < targetTimeToRestartESP32) {
+    if (currentMillis < targetTimeToRestartESP32)
+    {
         targetMillis = targetTimeToRestartESP32 - currentMillis;
-    } else {
-        targetMillis = dayMillis - (currentMillis - targetTimeToRestartESP32);  // Nächster Tag 4 Uhr
+    }
+    else
+    {
+        targetMillis = dayMillis - (currentMillis - targetTimeToRestartESP32);
     }
 
-    targetMillis += millis();  // Setze Zielzeit relativ zu millis()    
+    targetMillis += millis(); // Setze Zielzeit relativ zu millis()
 }
 
 void setup()
 {
-    SerialMon.begin(UART_BAUD);
-    while (!SerialMon) {};
+    Serial.begin(UART_BAUD);
+    while (!Serial)
+    {
+    };
+
+    HelperUtils::initEEPROM(config);
+
+    if (!HelperUtils::loadConfigFromEEPROM(config))
+    {
+        delay(5000);
+        Serial.println("Bitte Konfigurationsdaten eingeben:");
+        Serial.println("Format: apn=\"\";gprsUser=\"\";gprsPass=\"\";GSM_PIN=\"\";server=\"zk.de\";port=443;username=\"\";password=\"\";");
+
+        String inputString = "";
+        while (inputString.length() == 0)
+        {
+            if (Serial.available())
+            {
+                inputString = Serial.readStringUntil('\n');
+            }
+        }
+        HelperUtils::parseConfigString(inputString, config);
+        HelperUtils::saveConfigToEEPROM(config);
+    }
 
     initKeyPins();
 
@@ -132,20 +155,21 @@ void setup()
     modem.uploadLogs();
 
     LED_Strip.clear();
-      
 }
 
 void loop()
 {
-    if (millis() >= targetMillis) {
+    if (millis() >= targetMillis)
+    {
         Serial.println("Target time reached.");
         Serial.println("Uploading logs and restarting ESP32...");
         SPIFFSUtils::addLogEntry("ESP32 wird neu gestartet");
         LED_Strip.setStaticColor("blue");
-        while (!modem.uploadLogs()){
+        while (!modem.uploadLogs())
+        {
             delay(100);
         }
-        ESP.restart();  // ESP32 neustarten
+        ESP.restart(); // ESP32 neustarten
     }
     checkNFCTag();
 }
