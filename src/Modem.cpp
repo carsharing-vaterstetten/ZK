@@ -12,6 +12,12 @@ Modem::Modem() : modem(SerialAT), client(modem), http(client, config.server, por
 bool Modem::init(bool secoundTry)
 {
     SerialMon.println("Initializing modem...");
+
+    #ifdef TINY_GSM_T_PCIE
+        pinMode(POWER_PIN, OUTPUT);
+        digitalWrite(POWER_PIN, HIGH);
+    #endif
+    
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
     delay(1000);

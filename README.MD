@@ -29,8 +29,11 @@ Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP3
   - `PIN_TX`: 27
   - `PIN_RX`: 26
   - `PWR_PIN`: 4
+  - `POWER_PIN`: 25 (Notwendig für das T-PCIE-Board)
 
 - **NFC Modul Pins**:
+  - `NCF_SDA`: 21
+  - `NCF_SCL`: 22
   - `NFC_MISO`: 18
   - `NFC_MOSI`: 19
   - `NFC_SCLK`: 23
@@ -75,13 +78,20 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.4.0]
+
+#### Hinzugefügt
+
+- In der `Config.h`-Datei kann die Unterstützung für das `T-PCIE`-Board mit `#define TINY_GSM_T_PCIE` aktiviert werden.
+- Möglichkeit, das `Adafruit PN532` über I2C zu betreiben:
+  - Verwenden Sie `#define NFC_I2C`, `#define NFC_SDA`, `#define NFC_SCL`.
+
 ### [0.3.0]
 
 #### Breaking Changes
 
 - Die Einstellung zum Verbinden mit dem Server wurde von `Config.h` entfernt. Nun muss beim erste initialiserung des ESP32 folgende Zeichenkette in Serial Monitor eingegeben werden:
   - `apn="";gprsUser="";gprsPass="";GSM_PIN="";server="";port=;username="";password="";`
-
 
 ### [0.2.0]
 
