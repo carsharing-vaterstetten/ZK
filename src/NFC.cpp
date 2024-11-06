@@ -3,7 +3,11 @@
 
 #define SerialMon Serial
 
-NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS) {}
+#ifdef NCF_I2C
+    NFC::NFC() : nfc(NCF_SDA, NCF_SCL) {} 
+#else
+    NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS) {}
+#endif
 
 void NFC::init()
 {
