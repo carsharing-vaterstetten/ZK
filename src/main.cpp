@@ -25,8 +25,8 @@ void initKeyPins()
 // Wenn ja, wird je nach Zustand loggedIn auf true oder false gesetzt.
 void checkNFCTag()
 {
-    char *readValue = nfc.readTag();
-    if (strcmp(readValue, "") != 0)
+    String readValue = nfc.readTag();
+    if (readValue != "")
     {
         Serial.println(readValue);
         if (SPIFFSUtils::isRfidInSPIFFS(readValue))
@@ -57,10 +57,6 @@ void checkNFCTag()
             delay(2000);
         }
         LED_Strip.clear();
-    }
-    if (readValue != "")
-    {
-        delete[] readValue;
     }
 }
 

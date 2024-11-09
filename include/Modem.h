@@ -25,7 +25,7 @@ public:
 private:
     TinyGsm modem;
     TinyGsmClient client;
-    HttpClient http;
+    static HttpClient *http;
 };
 
 #endif

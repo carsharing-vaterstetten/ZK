@@ -4,9 +4,9 @@
 #define SerialMon Serial
 
 #ifdef NCF_I2C
-    NFC::NFC() : nfc(NCF_SDA, NCF_SCL) {} 
+NFC::NFC() : nfc(NCF_SDA, NCF_SCL) {}
 #else
-    NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS) {}
+NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS) {}
 #endif
 
 void NFC::init()
@@ -28,30 +28,28 @@ void NFC::init()
     SerialMon.print((versiondata >> 16) & 0xFF, DEC);
     SerialMon.print('.');
     SerialMon.println((versiondata >> 8) & 0xFF, DEC);
-    SerialMon.println("Waiting for a Card ...");
 }
 
-char *NFC::bytesToHexValue(uint8_t bytes[], int nLen)
+String NFC::bytesToHexValue(uint8_t bytes[], int nLen)
 {
-    int i = 0;
-    char OneByte[3];
-    char *chipValue = new char[nLen * 2 + 1];
-    chipValue[0] = '\0';
+    String chipValue = "";
 
-    for (i = 0; i < nLen; i++)
+    for (int i = 0; i < nLen; i++)
     {
+        char OneByte[3];
         sprintf(OneByte, "%02X", bytes[i]);
-        strcat(chipValue, OneByte);
+        chipValue += OneByte;
     }
+
     return chipValue;
 }
 
-char *NFC::readTag()
+String NFC::readTag()
 {
     uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t uidLength;
 
-    boolean success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 30); // 30ms timeout
+    boolean success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 1000);
 
     if (success)
     {

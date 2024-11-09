@@ -5,19 +5,21 @@
 #define SerialMon Serial
 #define SerialAT Serial1
 
+HttpClient *Modem::http = nullptr;
+
 extern Config config;
 
-Modem::Modem() : modem(SerialAT), client(modem), http(client, config.server, port) {}
+Modem::Modem() : modem(SerialAT), client(modem) {}
 
 bool Modem::init(bool secoundTry)
 {
     SerialMon.println("Initializing modem...");
 
-    #ifdef TINY_GSM_T_PCIE
-        pinMode(POWER_PIN, OUTPUT);
-        digitalWrite(POWER_PIN, HIGH);
-    #endif
-    
+#ifdef TINY_GSM_T_PCIE
+    pinMode(POWER_PIN, OUTPUT);
+    digitalWrite(POWER_PIN, HIGH);
+#endif
+
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
     delay(1000);
@@ -64,7 +66,7 @@ void Modem::end()
 {
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
-    http.stop();
+    http->stop();
     modem.gprsDisconnect();
     SerialMon.println("Modem disconnected");
 }
@@ -72,31 +74,35 @@ void Modem::end()
 int Modem::sendRequest(String path, String method, String body)
 {
     int err = 0;
-    http.connectionKeepAlive();
-    http.beginRequest();
+    if (http == nullptr)
+    {
+        http = new HttpClient(client, config.server, config.port);
+    }
+    http->connectionKeepAlive();
+    http->beginRequest();
 
     if (method == "GET")
     {
-        err = http.get(path);
-        http.sendBasicAuth(config.username, config.password);
+        err = http->get(path);
+        http->sendBasicAuth(config.username, config.password);
     }
     else if (method == "POST")
     {
-        err = http.post(path);
-        http.sendBasicAuth(config.username, config.password);
-        http.sendHeader("Content-Type", "application/json");
-        http.sendHeader("Content-Length", body.length());
-        http.beginBody();
+        err = http->post(path);
+        http->sendBasicAuth(config.username, config.password);
+        http->sendHeader("Content-Type", "application/json");
+        http->sendHeader("Content-Length", body.length());
+        http->beginBody();
 
         const size_t chunkSize = 512;
         size_t bodyLength = body.length();
         for (size_t i = 0; i < bodyLength; i += chunkSize)
         {
             String chunk = body.substring(i, min(i + chunkSize, bodyLength));
-            http.print(chunk);
+            http->print(chunk);
         }
     }
-    http.endRequest();
+    http->endRequest();
     return err;
 }
 
@@ -120,32 +126,32 @@ String *Modem::getRfids(int &arraySize)
         return nullptr;
     }
 
-    int status = http.responseStatusCode();
+    int status = http->responseStatusCode();
     SerialMon.print(F("Response status code: "));
     SerialMon.println(status);
     if (!status)
     {
         SerialMon.println(F("no response"));
         delay(10000);
-        http.stop();
+        http->stop();
         return nullptr;
     }
 
     if (status != 200)
     {
         SerialMon.println("unerwartete Antwort");
-        http.stop();
+        http->stop();
         return nullptr;
     }
 
     SerialMon.println(F("Response Headers:"));
-    while (http.headerAvailable())
+    while (http->headerAvailable())
     {
-        String headerName = http.readHeaderName();
-        String headerValue = http.readHeaderValue();
+        String headerName = http->readHeaderName();
+        String headerValue = http->readHeaderValue();
         SerialMon.println("    " + headerName + " : " + headerValue);
     }
-    int contentLength = http.contentLength();
+    int contentLength = http->contentLength();
     String responseBody = "";
     if (contentLength > 0)
     {
@@ -153,7 +159,7 @@ String *Modem::getRfids(int &arraySize)
         char buffer[128];
         while (readBytes < contentLength)
         {
-            int bytesToRead = http.readBytes(buffer, sizeof(buffer) - 1);
+            int bytesToRead = http->readBytes(buffer, sizeof(buffer) - 1);
             readBytes += bytesToRead;
             buffer[bytesToRead] = '\0';
             responseBody += buffer;
@@ -214,35 +220,35 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
         SerialMon.println(err);
         return;
     }
-    int status = http.responseStatusCode();
+    int status = http->responseStatusCode();
     SerialMon.print(F("Response status code: "));
     SerialMon.println(status);
 
     if (!status)
     {
         SerialMon.println(F("no response"));
-        http.stop();
+        http->stop();
         return;
     }
     if (status == 200)
     {
         SerialMon.println("kein Update notwendig");
-        http.stop();
+        http->stop();
         return;
     }
     if (status != 210)
     {
         SerialMon.println("unerwartete Antwort");
-        http.stop();
+        http->stop();
         return;
     }
     else
     {
         SerialMon.println(F("Response Headers:"));
-        while (http.headerAvailable())
+        while (http->headerAvailable())
         {
-            String headerName = http.readHeaderName();
-            String headerValue = http.readHeaderValue();
+            String headerName = http->readHeaderName();
+            String headerValue = http->readHeaderValue();
             SerialMon.println("    " + headerName + " : " + headerValue);
         }
 
@@ -263,16 +269,16 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
         }
 
         SerialMon.println("Getting Firmware data starting ...");
-        int contentLength = http.contentLength();
+        int contentLength = http->contentLength();
         const size_t bufferSize = 2048;
         uint8_t buffer[bufferSize];
         size_t totalBytesRead = 0;
         unsigned long startTime = millis();
-        while (http.connected() || http.available())
+        while (http->connected() || http->available())
         {
-            if (http.available())
+            if (http->available())
             {
-                size_t bytesRead = http.readBytes(buffer, bufferSize);
+                size_t bytesRead = http->readBytes(buffer, bufferSize);
                 file.write(buffer, bytesRead);
                 totalBytesRead += bytesRead;
                 float percentage = ((float)totalBytesRead * 100) / contentLength;
@@ -283,7 +289,7 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
         SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
         SerialMon.printf("\rProgress: %.2f%%", (float)totalBytesRead / contentLength * 100);
         file.close();
-        http.stop();
+        http->stop();
         SerialMon.println("File saved successfully");
         SPIFFSUtils::performOTAUpdateFromSPIFFS();
     }
@@ -324,39 +330,39 @@ bool Modem::uploadLogs()
         return true;
     }
 
-    int status = http.responseStatusCode();
+    int status = http->responseStatusCode();
     SerialMon.print(F("Response status code: "));
     SerialMon.println(status);
 
     if (!status)
     {
         SerialMon.println(F("no response"));
-        http.stop();
+        http->stop();
         return true;
     }
 
     if (status != 201)
     {
         SerialMon.println("unerwartete Antwort");
-        http.stop();
+        http->stop();
         return true;
     }
 
     SerialMon.println(F("Response Headers:"));
-    while (http.headerAvailable())
+    while (http->headerAvailable())
     {
-        String headerName = http.readHeaderName();
-        String headerValue = http.readHeaderValue();
+        String headerName = http->readHeaderName();
+        String headerValue = http->readHeaderValue();
         SerialMon.println("    " + headerName + " : " + headerValue);
     }
 
     SerialMon.println(F("Response Body:"));
-    while (http.available())
+    while (http->available())
     {
-        SerialMon.write(http.read());
+        SerialMon.write(http->read());
     }
 
-    http.stop();
+    http->stop();
     file.close();
     SPIFFS.remove(LOG_FILE_NAME);
     SerialMon.println("Logs uploaded successfully");

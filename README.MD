@@ -78,6 +78,13 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.4.1]
+
+#### Verändert
+
+- Überarbeitung der Erstellung des `HTTP-Client`-Objekts.
+- Anpassung der NFC-Lese-Funktionen: Diese verwenden jetzt `String`-Objekte anstelle von `char-Arrays`.
+
 ### [0.4.0]
 
 #### Hinzugefügt
