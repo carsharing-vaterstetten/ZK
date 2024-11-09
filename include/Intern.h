@@ -2,7 +2,7 @@
 #ifndef Intern_H
 #define Intern_H
 
-#define FIRMWARE_VERSION "0.4.0"
+#define FIRMWARE_VERSION "0.4.1"
 #define RFID_FILE_NAME "/rfids.txt"
 #define FIRMWARE_FILE_NAME "/firmware.bin"
 #define LOG_FILE_NAME "/logs.json"
@@ -11,10 +11,6 @@ extern String MAC_ADDRESS;
 
 #define CONFIG_START_ADDRESS 0
 #define CONFIG_VERSION 1
-
-// FIXME: Port aus config lesen hat beim http(client, config.server, config.port) nicht funktioniert...
-// Ersmal als globale Variable speichern.
-const int port = 8080; 
 
 struct Config
 {

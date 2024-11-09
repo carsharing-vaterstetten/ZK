@@ -11,8 +11,8 @@ class NFC
 public:
     NFC();
     void init();
-    char *readTag();
-    char *bytesToHexValue(uint8_t bytes[], int nLen);
+    String readTag();
+    String bytesToHexValue(uint8_t bytes[], int nLen);
 
 private:
     Adafruit_PN532 nfc;
