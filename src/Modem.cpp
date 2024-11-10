@@ -284,6 +284,10 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
                 float percentage = ((float)totalBytesRead * 100) / contentLength;
                 unsigned long elapsedTime = millis() - startTime;
                 SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
+                if (totalBytesRead >= contentLength)
+                {
+                    break;
+                }                
             }
         }
         SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
