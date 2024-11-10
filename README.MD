@@ -78,6 +78,12 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.4.2]
+
+#### Verändert
+
+- Es wird sichergestellt, dass der Firmware-Update-Prozess korrekt beendet wird, wenn alle Bytes gelesen wurden
+
 ### [0.4.1]
 
 #### Verändert
