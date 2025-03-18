@@ -78,6 +78,12 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.4.3]
+
+#### Verändert
+
+- Falls der interne Speicher beim Hochfahren nicht benutzt werden kann wird dieser formatiert
+
 ### [0.4.2]
 
 #### Verändert

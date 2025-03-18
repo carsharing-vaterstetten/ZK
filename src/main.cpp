@@ -117,13 +117,20 @@ void setup()
         HelperUtils::saveConfigToEEPROM(config);
     }
 
+    if (!SPIFFS.begin())
+    {
+        Serial.println("SPIFFS Mount Failed.");
+        if (!SPIFFS.format()) {
+            Serial.println("Format ging auch nicht! Tja");
+        }
+    }
     initKeyPins();
 
     LED_Strip.init();
     LED_Strip.setStaticColor("white");
 
     MAC_ADDRESS = HelperUtils::getMacAddress();
-
+    
     modem.init();
     initTime();
 
