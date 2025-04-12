@@ -78,6 +78,14 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.4.4]
+
+#### Verändert
+
+- Uhrzeit für Reboot geändert auf 03:30 Uhr
+- Pins auf neues Shield angepasst
+- modem delay reduziert
+
 ### [0.4.3]
 
 #### Verändert

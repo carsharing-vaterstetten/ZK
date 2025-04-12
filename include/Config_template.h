@@ -9,8 +9,8 @@
 #define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1Kb
 
-#define LED_PIN 21
-#define LED_COUNT 3
+#define LED_PIN 12
+#define LED_COUNT 4
 
 // Modem Pins
 #define PIN_TX 27
@@ -37,7 +37,7 @@ extern byte NETWORK_MODE;
  */
 extern byte PREFERRED_MODE;
 
-#define NCF_I2C
+//#define NCF_I2C
 
 // NFC Modul Pins
 #define NFC_MOSI 23
@@ -49,6 +49,6 @@ extern byte PREFERRED_MODE;
 #define NCF_SCL 22
 
 // ESP32 startet sich jeden tag um die Uhrzeit neu
-const unsigned long targetTimeToRestartESP32 = (19 * 3600 + 30 * 60) * 1000; // 19:30 Uhr
+const unsigned long targetTimeToRestartESP32 = (03 * 3600 + 30 * 60) * 1000; // 03:30 Uhr
 
 #endif
