@@ -18,6 +18,7 @@ public:
     static bool loadConfigFromEEPROM(Config &config);
     static void parseConfigString(String &inputString, Config &config);
     static void resetEEPROM();
+    static String getResetReasonHumanReadable(esp_reset_reason_t reset_reason);
 };
 
 #endif
