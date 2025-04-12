@@ -107,3 +107,32 @@ void HelperUtils::resetEEPROM() {
   EEPROM.commit();
   Serial.println("EEPROM wurde zurückgesetzt.");
 }
+
+String HelperUtils::getResetReasonHumanReadable(const esp_reset_reason_t reset_reason) {
+    switch (reset_reason) {
+        case ESP_RST_POWERON:
+            return "Reset due to power-on event";
+        case ESP_RST_BROWNOUT:
+            return "Brownout reset";
+        case ESP_RST_SDIO:
+            return "Reset over SDIO";
+        case ESP_RST_PANIC:
+            return "Software reset due to exception/panic";
+        case ESP_RST_INT_WDT:
+            return "Reset due to interrupt watchdog";
+        case ESP_RST_TASK_WDT:
+            return "Reset due to task watchdog";
+        case ESP_RST_WDT:
+            return "General watchdog reset";
+        case ESP_RST_DEEPSLEEP:
+            return "Reset after exiting deep sleep mode";
+        case ESP_RST_EXT:
+            return "Reset by external pin";
+        case ESP_RST_UNKNOWN:
+            return "Reset reason could not be determined";
+        case ESP_RST_SW:
+            return "Software reset via esp_restart";
+        default:
+            return "Unknown reset reason";
+    }
+}

@@ -4,6 +4,7 @@
 #include <SPIFFSUtils.h>
 #include <HelperUtils.h>
 #include <LED.h>
+#include <esp_system.h>
 
 bool loggedIn = false;
 unsigned long targetMillis;
@@ -96,6 +97,11 @@ void setup()
     while (!Serial)
     {
     };
+
+    const esp_reset_reason_t reset_reason = esp_reset_reason();
+
+    Serial.print("ESP32 startup. Reset Reason: ");
+    Serial.println(HelperUtils::getResetReasonHumanReadable(reset_reason));
 
     HelperUtils::initEEPROM(config);
 
