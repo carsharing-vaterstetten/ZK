@@ -18,17 +18,22 @@ bool Modem::init(bool secoundTry)
 #ifdef TINY_GSM_T_PCIE
     pinMode(POWER_PIN, OUTPUT);
     digitalWrite(POWER_PIN, HIGH);
+    SerialMon.println("Set POWER_PIN HIGH");
 #endif
 
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
+    SerialMon.println("Set PWR_PIN LOW");
     delay(1000);
     digitalWrite(PWR_PIN, HIGH);
+    SerialMon.println("Set PWR_PIN HIGH");
 
     SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-
+    SerialMon.println("SerialAT started");
     sleep(1);
+
     modem.restart();
+    SerialMon.println("Modem restarted");
     sleep(1);
 
     String modemInfo = modem.getModemInfo();

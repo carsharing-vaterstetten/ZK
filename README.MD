@@ -78,6 +78,7 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+
 ### [0.5.0]
 
 #### Verändert
@@ -86,6 +87,14 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
     - Der Arduino setzt den Watchdog regelmäßig alle `HW_WATCHDOG_RESET_DELAY_MS` = 100ms zurück. Der tatsächliche Timeout
       liegt bei `HW_WATCHDOG_TIMEOUT` = 300s (5min) – wird der Watchdog innerhalb dieser Zeit nicht zurückgesetzt,
       erfolgt ein automatischer Reset.
+
+### [0.4.4]
+
+#### Verändert
+
+- Uhrzeit für Reboot geändert auf 03:30 Uhr
+- Pins auf neues Shield angepasst
+- modem delay reduziert
 
 ### [0.4.3]
 
