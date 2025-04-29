@@ -8,9 +8,6 @@
 #include <esp_system.h>
 #include <esp_task_wdt.h>
 
-#define HW_WATCHDOG_TIMEOUT (300) // [Seconds], 5mins
-#define HW_WATCHDOG_RESET_DELAY_MS (100) // [Milliseconds]
-
 bool loggedIn = false;
 unsigned long nextWatchdogResetMs;
 unsigned long targetMillis;

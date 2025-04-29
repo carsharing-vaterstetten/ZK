@@ -51,4 +51,7 @@ extern byte PREFERRED_MODE;
 // ESP32 startet sich jeden tag um die Uhrzeit neu
 const unsigned long targetTimeToRestartESP32 = (19 * 3600 + 30 * 60) * 1000; // 19:30 Uhr
 
+#define HW_WATCHDOG_TIMEOUT (300) // [Sekunden] Maximal erlaubte Zeit ohne Reset – nach 5 Minuten startet der HW-Watchdog den Arduino neu
+#define HW_WATCHDOG_RESET_DELAY_MS (100) // [Millisekunden] Der Arduino muss spätestens alle 100ms den Watchdog zurücksetzen, damit der 5-Minuten-Timeout nicht abläuft
+
 #endif
