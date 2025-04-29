@@ -78,6 +78,15 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.5.0]
+
+#### Verändert
+
+- Ein Hardware-Watchdog wurde aktiviert, um den Arduino bei unerwartetem Verhalten automatisch neu zu starten.
+    - Der Arduino setzt den Watchdog regelmäßig alle `HW_WATCHDOG_RESET_DELAY_MS` = 100ms zurück. Der tatsächliche Timeout
+      liegt bei `HW_WATCHDOG_TIMEOUT` = 300s (5min) – wird der Watchdog innerhalb dieser Zeit nicht zurückgesetzt,
+      erfolgt ein automatischer Reset.
+
 ### [0.4.3]
 
 #### Verändert
