@@ -4,8 +4,12 @@
 #include <SPIFFSUtils.h>
 #include <HelperUtils.h>
 #include <LED.h>
+#include <esp32-hal.h>
+#include <esp_system.h>
+#include <esp_task_wdt.h>
 
 bool loggedIn = false;
+unsigned long nextWatchdogResetMs;
 unsigned long targetMillis;
 const unsigned long dayMillis = 24 * 60 * 60 * 1000; // Ein Tag in Millisekunden
 String MAC_ADDRESS;
@@ -90,12 +94,67 @@ void initTime()
     targetMillis += millis(); // Setze Zielzeit relativ zu millis()
 }
 
+void initWatchdog() {
+    // Set hw watchdog timeout. The watchdog will reset the device after this timeout
+
+    Serial.print("Initializing the Task Watchdog Timer... ");
+    const esp_err_t watchdog_init_err = esp_task_wdt_init(HW_WATCHDOG_TIMEOUT, true);
+
+    switch (watchdog_init_err) {
+        case ESP_OK:
+            Serial.println("Success");
+            break;
+        case ESP_ERR_NO_MEM:
+            Serial.println("Failed due to lack of memory!");
+            break;
+        default:
+            Serial.println("Unknown status!");
+            break;
+    }
+
+    // Add the current task (main loop) to be monitored by the watchdog.
+    // This ensures that if the main loop doesn't reset the watchdog in time,
+    // the ESP32 will reset itself.
+
+    Serial.print("Subscribing the current task to the Task Watchdog Timer... ");
+
+    const esp_err_t error_code = esp_task_wdt_add(nullptr);
+
+    switch (error_code) {
+        case ESP_OK:
+            Serial.println("Success");
+            break;
+        case ESP_ERR_INVALID_ARG:
+            Serial.println("Error, the task is already subscribed!");
+            break;
+        case ESP_ERR_NO_MEM:
+            Serial.println("Error, could not subscribe the task due to lack of memory!");
+            break;
+        case ESP_ERR_INVALID_STATE:
+            Serial.println("Error, the Task Watchdog Timer has not been initialized yet!");
+            break;
+        default:
+            Serial.println("Unknown status!");
+            break;
+    }
+}
+
 void setup()
 {
     Serial.begin(UART_BAUD);
     while (!Serial)
     {
     };
+
+    const esp_reset_reason_t reset_reason = esp_reset_reason();
+
+    Serial.print("ESP32 startup. Reset Reason: ");
+    Serial.println(HelperUtils::getResetReasonHumanReadable(reset_reason));
+
+    // Initialize the watchdog.
+    // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
+    // That could possibly lead to an infinite resetting loop.
+    initWatchdog();
 
     HelperUtils::initEEPROM(config);
 
@@ -160,10 +219,13 @@ void setup()
     LED_Strip.clear();
 }
 
-void loop()
-{
-    if (millis() >= targetMillis)
-    {
+void loop() {
+    if (millis() >= nextWatchdogResetMs) {
+        esp_task_wdt_reset(); // Reset the watchdog timer
+        nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
+    }
+
+    if (millis() >= targetMillis) {
         Serial.println("Target time reached.");
         Serial.println("Uploading logs and restarting ESP32...");
         SPIFFSUtils::addLogEntry("ESP32 wird neu gestartet");
