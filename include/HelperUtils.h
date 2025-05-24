@@ -19,6 +19,8 @@ public:
     static void parseConfigString(String &inputString, Config &config);
     static void resetEEPROM();
     static String getResetReasonHumanReadable(esp_reset_reason_t reset_reason);
+    static esp_err_t setWatchdog(uint32_t watchdog_timeout);
+    static esp_err_t subscribeTaskToWatchdog();
 };
 
 #endif
