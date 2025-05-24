@@ -209,6 +209,7 @@ void printPercent(uint32_t readLength, uint32_t contentLength)
     }
 }
 
+/// Make sure to increase the HW Watchdog timeout before calling this function or use `handleFirmwareUpdateWithWatchdog()`
 void Modem::firmwareCheckAndUpdateIfNeeded()
 {
     JsonDocument body;
@@ -301,6 +302,25 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
         http->stop();
         SerialMon.println("File saved successfully");
         SPIFFSUtils::performOTAUpdateFromSPIFFS();
+    }
+}
+
+void Modem::handleFirmwareUpdateWithWatchdog() {
+
+    // Increase the HW Watchdog timeout to allow for longer OTA updates
+
+    esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
+    if (hwd_err != ESP_OK) {
+        SerialMon.println("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
+        return;
+    }
+
+    firmwareCheckAndUpdateIfNeeded();
+
+    // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
+    hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
+    if (hwd_err != ESP_OK) {
+        SerialMon.println("Failed to reset HW Watchdog timeout after OTA update.");
     }
 }
 

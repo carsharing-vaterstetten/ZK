@@ -155,7 +155,7 @@ void setup()
     SPIFFSUtils::addLogEntry("ESP32 wird initialisiert");
 
     LED_Strip.setStaticColor("purple");
-    modem.firmwareCheckAndUpdateIfNeeded();
+    modem.handleFirmwareUpdateWithWatchdog();
 
     LED_Strip.setStaticColor("orange");
 
