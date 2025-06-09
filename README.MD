@@ -26,12 +26,14 @@ Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP3
 - Diese können in der `include/Config.h` Datei angepasst werden.
 
 - **Modem Pins**:
+
   - `PIN_TX`: 27
   - `PIN_RX`: 26
   - `PWR_PIN`: 4
   - `POWER_PIN`: 25 (Notwendig für das T-PCIE-Board)
 
 - **NFC Modul Pins**:
+
   - `NCF_SDA`: 21
   - `NCF_SCL`: 22
   - `NFC_MISO`: 18
@@ -40,13 +42,14 @@ Dieses Projekt implementiert ein RFID-Zugangskontrollsystem auf Basis eines ESP3
   - `NFC_SS`: 5
 
 - **LED Pins**:
+
   - `LED_PIN`: 12
   - `LED_COUNT`: 3
 
 - **Schlüssel Pins**:
   - `OPEN_KEY`: 15
   - `CLOSE_KEY`: 14
-  > An diese Pins werden nach dem Lesen eines RFID-Tags Signale gesendet, um den Zugang zu gewähren oder zu verweigern.
+    > An diese Pins werden nach dem Lesen eines RFID-Tags Signale gesendet, um den Zugang zu gewähren oder zu verweigern.
 
 ## Software
 
@@ -78,15 +81,22 @@ Die folgenden Bibliotheken werden verwendet und sind in der `platformio.ini` Dat
 
 ## Change Log
 
+### [0.5.1]
+
+#### Verändert
+
+- Es wurde ein zweiter timer für den Hardware-Watchdog hinzugefügt welcher bei dem OverTheAir (OTA) Update aktiv wird. Somit kann der Download auch mal länger als die Zeit für den normalen Timer dauern.
+  - Sobald der Firmwarecheck feststellt das ein Update nötig ist wird das Intervall auf `HW_WATCHDOG_OTA_UPDATE_TIMEOUT` = 3600 ms (1 Stunde) gesetzt.
+  - Unanhängig davon ob das Update erfogreich war oder nicht wird der Watchdogtimer anschießend wieder auf `HW_WATCHDOG_DEFAULT_TIMEOUT` gesetzt.
 
 ### [0.5.0]
 
 #### Verändert
 
 - Ein Hardware-Watchdog wurde aktiviert, um den Arduino bei unerwartetem Verhalten automatisch neu zu starten.
-    - Der Arduino setzt den Watchdog regelmäßig alle `HW_WATCHDOG_RESET_DELAY_MS` = 100ms zurück. Der tatsächliche Timeout
-      liegt bei `HW_WATCHDOG_TIMEOUT` = 300s (5min) – wird der Watchdog innerhalb dieser Zeit nicht zurückgesetzt,
-      erfolgt ein automatischer Reset.
+  - Der Arduino setzt den Watchdog regelmäßig alle `HW_WATCHDOG_RESET_DELAY_MS` = 100ms zurück.
+  - Der tatsächliche Timeout liegt bei `HW_WATCHDOG_DEFAULT_TIMEOUT` = 300s (5min) – wird der Watchdog innerhalb dieser Zeit nicht zurückgesetzt,
+    erfolgt ein automatischer Reset
 
 ### [0.4.4]
 
