@@ -20,6 +20,7 @@ public:
     int sendRequest(String path, String method, String body = "");
     String *getRfids(int &arraySize);
     void firmwareCheckAndUpdateIfNeeded();
+    void handleFirmwareUpdateWithWatchdog();
     bool uploadLogs();
 
 private:

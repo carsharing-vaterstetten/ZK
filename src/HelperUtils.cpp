@@ -2,8 +2,9 @@
 
 #include "HelperUtils.h"
 
-String HelperUtils::toUpperCase(const String &str)
-{
+#include <esp_task_wdt.h>
+
+String HelperUtils::toUpperCase(const String &str) {
     String upperStr = str;
     for (int i = 0; i < upperStr.length(); i++)
     {
@@ -135,4 +136,51 @@ String HelperUtils::getResetReasonHumanReadable(const esp_reset_reason_t reset_r
         default:
             return "Unknown reset reason";
     }
+}
+
+/// This function configures and initializes the TWDT. If the TWDT is already initialized when this function is called, this function will update the TWDT's timeout period
+/// @param watchdog_timeout Timeout period of TWDT in seconds
+esp_err_t HelperUtils::setWatchdog(const uint32_t watchdog_timeout) {
+    Serial.print("Initializing the Task Watchdog Timer... ");
+    const esp_err_t watchdog_init_err = esp_task_wdt_init(watchdog_timeout, true);
+
+    switch (watchdog_init_err) {
+        case ESP_OK:
+            Serial.println("Success");
+            break;
+        case ESP_ERR_NO_MEM:
+            Serial.println("Failed due to lack of memory!");
+            return watchdog_init_err;
+        default:
+            Serial.println("Unknown status!");
+            return watchdog_init_err;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t HelperUtils::subscribeTaskToWatchdog() {
+    Serial.print("Subscribing the current task to the Task Watchdog Timer... ");
+
+    const esp_err_t task_wdt_add_error = esp_task_wdt_add(nullptr);
+
+    switch (task_wdt_add_error) {
+        case ESP_OK:
+            Serial.println("Success");
+            break;
+        case ESP_ERR_INVALID_ARG:
+            Serial.println("Error, the task is already subscribed!");
+            return task_wdt_add_error;
+        case ESP_ERR_NO_MEM:
+            Serial.println("Error, could not subscribe the task due to lack of memory!");
+            return task_wdt_add_error;
+        case ESP_ERR_INVALID_STATE:
+            Serial.println("Error, the Task Watchdog Timer has not been initialized yet!");
+            return task_wdt_add_error;
+        default:
+            Serial.println("Unknown status!");
+            return task_wdt_add_error;
+    }
+
+    return ESP_OK;
 }

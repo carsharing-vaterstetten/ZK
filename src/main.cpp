@@ -94,51 +94,6 @@ void initTime()
     targetMillis += millis(); // Setze Zielzeit relativ zu millis()
 }
 
-void initWatchdog() {
-    // Set hw watchdog timeout. The watchdog will reset the device after this timeout
-
-    Serial.print("Initializing the Task Watchdog Timer... ");
-    const esp_err_t watchdog_init_err = esp_task_wdt_init(HW_WATCHDOG_TIMEOUT, true);
-
-    switch (watchdog_init_err) {
-        case ESP_OK:
-            Serial.println("Success");
-            break;
-        case ESP_ERR_NO_MEM:
-            Serial.println("Failed due to lack of memory!");
-            break;
-        default:
-            Serial.println("Unknown status!");
-            break;
-    }
-
-    // Add the current task (main loop) to be monitored by the watchdog.
-    // This ensures that if the main loop doesn't reset the watchdog in time,
-    // the ESP32 will reset itself.
-
-    Serial.print("Subscribing the current task to the Task Watchdog Timer... ");
-
-    const esp_err_t error_code = esp_task_wdt_add(nullptr);
-
-    switch (error_code) {
-        case ESP_OK:
-            Serial.println("Success");
-            break;
-        case ESP_ERR_INVALID_ARG:
-            Serial.println("Error, the task is already subscribed!");
-            break;
-        case ESP_ERR_NO_MEM:
-            Serial.println("Error, could not subscribe the task due to lack of memory!");
-            break;
-        case ESP_ERR_INVALID_STATE:
-            Serial.println("Error, the Task Watchdog Timer has not been initialized yet!");
-            break;
-        default:
-            Serial.println("Unknown status!");
-            break;
-    }
-}
-
 void setup()
 {
     Serial.begin(UART_BAUD);
@@ -154,7 +109,11 @@ void setup()
     // Initialize the watchdog.
     // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
     // That could possibly lead to an infinite resetting loop.
-    initWatchdog();
+    HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
+    // Add the current task to be monitored by the watchdog.
+    // This ensures that if the main loop doesn't reset the watchdog in time,
+    // the ESP32 will reset itself.
+    HelperUtils::subscribeTaskToWatchdog();
 
     HelperUtils::initEEPROM(config);
 
@@ -196,7 +155,7 @@ void setup()
     SPIFFSUtils::addLogEntry("ESP32 wird initialisiert");
 
     LED_Strip.setStaticColor("purple");
-    modem.firmwareCheckAndUpdateIfNeeded();
+    modem.handleFirmwareUpdateWithWatchdog();
 
     LED_Strip.setStaticColor("orange");
 
