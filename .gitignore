@@ -1,4 +1,5 @@
 .pio
 .vscode/**
-config.h
+include/Config.h
 .DS_Store
+.idea
