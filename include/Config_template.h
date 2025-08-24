@@ -9,6 +9,12 @@
 #define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1Kb
 
+#define GPS_UPDATE_INTERVAL 500 // ms
+// GPS log backend credentials
+#define GPS_BACKEND_USERNAME ""
+#define GPS_BACKEND_PASSWORD ""
+#define GPS_BACKEND_SERVER_NAME ""
+
 #define LED_PIN 12
 #define LED_COUNT 4
 

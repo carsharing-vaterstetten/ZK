@@ -6,6 +6,7 @@
 #define RFID_FILE_NAME "/rfids.txt"
 #define FIRMWARE_FILE_NAME "/firmware.bin"
 #define LOG_FILE_NAME "/logs.json"
+#define GPS_LOG_FILE_NAME "/gps.txt"
 
 extern String MAC_ADDRESS;
 

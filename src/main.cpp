@@ -10,6 +10,8 @@
 
 bool loggedIn = false;
 unsigned long nextWatchdogResetMs;
+unsigned long lastGPSUpdate = 0;
+unsigned long lastGPSUpload = 0;
 unsigned long targetMillis;
 const unsigned long dayMillis = 24 * 60 * 60 * 1000; // Ein Tag in Millisekunden
 String MAC_ADDRESS;
@@ -66,7 +68,6 @@ void checkNFCTag()
 
 void initTime()
 {
-
     String time = modem.getLocalTime();
     Serial.println("Local Time: " + time);
 
@@ -121,7 +122,8 @@ void setup()
     {
         delay(5000);
         Serial.println("Bitte Konfigurationsdaten eingeben:");
-        Serial.println("Format: apn=\"\";gprsUser=\"\";gprsPass=\"\";GSM_PIN=\"\";server=\"zk.de\";port=443;username=\"\";password=\"\";");
+        Serial.println(
+            "Format: apn=\"\";gprsUser=\"\";gprsPass=\"\";GSM_PIN=\"\";server=\"zk.de\";port=443;username=\"\";password=\"\";");
 
         String inputString = "";
         while (inputString.length() == 0)
@@ -138,7 +140,8 @@ void setup()
     if (!SPIFFS.begin())
     {
         Serial.println("SPIFFS Mount Failed.");
-        if (!SPIFFS.format()) {
+        if (!SPIFFS.format())
+        {
             Serial.println("Format ging auch nicht! Tja");
         }
     }
@@ -148,7 +151,7 @@ void setup()
     LED_Strip.setStaticColor("white");
 
     MAC_ADDRESS = HelperUtils::getMacAddress();
-    
+
     modem.init();
     initTime();
 
@@ -160,7 +163,7 @@ void setup()
     LED_Strip.setStaticColor("orange");
 
     int arraySize;
-    String *rfids = modem.getRfids(arraySize);
+    String* rfids = modem.getRfids(arraySize);
 
     if (rfids != nullptr)
     {
@@ -170,6 +173,8 @@ void setup()
 
     nfc.init();
 
+    modem.enableGPS();
+
     SPIFFSUtils::addLogEntry("ESP32 wurde fertig initialisiert");
 
     LED_Strip.setStaticColor("blue");
@@ -178,13 +183,34 @@ void setup()
     LED_Strip.clear();
 }
 
-void loop() {
-    if (millis() >= nextWatchdogResetMs) {
+void loop()
+{
+    if (millis() >= nextWatchdogResetMs)
+    {
         esp_task_wdt_reset(); // Reset the watchdog timer
         nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
     }
 
-    if (millis() >= targetMillis) {
+    if (millis() >= lastGPSUpdate + GPS_UPDATE_INTERVAL)
+    {
+        String rawGPS;
+        if (modem.getGPSRaw(&rawGPS))
+        {
+            Serial.print("Raw GPS data: ");
+            Serial.println(rawGPS);
+            SPIFFSUtils::addGPSEntry(rawGPS);
+        }
+        lastGPSUpdate = millis();
+    }
+
+    if (millis() >= lastGPSUpload + 60 * 1000)
+    {
+        modem.uploadGPSLog();
+        lastGPSUpload = millis();
+    }
+
+    if (millis() >= targetMillis)
+    {
         Serial.println("Target time reached.");
         Serial.println("Uploading logs and restarting ESP32...");
         SPIFFSUtils::addLogEntry("ESP32 wird neu gestartet");
@@ -193,7 +219,9 @@ void loop() {
         {
             delay(100);
         }
+        modem.uploadGPSLogAndDelete(true);
         ESP.restart(); // ESP32 neustarten
     }
+
     checkNFCTag();
 }

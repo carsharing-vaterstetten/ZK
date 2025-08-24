@@ -2,14 +2,18 @@
 
 #include "Modem.h"
 
+#include "GPSUtils.h"
+
 #define SerialMon Serial
 #define SerialAT Serial1
 
-HttpClient *Modem::http = nullptr;
+HttpClient* Modem::http = nullptr;
 
 extern Config config;
 
-Modem::Modem() : modem(SerialAT), client(modem) {}
+Modem::Modem() : modem(SerialAT), client(modem)
+{
+}
 
 bool Modem::init(bool secoundTry)
 {
@@ -119,7 +123,7 @@ String Modem::getLocalTime()
     return time;
 }
 
-String *Modem::getRfids(int &arraySize)
+String* Modem::getRfids(int& arraySize)
 {
     SerialMon.print(F("Performing HTTPS GET request... "));
     int err = sendRequest("/rfids/", "GET");
@@ -185,7 +189,7 @@ String *Modem::getRfids(int &arraySize)
     JsonArray array = doc.as<JsonArray>();
 
     arraySize = array.size();
-    String *rfidArray = new String[arraySize];
+    String* rfidArray = new String[arraySize];
 
     for (int i = 0; i < arraySize; i++)
     {
@@ -289,11 +293,12 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
                 totalBytesRead += bytesRead;
                 float percentage = ((float)totalBytesRead * 100) / contentLength;
                 unsigned long elapsedTime = millis() - startTime;
-                SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
+                SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage,
+                                 (float)totalBytesRead / elapsedTime, elapsedTime);
                 if (totalBytesRead >= contentLength)
                 {
                     break;
-                }                
+                }
             }
         }
         SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
@@ -305,12 +310,13 @@ void Modem::firmwareCheckAndUpdateIfNeeded()
     }
 }
 
-void Modem::handleFirmwareUpdateWithWatchdog() {
-
+void Modem::handleFirmwareUpdateWithWatchdog()
+{
     // Increase the HW Watchdog timeout to allow for longer OTA updates
 
     esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
-    if (hwd_err != ESP_OK) {
+    if (hwd_err != ESP_OK)
+    {
         SerialMon.println("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
         return;
     }
@@ -319,7 +325,8 @@ void Modem::handleFirmwareUpdateWithWatchdog() {
 
     // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
     hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
-    if (hwd_err != ESP_OK) {
+    if (hwd_err != ESP_OK)
+    {
         SerialMon.println("Failed to reset HW Watchdog timeout after OTA update.");
     }
 }
@@ -396,4 +403,131 @@ bool Modem::uploadLogs()
     SPIFFS.remove(LOG_FILE_NAME);
     SerialMon.println("Logs uploaded successfully");
     return true;
+}
+
+bool Modem::uploadGPSLog()
+{
+    Serial.println("Uploading GPS log...");
+
+    HttpClient gpsUploadHttp(client, GPS_BACKEND_SERVER_NAME, 80);
+
+    File file = SPIFFS.open(GPS_LOG_FILE_NAME, "r");
+
+    if (!file)
+    {
+        Serial.println("Failed to open GPS log file");
+        return false;
+    }
+
+    gpsUploadHttp.beginRequest();
+    gpsUploadHttp.post("/upload-gps-log"); // endpoint path
+    gpsUploadHttp.sendBasicAuth(GPS_BACKEND_USERNAME, GPS_BACKEND_PASSWORD);
+    gpsUploadHttp.sendHeader("Content-Type", "application/octet-stream");
+    gpsUploadHttp.sendHeader("Content-Length", file.size());
+    gpsUploadHttp.beginBody();
+
+    // Stream file in 1KiB chunks
+    uint8_t buf[1024];
+    while (const size_t n = file.read(buf, sizeof(buf)))
+    {
+        client.write(buf, n);
+    }
+
+    gpsUploadHttp.endRequest();
+
+    const int status = gpsUploadHttp.responseStatusCode();
+    const String response = gpsUploadHttp.responseBody();
+
+    Serial.printf("HTTP status: %d\n", status);
+    Serial.println("Response:");
+    Serial.println(response);
+
+    file.close();
+
+    if (status == 200)
+    {
+        Serial.println("Upload successful");
+    }
+    else
+    {
+        Serial.println("Upload failed (bad response status, see above)");
+    }
+
+    return status == 200;
+}
+
+bool Modem::uploadGPSLogAndDelete(const bool deleteRegardlessOfSuccess)
+{
+    const bool uploadSuccess = uploadGPSLog();
+    if (uploadSuccess || deleteRegardlessOfSuccess)
+        SPIFFS.remove(GPS_LOG_FILE_NAME);
+    return uploadSuccess;
+}
+
+bool Modem::enableGPS()
+{
+    // Set Modem GPS Power Control Pin to HIGH ,turn on GPS power
+    modem.sendAT("+CGPIO=0,48,1,1");
+    if (modem.waitResponse(10000L) != 1)
+    {
+        DBG("Set GPS Power HIGH Failed");
+    }
+
+    Serial.print("Enabling GPS... ");
+    const bool success = modem.enableGPS();
+    Serial.println(success ? "Success" : "Failed");
+    return success;
+}
+
+
+bool Modem::disableGPS()
+{
+    // Set Modem GPS Power Control Pin to LOW ,turn off GPS power
+    // Only in version 20200415 is there a function to control GPS power
+    modem.sendAT("+CGPIO=0,48,1,0");
+    if (modem.waitResponse(10000L) != 1)
+    {
+        DBG("Set GPS Power LOW Failed");
+    }
+    Serial.print("Enabling GPS... ");
+    const bool success = modem.disableGPS();
+    Serial.println(success ? "Success" : "Failed");
+    return success;
+}
+
+bool Modem::getGPSParsed(float* UTCDateAndTime, float* latitude, float* longitude, float* mslAltitude,
+                         float* speedOverGround, const int retries, const int retryDelayMs)
+{
+    String rawGPSData;
+    const bool success = getGPSRaw(&rawGPSData, retries, retryDelayMs);
+
+    if (!success) return false;
+
+    GPSUtils::parseRawGPSDataString(rawGPSData, UTCDateAndTime, latitude, longitude, mslAltitude, speedOverGround);
+
+    return true;
+}
+
+bool Modem::getGPSRaw(String* rawGPSData, const int retries, const int retryDelayMs)
+{
+    float lat, lon;
+
+    for (int i = 0; i < retries; ++i)
+    {
+        Serial.printf("Attempt No %d at getting GPS data: ", i + 1);
+        Serial.flush();
+
+        if (modem.getGPS(&lat, &lon))
+        {
+            *rawGPSData = modem.getGPSraw();
+            Serial.println("Success");
+            return true;
+        }
+
+        Serial.println("Failed");
+
+        delay(retryDelayMs);
+    }
+
+    return false;
 }

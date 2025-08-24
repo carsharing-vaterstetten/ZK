@@ -154,3 +154,29 @@ void SPIFFSUtils::addLogEntry(const String &logText)
 
     file.close();
 }
+
+/// Adds a GPS entry to the GPS log file in SPIFFS. Returns true if successful, false otherwise.
+bool SPIFFSUtils::addGPSEntry(const String &gpsText)
+{
+    Serial.print("Adding GPS entry to log... ");
+    if (!SPIFFS.begin())
+    {
+        Serial.println("SPIFFS Mount Failed.");
+        return false;
+    }
+
+    File file = SPIFFS.open(GPS_LOG_FILE_NAME, FILE_APPEND);
+
+    if (!file)
+    {
+        Serial.println("Failed to open GPS log file for appending");
+        return false;
+    }
+
+    file.println(gpsText);
+    file.close();
+
+    Serial.println("Success");
+
+    return true;
+}
