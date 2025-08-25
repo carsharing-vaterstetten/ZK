@@ -3,7 +3,7 @@
 #define SerialMon Serial
 extern Modem modem;
 
-void SPIFFSUtils::saveRfidsToSPIFFS(String *rfids, int arraySize)
+void SPIFFSUtils::saveRfidsToSPIFFS(String* rfids, int arraySize)
 {
     if (!SPIFFS.begin())
     {
@@ -29,7 +29,7 @@ void SPIFFSUtils::saveRfidsToSPIFFS(String *rfids, int arraySize)
 
 bool SPIFFSUtils::isRfidInSPIFFS(String rfid)
 {
-    if (!SPIFFS.begin())    
+    if (!SPIFFS.begin())
     {
         SerialMon.println("SPIFFS Mount Failed.");
         return false;
@@ -102,7 +102,7 @@ void SPIFFSUtils::performOTAUpdateFromSPIFFS()
     ESP.restart(); // Restart ESP32 to apply the update
 }
 
-void SPIFFSUtils::addLogEntry(const String &logText)
+void SPIFFSUtils::addLogEntry(const String& logText)
 {
     if (!SPIFFS.begin())
     {
@@ -137,7 +137,7 @@ void SPIFFSUtils::addLogEntry(const String &logText)
 
     JsonObject logs_o = logs.add<JsonObject>();
     logs_o["created_at"] = modem.getLocalTime();
-    logs_o["firmware_version"] = FIRMWARE_VERSION; 
+    logs_o["firmware_version"] = FIRMWARE_VERSION;
     logs_o["log"] = logText;
 
     file = SPIFFS.open(LOG_FILE_NAME, FILE_WRITE);
@@ -156,7 +156,7 @@ void SPIFFSUtils::addLogEntry(const String &logText)
 }
 
 /// Adds a GPS entry to the GPS log file in SPIFFS. Returns true if successful, false otherwise.
-bool SPIFFSUtils::addGPSEntry(const String &gpsText)
+bool SPIFFSUtils::addGPSEntry(const String& gpsText, const String& currentlyUsedRfid)
 {
     Serial.print("Adding GPS entry to log... ");
     if (!SPIFFS.begin())
@@ -173,7 +173,9 @@ bool SPIFFSUtils::addGPSEntry(const String &gpsText)
         return false;
     }
 
-    file.println(gpsText);
+    file.print(gpsText);
+    file.print(",");
+    file.println(currentlyUsedRfid);
     file.close();
 
     Serial.println("Success");

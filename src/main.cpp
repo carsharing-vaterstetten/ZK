@@ -10,11 +10,13 @@
 
 bool loggedIn = false;
 unsigned long nextWatchdogResetMs;
-unsigned long lastGPSUpdate = 0;
+unsigned long nextGPSUpdate;
 unsigned long lastGPSUpload = 0;
 unsigned long targetMillis;
 const unsigned long dayMillis = 24 * 60 * 60 * 1000; // Ein Tag in Millisekunden
 String MAC_ADDRESS;
+String currentlyLoggedInRfid = "";
+std::vector<String> gpsTestingParticipatingRfids;
 
 Modem modem;
 NFC nfc;
@@ -31,27 +33,31 @@ void initKeyPins()
 // Wenn ja, wird je nach Zustand loggedIn auf true oder false gesetzt.
 void checkNFCTag()
 {
-    String readValue = nfc.readTag();
+    const String readValue = nfc.readTag();
     if (readValue != "")
     {
-        Serial.println(readValue);
+        Serial.printf("Tag read successfully: %s\r\n", readValue.c_str());
         if (SPIFFSUtils::isRfidInSPIFFS(readValue))
         {
             loggedIn = !loggedIn;
             if (loggedIn)
             {
+                currentlyLoggedInRfid = readValue;
                 digitalWrite(OPEN_KEY, HIGH);
                 delay(200);
                 LED_Strip.setStaticColor("green");
                 digitalWrite(OPEN_KEY, LOW);
+                Serial.println("Car unlocked");
                 SPIFFSUtils::addLogEntry("Auto aufgesperrt");
             }
             else
             {
+                currentlyLoggedInRfid = "";
                 digitalWrite(CLOSE_KEY, HIGH);
                 delay(200);
                 LED_Strip.setStaticColor("red");
                 digitalWrite(CLOSE_KEY, LOW);
+                Serial.println("Car locked");
                 SPIFFSUtils::addLogEntry("Auto zugesperrt");
             }
             delay(2000);
@@ -59,6 +65,7 @@ void checkNFCTag()
         else
         {
             SPIFFSUtils::addLogEntry("Unbekannte RFID-Karte gescannt");
+            Serial.println("Scanned Unknown RFID-Card");
             LED_Strip.setStaticColor("red");
             delay(2000);
         }
@@ -93,6 +100,14 @@ void initTime()
     }
 
     targetMillis += millis(); // Setze Zielzeit relativ zu millis()
+}
+
+bool isRfidParticipatingInGPSTestProgram(const String& rfid)
+{
+    for (int i = 0; i < gpsTestingParticipatingRfids.size(); ++i)
+        if (rfid == gpsTestingParticipatingRfids[i])
+            return true;
+    return false;
 }
 
 void setup()
@@ -171,6 +186,8 @@ void setup()
         delete[] rfids;
     }
 
+    gpsTestingParticipatingRfids = modem.fetchParticipatingGPSTestingRfids();
+
     nfc.init();
 
     modem.enableGPS();
@@ -191,21 +208,29 @@ void loop()
         nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
     }
 
-    if (millis() >= lastGPSUpdate + GPS_UPDATE_INTERVAL)
+    if ((currentlyLoggedInRfid == "" || isRfidParticipatingInGPSTestProgram(currentlyLoggedInRfid)) &&
+        millis() >= nextGPSUpdate)
     {
         String rawGPS;
         if (modem.getGPSRaw(&rawGPS))
         {
-            Serial.print("Raw GPS data: ");
-            Serial.println(rawGPS);
-            SPIFFSUtils::addGPSEntry(rawGPS);
+            SPIFFSUtils::addGPSEntry(rawGPS, currentlyLoggedInRfid);
         }
-        lastGPSUpdate = millis();
+
+        if (currentlyLoggedInRfid == "")
+        {
+            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_STANDING;
+        }
+        else
+        {
+            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_DRIVING;
+        }
     }
 
     if (millis() >= lastGPSUpload + 60 * 1000)
     {
         modem.uploadGPSLog();
+        //modem.uploadGPSLogAndDelete(true);
         lastGPSUpload = millis();
     }
 

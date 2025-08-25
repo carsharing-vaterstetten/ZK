@@ -2,6 +2,8 @@
 
 #include "Modem.h"
 
+#include <vector>
+
 #include "GPSUtils.h"
 
 #define SerialMon Serial
@@ -419,26 +421,62 @@ bool Modem::uploadGPSLog()
         return false;
     }
 
+    const size_t fileSize = file.size();
+
+    Serial.printf("GPS log size: %d bytes\r\n", fileSize);
+
+    if (fileSize == 0)
+    {
+        Serial.println("File is empty. Nothing to upload.");
+        return true;
+    }
+
     gpsUploadHttp.beginRequest();
     gpsUploadHttp.post("/upload-gps-log"); // endpoint path
     gpsUploadHttp.sendBasicAuth(GPS_BACKEND_USERNAME, GPS_BACKEND_PASSWORD);
     gpsUploadHttp.sendHeader("Content-Type", "application/octet-stream");
     gpsUploadHttp.sendHeader("Content-Length", file.size());
+    gpsUploadHttp.sendHeader("x-mac", MAC_ADDRESS);
+    gpsUploadHttp.sendHeader("X-firmware", FIRMWARE_VERSION);
+
     gpsUploadHttp.beginBody();
 
     // Stream file in 1KiB chunks
-    uint8_t buf[1024];
+    constexpr int bufSize = 1024;
+    uint8_t buf[bufSize];
+    size_t i = 0;
     while (const size_t n = file.read(buf, sizeof(buf)))
     {
         client.write(buf, n);
+        const size_t uploadProgress = i * bufSize + n;
+        Serial.printf("Upload Progress: %d B / %d B        \r", uploadProgress, fileSize);
+        ++i;
     }
+
+    Serial.println("");
+
+    Serial.println("Ending Request...");
 
     gpsUploadHttp.endRequest();
 
+    Serial.println("Done");
+    Serial.println("Awaiting response...");
+
     const int status = gpsUploadHttp.responseStatusCode();
+
+    Serial.println("Status received");
+    Serial.println("Reading response body");
+
     const String response = gpsUploadHttp.responseBody();
 
-    Serial.printf("HTTP status: %d\n", status);
+    Serial.println("Done");
+    Serial.println("Stoping...");
+
+    gpsUploadHttp.stop();
+
+    Serial.println("Done");
+
+    Serial.printf("HTTP status: %d\r\n", status);
     Serial.println("Response:");
     Serial.println(response);
 
@@ -460,7 +498,18 @@ bool Modem::uploadGPSLogAndDelete(const bool deleteRegardlessOfSuccess)
 {
     const bool uploadSuccess = uploadGPSLog();
     if (uploadSuccess || deleteRegardlessOfSuccess)
-        SPIFFS.remove(GPS_LOG_FILE_NAME);
+    {
+        Serial.print("Removing GPS log file... ");
+        if (SPIFFS.exists(GPS_LOG_FILE_NAME))
+        {
+            const bool removeSuccess = SPIFFS.remove(GPS_LOG_FILE_NAME);
+            Serial.println(removeSuccess ? "Success" : "Failed");
+        }
+        else
+        {
+            Serial.println("File doesn't exist.");
+        }
+    }
     return uploadSuccess;
 }
 
@@ -530,4 +579,40 @@ bool Modem::getGPSRaw(String* rawGPSData, const int retries, const int retryDela
     }
 
     return false;
+}
+
+std::vector<String> Modem::fetchParticipatingGPSTestingRfids()
+{
+    Serial.println("Fetching GPS Test Program Participating RIFDs");
+
+    HttpClient h(client, GPS_BACKEND_SERVER_NAME, 80);
+
+    h.beginRequest();
+    h.get("/static/participating-rfids");
+    h.sendBasicAuth(GPS_BACKEND_USERNAME, GPS_BACKEND_PASSWORD);
+
+    h.endRequest();
+
+    const int status = h.responseStatusCode();
+    const String response = h.responseBody();
+    h.stop();
+
+    // Rfids in this format: "XXXXXXXX;XXXXXXXX;XXXXXXXX"
+
+    std::vector<String> participatingRfids;
+
+    Serial.println("Participating RFIDs: ");
+    for (int i = 0; i < response.length(); i += 9)
+    {
+        const String rfid = response.substring(i, i + 8);
+        participatingRfids.push_back(rfid);
+        Serial.printf("%s,", rfid.c_str());
+    }
+
+    Serial.println("");
+    Serial.printf("HTTP status: %d\r\n", status);
+    Serial.println("Response:");
+    Serial.println(response);
+
+    return participatingRfids;
 }

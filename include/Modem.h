@@ -9,6 +9,7 @@
 #include <ArduinoHttpClient.h>
 #include <SPIFFSUtils.h>
 #include <HelperUtils.h>
+#include <vector>
 
 class Modem
 {
@@ -30,6 +31,7 @@ public:
                       float* mslAltitude = nullptr, float* speedOverGround = nullptr, int retries = 1,
                       int retryDelayMs = 1000);
     bool getGPSRaw(String* rawGPSData, int retries = 1, int retryDelayMs = 1000);
+    std::vector<String> fetchParticipatingGPSTestingRfids();
 
 private:
     TinyGsm modem;

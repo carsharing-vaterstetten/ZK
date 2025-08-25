@@ -16,7 +16,7 @@ public:
     static bool isRfidInSPIFFS(String rfid);
     static void performOTAUpdateFromSPIFFS();
     static void addLogEntry(const String& logText);
-    static bool addGPSEntry(const String& gpsText);
+    static bool addGPSEntry(const String& gpsText, const String& currentlyUsedRfid);
 };
 
 #endif
