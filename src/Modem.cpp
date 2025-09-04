@@ -1,69 +1,96 @@
 // Modem.cpp
 
 #include "Modem.h"
+#include "Config.h"
+#include "Globals.h"
+#include <HelperUtils.h>
+#include <ctime>
+#include <SD_MMC.h>
 
-#define SerialMon Serial
+#include "Backend.h"
+#include "StorageManager.h"
+
 #define SerialAT Serial1
 
-HttpClient *Modem::http = nullptr;
+TinyGsmSim7000* Modem::gsmModem = nullptr;
+TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
+bool Modem::isInit = false;
 
-extern Config config;
-
-Modem::Modem() : modem(SerialAT), client(modem) {}
-
-bool Modem::init(bool secoundTry)
+void Modem::powerOn()
 {
-    SerialMon.println("Initializing modem...");
-
-#ifdef TINY_GSM_T_PCIE
-    pinMode(POWER_PIN, OUTPUT);
-    digitalWrite(POWER_PIN, HIGH);
-    SerialMon.println("Set POWER_PIN HIGH");
-#endif
-
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
-    SerialMon.println("Set PWR_PIN LOW");
     delay(1000);
     digitalWrite(PWR_PIN, HIGH);
-    SerialMon.println("Set PWR_PIN HIGH");
+}
+
+void Modem::powerOff()
+{
+    pinMode(PWR_PIN, OUTPUT);
+    digitalWrite(PWR_PIN, LOW);
+    delay(1500);
+    digitalWrite(PWR_PIN, HIGH);
+}
+
+bool Modem::init(const bool secondTry)
+{
+    delete gsmModem;
+    delete gsmClient;
+
+    gsmModem = new TinyGsmSim7000{SerialAT};
+    gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
+
+    fileLog.infoln("Initializing modem...");
+
+    powerOn();
 
     SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-    SerialMon.println("SerialAT started");
-    sleep(1);
 
-    modem.restart();
-    SerialMon.println("Modem restarted");
-    sleep(1);
-
-    String modemInfo = modem.getModemInfo();
-    SerialMon.println("Modem Info: " + modemInfo);
-
-    if (config.GSM_PIN && modem.getSimStatus() != 3)
+    while (!gsmModem->testAT())
     {
-        modem.simUnlock(config.GSM_PIN);
+        delay(10);
     }
 
-    modem.gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+    fileLog.infoln("Modem connected");
 
-    SerialMon.print("Network status: ");
-    if (!modem.waitForNetwork())
+    const bool modemInitSuccess = gsmModem->init();
+
+    // Most of the time the modem works event if it returns an error
+    fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
+                               "There was an error while initializing the modem");
+
+    fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
+
+    if (gsmModem->getSimStatus() != SIM_ANTITHEFT_LOCKED)
     {
-        SerialMon.println(" fail");
+        const bool simUnlockSuccess = gsmModem->simUnlock(config.GSM_PIN);
+        fileLog.logInfoOrWarningln(simUnlockSuccess, "SIM unlocked successfully", "SIM unlocking failed");
     }
 
-    if (modem.isNetworkConnected())
+    fileLog.infoln("Connecting Modem...");
+
+    const bool gprsSuccess = gsmModem->gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+
+    fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+    fileLog.infoln("Waiting for network...");
+
+    const bool networkSuccess = gsmModem->waitForNetwork();
+    fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
+                               "The modem did not connect to the network even after waiting");
+
+    if (gsmModem->isNetworkConnected())
     {
-        SerialMon.println("Network connected");
+        isInit = true;
         return true;
     }
-    else
+
+    if (!secondTry)
     {
-        if (!secoundTry)
-        {
-            return init(true);
-        }
+        fileLog.infoln("Modem failed to connect on first attempt. Giving it another try.");
+        return init(true);
     }
+
     return false;
 }
 
@@ -71,329 +98,270 @@ void Modem::end()
 {
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
-    http->stop();
-    modem.gprsDisconnect();
-    SerialMon.println("Modem disconnected");
+    gsmModem->gprsDisconnect();
+    fileLog.infoln("Modem disconnected");
 }
 
-int Modem::sendRequest(String path, String method, String body)
+int Modem::uploadFile(const String& endpoint, File& f, String* response, const String& urlParams, const int bufferSize)
 {
-    int err = 0;
-    if (http == nullptr)
+    f.flush();
+    const size_t fileSize = f.size();
+
+    if (fileSize == 0)
     {
-        http = new HttpClient(client, config.server, config.port);
+        f.close();
+        fileLog.warningln("File is empty, not uploading");
+        return 1;
     }
-    http->connectionKeepAlive();
-    http->beginRequest();
 
-    if (method == "GET")
+    // Append URL parameters if provided
+    String fullEndpoint = endpoint;
+    if (urlParams.length() > 0)
     {
-        err = http->get(path);
-        http->sendBasicAuth(config.username, config.password);
+        fullEndpoint += "?" + urlParams;
     }
-    else if (method == "POST")
-    {
-        err = http->post(path);
-        http->sendBasicAuth(config.username, config.password);
-        http->sendHeader("Content-Type", "application/json");
-        http->sendHeader("Content-Length", body.length());
-        http->beginBody();
 
-        const size_t chunkSize = 512;
-        size_t bodyLength = body.length();
-        for (size_t i = 0; i < bodyLength; i += chunkSize)
-        {
-            String chunk = body.substring(i, min(i + chunkSize, bodyLength));
-            http->print(chunk);
-        }
-    }
-    http->endRequest();
-    return err;
-}
+    HttpClient uploadHttp{*gsmClient, config.server, config.port};
 
-// Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
-// @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-String Modem::getLocalTime()
-{
-    String time = modem.getGSMDateTime(DATE_FULL);
-    return time;
-}
+    uploadHttp.beginRequest();
+    const int err = uploadHttp.post(fullEndpoint);
 
-String *Modem::getRfids(int &arraySize)
-{
-    SerialMon.print(F("Performing HTTPS GET request... "));
-    int err = sendRequest("/rfids/", "GET");
     if (err != 0)
     {
-        SerialMon.println(F("failed to connect"));
-        SerialMon.println(err);
-        delay(10000);
-        return nullptr;
+        f.close();
+        uploadHttp.stop();
+        fileLog.errorln("Failed to upload file. Error " + String(err));
+        return err;
     }
 
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-    if (!status)
+    uploadHttp.sendBasicAuth(config.username, config.password);
+    uploadHttp.sendHeader("Content-Type", "application/octet-stream");
+    uploadHttp.sendHeader("Content-Length", String(fileSize));
+    uploadHttp.beginBody();
+
+    uint8_t buffer[bufferSize];
+    size_t totalBytesUploaded = 0;
+    size_t nextPrint = fileSize / 10;
+    const bool isFileLogFile = strcmp(f.path(), LOG_FILE_PATH) == 0;
+
+    while (f.available())
     {
-        SerialMon.println(F("no response"));
-        delay(10000);
-        http->stop();
-        return nullptr;
+        const size_t bytesRead = f.read(buffer, sizeof(buffer));
+        uploadHttp.write(buffer, bytesRead);
+        totalBytesUploaded += bytesRead;
+
+        if (totalBytesUploaded >= nextPrint)
+        {
+            const String msg =
+                "Uploaded " + String(totalBytesUploaded) + " B of " + String(fileSize) + " B";
+
+            if (isFileLogFile)
+            {
+                serialOnlyLog.debugln(msg);
+            }
+            else
+            {
+                fileLog.debugln(msg);
+            }
+
+            nextPrint += fileSize / 10;
+        }
     }
+
+    uploadHttp.endRequest();
+    const int status = uploadHttp.responseStatusCode();
+    const String responseBody = uploadHttp.responseBody();
+
+    f.close();
+    uploadHttp.stop();
+
+    fileLog.infoln("Response status code: " + String(status));
+    fileLog.infoln("Response body: " + responseBody);
+    *response = responseBody;
+
+    return status;
+}
+
+/// returns response status
+int Modem::simpleGet(const String& aUrlPath, String* responseBody)
+{
+    HttpClient http{*gsmClient, config.server, config.port};
+    http.beginRequest();
+    const int err = http.get(aUrlPath);
+
+    if (err != HTTP_SUCCESS)
+    {
+        http.stop();
+        return err;
+    }
+
+    http.sendBasicAuth(config.username, config.password);
+    http.endRequest();
+
+    const int responseStatus = http.responseStatusCode();
+    http.skipResponseHeaders();
+
+    if (responseBody)
+    {
+        *responseBody = http.responseBody();
+    }
+
+    http.stop();
+
+    return responseStatus;
+}
+
+
+bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize)
+{
+    fileLog.infoln("Downloading " + remotePath + " to " + f.path());
+    String srcPath = f.path();
+    HttpClient downloadHttp{*gsmClient, config.server, config.port};
+
+    downloadHttp.beginRequest();
+    const int err = downloadHttp.get(remotePath);
+
+    if (err != 0)
+    {
+        fileLog.errorln("Error " + String(err) + ". Download canceled");
+        downloadHttp.stop();
+        f.close();
+        return false;
+    }
+
+    downloadHttp.sendBasicAuth(config.username, config.password);
+    downloadHttp.endRequest();
+
+    const int status = downloadHttp.responseStatusCode();
+    downloadHttp.skipResponseHeaders();
+
+    fileLog.infoln("Response status: " + String(status));
 
     if (status != 200)
     {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return nullptr;
+        fileLog.errorln("Unexpected status (see above). Download canceled");
+        downloadHttp.stop();
+        f.close();
+        return false;
     }
 
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
+    uint8_t buf[bufferSize];
+
+    const size_t totalLen = downloadHttp.contentLength();
+    size_t downloaded = 0;
+    size_t nextPrint = totalLen / 10;
+
+    fileLog.infoln("Downloading " + String(totalLen) + " B");
+
+    while (downloadHttp.connected() || downloadHttp.available())
     {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
-    }
-    int contentLength = http->contentLength();
-    String responseBody = "";
-    if (contentLength > 0)
-    {
-        int readBytes = 0;
-        char buffer[128];
-        while (readBytes < contentLength)
+        while (downloadHttp.available())
         {
-            int bytesToRead = http->readBytes(buffer, sizeof(buffer) - 1);
-            readBytes += bytesToRead;
-            buffer[bytesToRead] = '\0';
-            responseBody += buffer;
-        }
-    }
+            const size_t len = downloadHttp.readBytes(buf, bufferSize);
+            f.write(buf, len);
+            downloaded += len;
 
-    SerialMon.println(F("Response Body:"));
-    SerialMon.println(responseBody);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, responseBody);
-    if (error)
-    {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.f_str());
-        return nullptr;
-    }
-    JsonArray array = doc.as<JsonArray>();
-
-    arraySize = array.size();
-    String *rfidArray = new String[arraySize];
-
-    for (int i = 0; i < arraySize; i++)
-    {
-        rfidArray[i] = HelperUtils::toUpperCase(array[i]["rfid"].as<String>());
-    }
-
-    return rfidArray;
-}
-
-void printPercent(uint32_t readLength, uint32_t contentLength)
-{
-    if (contentLength != (uint32_t)-1)
-    {
-        SerialMon.print("\r ");
-        SerialMon.print((100.0 * readLength) / contentLength);
-        SerialMon.print('%');
-    }
-    else
-    {
-        SerialMon.println(readLength);
-    }
-}
-
-/// Make sure to increase the HW Watchdog timeout before calling this function or use `handleFirmwareUpdateWithWatchdog()`
-void Modem::firmwareCheckAndUpdateIfNeeded()
-{
-    JsonDocument body;
-    body["mac_address"] = MAC_ADDRESS;
-    body["firmware_version"] = FIRMWARE_VERSION;
-    serializeJsonPretty(body, SerialMon);
-
-    SerialMon.println("");
-
-    int err = sendRequest("/firmware/", "POST", body.as<String>());
-    if (err != 0)
-    {
-        SerialMon.println(F("failed to connect 'firmware'"));
-        SerialMon.println(err);
-        return;
-    }
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-
-    if (!status)
-    {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return;
-    }
-    if (status == 200)
-    {
-        SerialMon.println("kein Update notwendig");
-        http->stop();
-        return;
-    }
-    if (status != 210)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return;
-    }
-    else
-    {
-        SerialMon.println(F("Response Headers:"));
-        while (http->headerAvailable())
-        {
-            String headerName = http->readHeaderName();
-            String headerValue = http->readHeaderValue();
-            SerialMon.println("    " + headerName + " : " + headerValue);
-        }
-
-        if (!SPIFFS.begin(true))
-        {
-            Serial.println("SPIFFS Mount Failed");
-            return;
-        }
-        if (SPIFFS.exists(FIRMWARE_FILE_NAME))
-        {
-            SPIFFS.remove(FIRMWARE_FILE_NAME);
-        }
-        File file = SPIFFS.open(FIRMWARE_FILE_NAME, FILE_WRITE);
-        if (!file)
-        {
-            Serial.println("Failed to open file for writing");
-            return;
-        }
-
-        SerialMon.println("Getting Firmware data starting ...");
-        int contentLength = http->contentLength();
-        const size_t bufferSize = 2048;
-        uint8_t buffer[bufferSize];
-        size_t totalBytesRead = 0;
-        unsigned long startTime = millis();
-        while (http->connected() || http->available())
-        {
-            if (http->available())
+            if (downloaded >= nextPrint)
             {
-                size_t bytesRead = http->readBytes(buffer, bufferSize);
-                file.write(buffer, bytesRead);
-                totalBytesRead += bytesRead;
-                float percentage = ((float)totalBytesRead * 100) / contentLength;
-                unsigned long elapsedTime = millis() - startTime;
-                SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
-                if (totalBytesRead >= contentLength)
-                {
-                    break;
-                }                
+                fileLog.debugln("Downloaded " + String(downloaded) + " B of " + String(totalLen) + " B");
+                nextPrint += totalLen / 10;
             }
         }
-        SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
-        SerialMon.printf("\rProgress: %.2f%%", (float)totalBytesRead / contentLength * 100);
-        file.close();
-        http->stop();
-        SerialMon.println("File saved successfully");
-        SPIFFSUtils::performOTAUpdateFromSPIFFS();
-    }
-}
-
-void Modem::handleFirmwareUpdateWithWatchdog() {
-
-    // Increase the HW Watchdog timeout to allow for longer OTA updates
-
-    esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
-        return;
     }
 
-    firmwareCheckAndUpdateIfNeeded();
+    downloadHttp.stop();
 
-    // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
-    hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to reset HW Watchdog timeout after OTA update.");
-    }
-}
+    f.close();
 
-// liefert immer true zurück
-// rückgabe ist nur dafür da, damit der loop auf die funktion warten kann
-bool Modem::uploadLogs()
-{
-    if (!SPIFFS.begin())
+    if (downloaded != totalLen)
     {
-        SerialMon.println("SPIFFS Mount Failed.");
-        return true;
+        fileLog.errorln(
+            "Downloaded file size (" + String(downloaded) + " B) != content length (" + String(totalLen) + " B)");
+        return false;
     }
 
-    File file = SPIFFS.open(LOG_FILE_NAME, FILE_READ);
+    fileLog.infoln("Download complete");
+
+    return true;
+}
+
+
+bool Modem::uploadLog()
+{
+    fileLog.infoln("Uploading log");
+    File file = StorageManager::openLog(FILE_READ);
+
     if (!file)
     {
-        SerialMon.println("File doesn't exist. Creating a new one.");
+        fileLog.errorln("Failed to open log for reading");
+        return false;
+    }
+    const size_t fileSize = file.size();
+
+    serialOnlyLog.infoln("Log size: " + String(fileSize) + " B");
+
+    if (fileSize == 0)
+    {
+        file.close();
+        fileLog.infoln("Log is empty, not uploading");
         return true;
     }
 
-    int contentLength = file.size();
-    if (contentLength == 0)
-    {
-        SerialMon.println("File is empty");
-        return true;
-    }
-    SerialMon.print("File size: ");
-    SerialMon.println(contentLength);
+    String response;
+    const int responseCode = uploadFile(LOG_FILE_UPLOAD_ENDPOINT, file, &response, "efuse_mac=" + String(efuseMac, 16));
 
-    SerialMon.println("Uploading logs to server...");
-    int err = sendRequest("/logs/", "POST", file.readString());
-    if (err != 0)
+    if (responseCode != 200)
     {
-        SerialMon.println(F("failed to connect 'logs'"));
-        SerialMon.println(err);
-        return true;
+        fileLog.errorln("Failed to upload log");
+        return false;
     }
 
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
+    const int serverReceivedBytes = response.toInt();
 
-    if (!status)
+    if (serverReceivedBytes != fileSize)
     {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return true;
+        fileLog.errorln("Server only received " + String(serverReceivedBytes) + " B of " + String(fileSize) + " B");
+        return false;
     }
 
-    if (status != 201)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return true;
-    }
+    fileLog.infoln("Log successfully uploaded");
 
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
-    {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
-    }
-
-    SerialMon.println(F("Response Body:"));
-    while (http->available())
-    {
-        SerialMon.write(http->read());
-    }
-
-    http->stop();
-    file.close();
-    SPIFFS.remove(LOG_FILE_NAME);
-    SerialMon.println("Logs uploaded successfully");
     return true;
+}
+
+void Modem::uploadLogAndDelete(const uint32_t deleteAfterNRetries)
+{
+    bool success = uploadLog();
+
+    for (uint32_t i = 0; i < deleteAfterNRetries && !success; ++i)
+    {
+        fileLog.errorln(
+            "Attempt No. " + String(i + 1) + " of " + String(deleteAfterNRetries) +
+            " failed at uploading log. Retrying...");
+        success = uploadLog();
+    }
+
+    const bool removeSuccess = StorageManager::removeLog();
+    fileLog.logInfoOrErrorln(removeSuccess, "Deleted log successfully", "Failed to delete log");
+}
+
+uint64_t Modem::getUTCTimestamp()
+{
+    int year, month, day, hour, minute, second;
+    float timeZone;
+    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timeZone);
+
+    tm datetime{};
+
+    datetime.tm_year = year - 1900; // Number of years since 1900
+    datetime.tm_mon = month - 1; // Number of months since January
+    datetime.tm_mday = day;
+    datetime.tm_hour = hour;
+    datetime.tm_min = minute;
+    datetime.tm_sec = second;
+    // Daylight Savings must be specified
+    // -1 uses the computer's timezone setting
+    datetime.tm_isdst = -1;
+
+    return mktime(&datetime);
 }

@@ -1,16 +1,17 @@
+#pragma once
 
-#ifndef Intern_H
-#define Intern_H
+#include <Arduino.h>
 
-#define FIRMWARE_VERSION "0.5.1"
-#define RFID_FILE_NAME "/rfids.txt"
-#define FIRMWARE_FILE_NAME "/firmware.bin"
-#define LOG_FILE_NAME "/logs.json"
+#define FIRMWARE_VERSION "0.6.0"
 
-extern String MAC_ADDRESS;
+// Local paths
+#define RFID_FILE_PATH "/rfids.bin"
+#define TMP_RFID_FILE_PATH "/tmp_rfids.bin"
+#define FIRMWARE_FILE_PATH "/firmware.bin"
+#define LOG_FILE_PATH "/log.log"
 
 #define CONFIG_START_ADDRESS 0
-#define CONFIG_VERSION 1
+#define CONFIG_VERSION 2
 
 struct Config
 {
@@ -20,9 +21,8 @@ struct Config
   char gprsPass[32];
   char GSM_PIN[16];
   char server[64];
-  int port;
+  uint16_t port;
   char username[32];
   char password[64];
+  bool preferSDCard;
 };
-
-#endif

@@ -1,26 +1,19 @@
-// HelperUtils.h
-#ifndef HELPERUTILS_H
-#define HELPERUTILS_H
+#pragma once
 
-#include <Arduino.h>
-#include <Config.h>
+
 #include <Intern.h>
-#include <WiFi.h>
-#include <EEPROM.h>
+#include <FS.h>
 
 class HelperUtils
 {
 public:
-    static String getMacAddress();
-    static String toUpperCase(const String &str);
-    static void initEEPROM(Config &config);
-    static void saveConfigToEEPROM(Config &config);
-    static bool loadConfigFromEEPROM(Config &config);
-    static void parseConfigString(String &inputString, Config &config);
-    static void resetEEPROM();
+    static void parseConfigString(const String& inputString, Config& c);
+    static String getConfigHumanReadable(const Config& c);
+    static String getConfigFormat(const Config& c);
     static String getResetReasonHumanReadable(esp_reset_reason_t reset_reason);
     static esp_err_t setWatchdog(uint32_t watchdog_timeout);
     static esp_err_t subscribeTaskToWatchdog();
+    static void requestConfig(Config& c);
+    static bool md5File(File file, uint8_t out[16]);
+    static String md5ToHex(const uint8_t md5[16]);
 };
-
-#endif

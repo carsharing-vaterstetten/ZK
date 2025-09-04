@@ -4,15 +4,13 @@
 
 #include <Arduino.h>
 #include <Adafruit_PN532.h>
-#include <Config.h>
 
 class NFC
 {
 public:
     NFC();
-    void init();
-    String readTag();
-    String bytesToHexValue(uint8_t bytes[], int nLen);
+    bool init();
+    uint32_t readTag();
 
 private:
     Adafruit_PN532 nfc;

@@ -1,43 +1,24 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#pragma once
 
-#include <Intern.h>
-
-#define UART_BAUD 115200
+#define UART_BAUD 115200U
 
 #define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_T_PCIE
-#define TINY_GSM_RX_BUFFER 1024 // 1Kb
+#define TINY_GSM_RX_BUFFER 1024 // 1KiB
+
+#define GPS_UPDATE_INTERVAL_WHILE_DRIVING 500 // ms
+#define GPS_UPDATE_INTERVAL_WHILE_STANDING 1000 // ms
 
 #define LED_PIN 12
 #define LED_COUNT 4
 
-// Modem Pins
+// Modem pins
 #define PIN_TX 27
 #define PIN_RX 26
 #define PWR_PIN 4
-#define POWER_PIN 25
 
-// Schlüssel knopfe
-#define OPEN_KEY 15
-#define CLOSE_KEY 14
-
-/*
- *   2 Automatic
- *   13 GSM only
- *   38 LTE only
- *   51 GSM and LTE only
- */
-extern byte NETWORK_MODE;
-
-/*
- *    1 CAT-M
- *    2 NB-Iot
- *    3 CAT-M and NB-IoT
- */
-extern byte PREFERRED_MODE;
-
-//#define NCF_I2C
+// Car key pins
+#define OPEN_KEY 21
+#define CLOSE_KEY 22
 
 // NFC Modul Pins
 #define NFC_MOSI 23
@@ -45,14 +26,9 @@ extern byte PREFERRED_MODE;
 #define NFC_SCLK 18
 #define NFC_SS 5
 
-#define NCF_SDA 21
-#define NCF_SCL 22
+// Restart the esp at this time
+#define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
-// ESP32 startet sich jeden tag um die Uhrzeit neu
-const unsigned long targetTimeToRestartESP32 = (03 * 3600 + 30 * 60) * 1000; // 03:30 Uhr
-
-#define HW_WATCHDOG_DEFAULT_TIMEOUT (300) // [Sekunden] Maximal erlaubte Zeit ohne Reset – nach 5 Minuten startet der HW-Watchdog den Arduino neu
-#define HW_WATCHDOG_OTA_UPDATE_TIMEOUT (3600) // [Sekunden] Maximal erlaubte Zeit ohne Reset während eines OTA Updates
-#define HW_WATCHDOG_RESET_DELAY_MS (100) // [Millisekunden] Der Arduino muss spätestens alle 100ms den Watchdog zurücksetzen, damit der 5-Minuten-Timeout nicht abläuft
-
-#endif
+#define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
+#define HW_WATCHDOG_OTA_UPDATE_TIMEOUT 3600U // [s] same as HW_WATCHDOG_DEFAULT_TIMEOUT but when performing an ota update
+#define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
