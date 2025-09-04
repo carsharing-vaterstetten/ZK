@@ -1,7 +1,8 @@
-#include "../include/Log.h"
+#include "Log.h"
 
 #include <SPIFFS.h>
 
+#include "Modem.h"
 #include "SD_MMC.h"
 
 #define COLOR_RESET   "\033[0m"
@@ -12,13 +13,14 @@
 #define COLOR_MAGENTA "\033[35m"
 #define COLORIZE_SERIAL
 
-void Log::enableSerialLogging()
+void Log::enableSerialLogging(const uint8_t loggingLevel)
 {
     logToSerial = true;
+    serialLoggingLevel = loggingLevel;
 }
 
 /// Make sure the pins of the sd card aren't used by something else!
-bool Log::enableSDCardLogging(const String& SDCardLogFileName)
+bool Log::enableSDCardLogging(const String& SDCardLogFileName, const uint8_t loggingLevel)
 {
     if (!SD_MMC.exists(SDCardLogFileName))
     {
@@ -32,10 +34,11 @@ bool Log::enableSDCardLogging(const String& SDCardLogFileName)
 
     SDCardLogPath = SDCardLogFileName;
     logToSDCard = true;
+    sdCardLoggingLevel = loggingLevel;
     return true;
 }
 
-bool Log::enableFlashLogging(const String& flashLogFileName)
+bool Log::enableFlashLogging(const String& flashLogFileName, const uint8_t loggingLevel)
 {
     if (!SPIFFS.exists(flashLogFileName))
     {
@@ -47,6 +50,7 @@ bool Log::enableFlashLogging(const String& flashLogFileName)
 
     flashLogPath = flashLogFileName;
     logToFlash = true;
+    flashLoggingLevel = loggingLevel;
     return true;
 }
 
@@ -65,46 +69,6 @@ void Log::stopFlashLogging()
     logToFlash = false;
 }
 
-/// Maximum of 127 chars
-void Log::debugf(const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(LOGGING_LEVEL_DEBUG, msg, args);
-    va_end(args);
-}
-
-void Log::infof(const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(LOGGING_LEVEL_INFO, msg, args);
-    va_end(args);
-}
-
-void Log::warningf(const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(LOGGING_LEVEL_WARNING, msg, args);
-    va_end(args);
-}
-
-void Log::errorf(const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(LOGGING_LEVEL_ERROR, msg, args);
-    va_end(args);
-}
-
-void Log::criticalf(const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(LOGGING_LEVEL_CRITICAL, msg, args);
-    va_end(args);
-}
 
 void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const String& ifError,
                            const uint8_t level) const
@@ -120,26 +84,6 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
 }
 
 void Log::logMsgln(const String& msg, const uint8_t level) const
-{
-    logMsg(level, msg + "\n");
-}
-
-void Log::vlogMsgf(const uint8_t level, const char* msg, const va_list args) const
-{
-    if (!logToSerial) return;
-
-    char buf[128]; // static buffer to avoid heap fragmentation
-    const int len = vsnprintf(buf, sizeof(buf), msg, args);
-
-    if (len <= 0) return;
-
-    // If message is longer than buffer, truncate safely
-    buf[sizeof(buf) - 1] = '\0';
-
-    logMsg(level, buf);
-}
-
-void Log::logMsg(const uint8_t level, const String& msg) const
 {
     String finalStr = "";
 
@@ -166,22 +110,27 @@ void Log::logMsg(const uint8_t level, const String& msg) const
         finalSerialStr += "] ";
     }
 
+    String nameString = "";
+
+    if (!loggerName.isEmpty())
+    {
+        nameString = "[" + loggerName + "] ";
+    }
+
+    finalStr += nameString;
+    finalSerialStr += nameString;
+
     finalStr += msg;
     finalSerialStr += msg;
 
-    writeToSerial(finalSerialStr);
-    appendToFileOnFlash(finalStr);
-    appendToFileOnSDCard(finalStr);
+    if (level >= serialLoggingLevel)
+        writeLineToSerial(finalSerialStr);
+    if (level >= flashLoggingLevel)
+        appendLineToFileOnFlash(finalStr);
+    if (level >= sdCardLoggingLevel)
+        appendLineToFileOnSDCard(finalStr);
 }
 
-
-void Log::logMsgf(const uint8_t level, const char* msg, ...) const
-{
-    va_list args;
-    va_start(args, msg);
-    vlogMsgf(level, msg, args);
-    va_end(args);
-}
 
 /// Does not add any time and level information
 void Log::write(const uint8_t* buffer, const size_t size) const
@@ -208,47 +157,27 @@ void Log::write(const uint8_t* buffer, const size_t size) const
     }
 }
 
-
 void Log::appendLineToFileOnSDCard(const String& msg) const
-{
-    appendToFileOnSDCard(msg + "\n");
-}
-
-void Log::appendLineToFileOnFlash(const String& msg) const
-{
-    appendToFileOnFlash(msg + "\n");
-}
-
-void Log::writeLineToSerial(const String& msg) const
-{
-    writeToSerial(msg + "\n");
-}
-
-
-void Log::appendToFileOnSDCard(const String& msg) const
 {
     if (!logToSDCard) return;
 
     File file = SD_MMC.open(SDCardLogPath, FILE_APPEND);
-
-    file.print(msg);
+    file.println(msg);
     file.close();
 }
 
-void Log::appendToFileOnFlash(const String& msg) const
+void Log::appendLineToFileOnFlash(const String& msg) const
 {
     if (!logToFlash) return;
 
     File file = SPIFFS.open(flashLogPath, FILE_APPEND);
-    file.print(msg);
+    file.println(msg);
     file.close();
 }
 
-void Log::writeToSerial(const String& msg) const
+void Log::writeLineToSerial(const String& msg)
 {
-    if (!logToSerial) return;
-
-    Serial.print(msg);
+    Serial.println(msg);
 }
 
 String Log::getLoggingLevelChar(const uint8_t level)

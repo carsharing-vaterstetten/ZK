@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-#include "Modem.h"
+#include <utility>
 
 #define LOGGING_LEVEL_DEBUG 0
 #define LOGGING_LEVEL_INFO 1
@@ -13,55 +13,41 @@
 class Log
 {
 public:
-    Log(const bool logTime, const bool logLoggingLevel) : logTime(logTime),
-                                                          logLoggingLevel(logLoggingLevel)
+    Log(const bool logTime, const bool logLoggingLevel, String loggerName = "") : loggerName(std::move(loggerName)),
+        logTime(logTime), logLoggingLevel(logLoggingLevel)
     {
     }
 
-    void enableSerialLogging();
-    void initSerial(unsigned long baud);
-    bool enableSDCardLogging(const String& SDCardLogFileName);
-    bool enableFlashLogging(const String& flashLogFileName);
+    void enableSerialLogging(uint8_t loggingLevel = LOGGING_LEVEL_DEBUG);
+    bool enableSDCardLogging(const String& SDCardLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
+    bool enableFlashLogging(const String& flashLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
 
     void stopSerialLogging();
     void stopSDCardLogging();
     void stopFlashLogging();
 
     void logMsgln(const String& msg, uint8_t level) const;
-    void vlogMsgf(uint8_t level, const char* msg, va_list args) const;
-    void logMsg(uint8_t level, const String& msg) const;
-    void logMsgf(uint8_t level, const char* msg, ...) const;
     void write(const uint8_t* buffer, size_t size) const;
-
-    void debugf(const char* msg, ...) const;
 
     void debugln(const String& msg) const
     {
         logMsgln(msg, LOGGING_LEVEL_DEBUG);
     }
 
-    void infof(const char* msg, ...) const;
-
     void infoln(const String& msg) const
     {
         logMsgln(msg, LOGGING_LEVEL_INFO);
     }
-
-    void warningf(const char* msg, ...) const;
 
     void warningln(const String& msg) const
     {
         logMsgln(msg, LOGGING_LEVEL_WARNING);
     }
 
-    void errorf(const char* msg, ...) const;
-
     void errorln(const String& msg) const
     {
         logMsgln(msg, LOGGING_LEVEL_ERROR);
     }
-
-    void criticalf(const char* msg, ...) const;
 
     void criticalln(const String& msg) const
     {
@@ -86,24 +72,25 @@ public:
     }
 
 private:
-    String SDCardLogPath;
     String flashLogPath;
-    bool isInitialized = false;
+    String SDCardLogPath;
+    String loggerName;
     bool logToSDCard = false;
     bool logToFlash = false;
     bool logToSerial = false;
     const bool logTime;
     const bool logLoggingLevel;
 
-    void appendLineToFileOnSDCard(const String& msg) const;
-    void appendLineToFileOnFlash(const String& msg) const;
-    void writeLineToSerial(const String& msg) const;
+    uint8_t serialLoggingLevel = LOGGING_LEVEL_DEBUG;
+    uint8_t flashLoggingLevel = LOGGING_LEVEL_DEBUG;
+    uint8_t sdCardLoggingLevel = LOGGING_LEVEL_DEBUG;
 
-    void appendToFileOnSDCard(const String& msg) const;
-    void appendToFileOnFlash(const String& msg) const;
-    void writeToSerial(const String& msg) const;
+    void appendLineToFileOnFlash(const String& msg) const;
+    static void writeLineToSerial(const String& msg);
 
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);
     static String getTimeString();
+
+    void appendLineToFileOnSDCard(const String& msg) const;
 };
