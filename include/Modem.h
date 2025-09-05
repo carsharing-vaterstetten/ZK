@@ -8,9 +8,9 @@
 
 class Modem
 {
-
     static void powerOn();
     static void powerOff();
+
 public:
     static TinyGsmSim7000::GsmClientSim7000* gsmClient;
 
@@ -20,6 +20,8 @@ public:
     static void end();
     static int uploadFile(const String& endpoint, File& f, String* response, const String& urlParams = "",
                           int bufferSize = 512);
+    static bool uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams = "",
+                                        int bufferSize = 512);
     static int simpleGet(const String& aUrlPath, String* responseBody);
     static bool downloadFile(const String& remotePath, File& f, int bufferSize = 512);
     static bool uploadLog();

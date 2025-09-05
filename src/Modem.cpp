@@ -104,8 +104,22 @@ void Modem::end()
 
 int Modem::uploadFile(const String& endpoint, File& f, String* response, const String& urlParams, const int bufferSize)
 {
+    const String filePath = f.path();
+    const bool isFileLogFile = filePath == LOG_FILE_PATH;
+
     f.flush();
     const size_t fileSize = f.size();
+
+    String msg = "Uploading " + filePath + " (" + String(fileSize) + " B) to " + endpoint;
+
+    if (isFileLogFile)
+    {
+        serialOnlyLog.infoln(msg);
+    }
+    else
+    {
+        fileLog.debugln(msg);
+    }
 
     if (fileSize == 0)
     {
@@ -142,7 +156,6 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
     uint8_t buffer[bufferSize];
     size_t totalBytesUploaded = 0;
     size_t nextPrint = fileSize / 10;
-    const bool isFileLogFile = strcmp(f.path(), LOG_FILE_PATH) == 0;
 
     while (f.available())
     {
@@ -152,8 +165,7 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
 
         if (totalBytesUploaded >= nextPrint)
         {
-            const String msg =
-                "Uploaded " + String(totalBytesUploaded) + " B of " + String(fileSize) + " B";
+            msg = "Uploaded " + String(totalBytesUploaded) + " B of " + String(fileSize) + " B";
 
             if (isFileLogFile)
             {
@@ -176,10 +188,36 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
     uploadHttp.stop();
 
     fileLog.infoln("Response status code: " + String(status));
-    fileLog.infoln("Response body: " + responseBody);
+
     *response = responseBody;
 
     return status;
+}
+
+bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
+                                    const int bufferSize)
+{
+    const size_t fileSize = f.size();
+
+    String resp;
+
+    const int respStatus = uploadFile(endpoint, f, &resp, urlParams, bufferSize);
+
+    if (respStatus != 200 || resp.isEmpty())
+    {
+        return false;
+    }
+
+    const long responseSize = resp.toInt();
+
+    if (responseSize != fileSize)
+    {
+        fileLog.errorln(
+            "File size check failed: local: " + String(fileSize) + " B != uploaded: " + String(responseSize) + " B");
+        return false;
+    }
+
+    return true;
 }
 
 /// returns response status
@@ -296,37 +334,10 @@ bool Modem::uploadLog()
         fileLog.errorln("Failed to open log for reading");
         return false;
     }
-    const size_t fileSize = file.size();
 
-    serialOnlyLog.infoln("Log size: " + String(fileSize) + " B");
+    const bool success = uploadFileWithSizeCheck(LOG_FILE_UPLOAD_ENDPOINT, file, "efuse_mac=" + String(efuseMac, 16));
 
-    if (fileSize == 0)
-    {
-        file.close();
-        fileLog.infoln("Log is empty, not uploading");
-        return true;
-    }
-
-    String response;
-    const int responseCode = uploadFile(LOG_FILE_UPLOAD_ENDPOINT, file, &response, "efuse_mac=" + String(efuseMac, 16));
-
-    if (responseCode != 200)
-    {
-        fileLog.errorln("Failed to upload log");
-        return false;
-    }
-
-    const int serverReceivedBytes = response.toInt();
-
-    if (serverReceivedBytes != fileSize)
-    {
-        fileLog.errorln("Server only received " + String(serverReceivedBytes) + " B of " + String(fileSize) + " B");
-        return false;
-    }
-
-    fileLog.infoln("Log successfully uploaded");
-
-    return true;
+    return success;
 }
 
 void Modem::uploadLogAndDelete(const uint32_t deleteAfterNRetries)
