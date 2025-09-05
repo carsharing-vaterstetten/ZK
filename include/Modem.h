@@ -22,10 +22,12 @@ public:
                           int bufferSize = 512);
     static bool uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams = "",
                                         int bufferSize = 512);
+    static bool uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, File& f, bool deleteIfSuccess,
+                                                 bool deleteAfterRetrying, uint32_t retries,
+                                                 const String& urlParams, int bufferSize = 512);
     static int simpleGet(const String& aUrlPath, String* responseBody);
     static bool downloadFile(const String& remotePath, File& f, int bufferSize = 512);
-    static bool uploadLog();
-    static void uploadLogAndDelete(uint32_t deleteAfterNRetries);
+    static bool uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)

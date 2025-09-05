@@ -188,7 +188,7 @@ void setup()
 
     RFIDs::downloadRfidsIfChanged();
 
-    Modem::uploadLogAndDelete(1);
+    Modem::uploadLog(true, true, 1);
 
     statusLed.clear();
 
@@ -209,7 +209,7 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
 
-        Modem::uploadLogAndDelete(10);
+        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyways
 
         ESP.restart();
     }

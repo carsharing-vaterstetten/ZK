@@ -194,8 +194,7 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
     return status;
 }
 
-bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
-                                    const int bufferSize)
+bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams, const int bufferSize)
 {
     const size_t fileSize = f.size();
 
@@ -203,8 +202,9 @@ bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const Strin
 
     const int respStatus = uploadFile(endpoint, f, &resp, urlParams, bufferSize);
 
-    if (respStatus != 200 || resp.isEmpty())
+    if (respStatus != 200)
     {
+        fileLog.errorln("Unexpected response code (see above)");
         return false;
     }
 
@@ -219,6 +219,33 @@ bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const Strin
 
     return true;
 }
+
+bool Modem::uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, File& f, const bool deleteIfSuccess,
+                                             const bool deleteAfterRetrying, const uint32_t retries,
+                                             const String& urlParams, const int bufferSize)
+{
+    const String filePath = f.path();
+
+    bool uploadSuccess = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize);
+
+    for (uint32_t i = 0; i < retries && !uploadSuccess; ++i)
+    {
+        fileLog.errorln(
+            "Attempt No. " + String(i + 1) + " of " + String(retries) +
+            " failed at uploading " + filePath + " to " + endpoint + ". Retrying...");
+        uploadSuccess = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize);
+    }
+
+    if (deleteAfterRetrying || (uploadSuccess && deleteIfSuccess))
+    {
+        const bool removeSuccess = StorageManager::remove(fileFs, filePath);
+        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
+                                 "Failed to delete " + filePath);
+    }
+
+    return uploadSuccess;
+}
+
 
 /// returns response status
 int Modem::simpleGet(const String& aUrlPath, String* responseBody)
@@ -323,8 +350,7 @@ bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize
     return true;
 }
 
-
-bool Modem::uploadLog()
+bool Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
     fileLog.infoln("Uploading log");
     File file = StorageManager::openLog(FILE_READ);
@@ -335,25 +361,8 @@ bool Modem::uploadLog()
         return false;
     }
 
-    const bool success = uploadFileWithSizeCheck(LOG_FILE_UPLOAD_ENDPOINT, file, "efuse_mac=" + String(efuseMac, 16));
-
-    return success;
-}
-
-void Modem::uploadLogAndDelete(const uint32_t deleteAfterNRetries)
-{
-    bool success = uploadLog();
-
-    for (uint32_t i = 0; i < deleteAfterNRetries && !success; ++i)
-    {
-        fileLog.errorln(
-            "Attempt No. " + String(i + 1) + " of " + String(deleteAfterNRetries) +
-            " failed at uploading log. Retrying...");
-        success = uploadLog();
-    }
-
-    const bool removeSuccess = StorageManager::removeLog();
-    fileLog.logInfoOrErrorln(removeSuccess, "Deleted log successfully", "Failed to delete log");
+    return uploadFileWithSizeCheckAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, file, deleteIfSuccess,
+                                            deleteAfterRetrying, retries, "efuse_mac=" + String(efuseMac, 16));
 }
 
 uint64_t Modem::getUTCTimestamp()
