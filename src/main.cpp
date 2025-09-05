@@ -73,6 +73,25 @@ void initTime()
     fileLog.infoln("Next restart planed in " + String(targetMillis / 1000) + " seconds");
 }
 
+void enableFileLogging(const bool forceFlash)
+{
+    if (forceFlash)
+    {
+        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
+
+        fileLog.enableFlashLogging(LOG_FILE_PATH);
+
+        fileLog.infoln("Forced to use flash. Now logging to file(s)");
+        return;
+    }
+
+    StorageManager::setFS(SD_MMC, SPIFFS, SD_MMC);
+
+    fileLog.enableSDCardLogging(LOG_FILE_PATH);
+
+    fileLog.infoln("Now logging to file(s)");
+}
+
 void setup()
 {
     Serial.begin(UART_BAUD);
@@ -111,17 +130,19 @@ void setup()
 
     if (StorageManager::isSDCardInserted() && config.preferSDCard)
     {
+        serialOnlyLog.infoln("Using SD-card as preferred storage");
+
         const bool sdInitSuccess = StorageManager::mountSDCard();
-        StorageManager::setFS(SD_MMC, SPIFFS, SD_MMC);
-        fileLog.enableSDCardLogging(LOG_FILE_PATH);
-        fileLog.logInfoOrCriticalErrorln(sdInitSuccess, "SD card initialization succeeded. Now logging to file",
-                                         "SD card initialization failed");
+        if (!sdInitSuccess)
+        {
+            serialOnlyLog.warningln("Failed to initialize SD-card");
+        }
+        enableFileLogging(!sdInitSuccess);
     }
     else
     {
-        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
-        fileLog.enableFlashLogging(LOG_FILE_PATH);
-        fileLog.infoln("Using flash instead of SD card. Now logging to file");
+        serialOnlyLog.infoln("Using flash as preferred storage");
+        enableFileLogging(true);
     }
 
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
