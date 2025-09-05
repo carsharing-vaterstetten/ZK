@@ -82,14 +82,20 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const bool success = Modem::downloadFile(REMOTE_RFID_PATH, file);
-    fileLog.logInfoOrWarningln(success, "Successfully downloaded RFIDs file", "RFIDs file download failed");
+    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file);
 
-    if (!success)
+    switch (downloadResult)
     {
+    case DownloadResult::HTTP_REQUEST_ERROR:
+    case DownloadResult::UNEXPECTED_STATUS_CODE:
+        fileLog.errorln("RFIDs file download failed");
         StorageManager::removeTmpRFIDs();
         return false;
+    case DownloadResult::SUCCESS:
+        break;
     }
+
+    fileLog.infoln("Successfully downloaded RFIDs file");
 
     const bool removeOldSuccess = StorageManager::removeRFIDs();
     fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
@@ -109,13 +115,12 @@ void RFIDs::downloadRfidsIfChanged()
 {
     switch (compareChecksums())
     {
+    case RfidsChecksumResult::ERROR:
     case RfidsChecksumResult::FILES_ARE_EQUAL:
         break;
     case RfidsChecksumResult::FILES_DIFFER:
     case RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST:
         downloadRfids();
-        break;
-    case RfidsChecksumResult::ERROR:
         break;
     }
 }

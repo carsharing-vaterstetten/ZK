@@ -102,7 +102,9 @@ void Modem::end()
     fileLog.infoln("Modem disconnected");
 }
 
-int Modem::uploadFile(const String& endpoint, File& f, String* response, const String& urlParams, const int bufferSize)
+UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
+                               const String& urlParams,
+                               const int bufferSize)
 {
     const String filePath = f.path();
     const bool isFileLogFile = filePath == LOG_FILE_PATH;
@@ -125,7 +127,7 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
     {
         f.close();
         fileLog.warningln("File is empty, not uploading");
-        return 1;
+        return UploadResult::FILE_IS_EMPTY;
     }
 
     // Append URL parameters if provided
@@ -145,7 +147,7 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
         f.close();
         uploadHttp.stop();
         fileLog.errorln("Failed to upload file. Error " + String(err));
-        return err;
+        return UploadResult::HTTP_REQUEST_ERROR;
     }
 
     uploadHttp.sendBasicAuth(config.username, config.password);
@@ -181,31 +183,43 @@ int Modem::uploadFile(const String& endpoint, File& f, String* response, const S
     }
 
     uploadHttp.endRequest();
-    const int status = uploadHttp.responseStatusCode();
+    *statusCode = uploadHttp.responseStatusCode();
     const String responseBody = uploadHttp.responseBody();
 
     f.close();
     uploadHttp.stop();
 
-    fileLog.infoln("Response status code: " + String(status));
+    fileLog.infoln("Response status code: " + String(*statusCode));
 
     *response = responseBody;
 
-    return status;
+    return UploadResult::SUCCESS;
 }
 
-bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams, const int bufferSize)
+UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
+                                                         const int bufferSize)
 {
     const size_t fileSize = f.size();
 
     String resp;
+    int responseStatusCode;
 
-    const int respStatus = uploadFile(endpoint, f, &resp, urlParams, bufferSize);
+    const UploadResult uploadResult = uploadFile(endpoint, f, &responseStatusCode, &resp, urlParams, bufferSize);
 
-    if (respStatus != 200)
+    switch (uploadResult)
     {
-        fileLog.errorln("Unexpected response code (see above)");
-        return false;
+    case UploadResult::FILE_IS_EMPTY:
+        return UploadWithSizeCheckResult::FILE_IS_EMPTY;
+    case UploadResult::HTTP_REQUEST_ERROR:
+        return UploadWithSizeCheckResult::HTTP_REQUEST_ERROR;
+    case UploadResult::SUCCESS:
+        break;
+    }
+
+    if (responseStatusCode != 200)
+    {
+        fileLog.errorln("Unexpected status code " + String(responseStatusCode));
+        return UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE;
     }
 
     const long responseSize = resp.toInt();
@@ -214,23 +228,24 @@ bool Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const Strin
     {
         fileLog.errorln(
             "File size check failed: local: " + String(fileSize) + " B != uploaded: " + String(responseSize) + " B");
-        return false;
+        return UploadWithSizeCheckResult::SIZE_CHECK_FAILED;
     }
 
-    return true;
+    return UploadWithSizeCheckResult::SUCCESS;
 }
 
-bool Modem::uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
-                                             const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                             const uint32_t retries, const String& urlParams, const int bufferSize)
+void Modem::uploadFileWithSizeCheckAndDelete(
+    const String& endpoint, FS& fileFs, const String& filePath,
+    const bool deleteIfSuccess, const bool deleteAfterRetrying,
+    const uint32_t retries, const String& urlParams, const int bufferSize)
 {
     if (!fileFs.exists(filePath))
     {
         fileLog.errorln(filePath + " does not exist");
-        return false;
+        return;
     }
 
-    bool uploadSuccess = false;
+    UploadWithSizeCheckResult uploadResult;
     uint32_t attemptNo = 0;
 
     do
@@ -240,12 +255,21 @@ bool Modem::uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs,
         if (!f)
         {
             fileLog.errorln("Failed to open " + filePath);
-            return false;
+            return;
         }
 
-        uploadSuccess = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize);
+        uploadResult = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize);
 
-        if (uploadSuccess) break;
+        switch (uploadResult)
+        {
+        case UploadWithSizeCheckResult::FILE_IS_EMPTY:
+        case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
+        case UploadWithSizeCheckResult::SUCCESS:
+            goto endLoop;
+        case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
+        case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
+            break;
+        }
 
         fileLog.errorln(
             "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
@@ -255,15 +279,14 @@ bool Modem::uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs,
     }
     while (attemptNo <= retries);
 
+endLoop:;
 
-    if (deleteAfterRetrying || (uploadSuccess && deleteIfSuccess))
+    if (deleteAfterRetrying || (uploadResult == UploadWithSizeCheckResult::SUCCESS && deleteIfSuccess))
     {
         const bool removeSuccess = StorageManager::remove(fileFs, filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }
-
-    return uploadSuccess;
 }
 
 
@@ -297,10 +320,9 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody)
 }
 
 
-bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize)
+DownloadResult Modem::downloadFile(const String& remotePath, File& f, const int bufferSize)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
-    String srcPath = f.path();
     HttpClient downloadHttp{*gsmClient, config.server, config.port};
 
     downloadHttp.beginRequest();
@@ -311,7 +333,7 @@ bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize
         fileLog.errorln("Error " + String(err) + ". Download canceled");
         downloadHttp.stop();
         f.close();
-        return false;
+        return DownloadResult::HTTP_REQUEST_ERROR;
     }
 
     downloadHttp.sendBasicAuth(config.username, config.password);
@@ -327,7 +349,7 @@ bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize
         fileLog.errorln("Unexpected status (see above). Download canceled");
         downloadHttp.stop();
         f.close();
-        return false;
+        return DownloadResult::UNEXPECTED_STATUS_CODE;
     }
 
     uint8_t buf[bufferSize];
@@ -358,24 +380,17 @@ bool Modem::downloadFile(const String& remotePath, File& f, const int bufferSize
 
     f.close();
 
-    if (downloaded != totalLen)
-    {
-        fileLog.errorln(
-            "Downloaded file size (" + String(downloaded) + " B) != content length (" + String(totalLen) + " B)");
-        return false;
-    }
-
     fileLog.infoln("Download complete");
 
-    return true;
+    return DownloadResult::SUCCESS;
 }
 
-bool Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
     fileLog.infoln("Uploading log");
-    return uploadFileWithSizeCheckAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH,
-                                            deleteIfSuccess, deleteAfterRetrying, retries,
-                                            "efuse_mac=" + String(efuseMac, 16));
+    uploadFileWithSizeCheckAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH,
+                                     deleteIfSuccess, deleteAfterRetrying, retries,
+                                     "efuse_mac=" + String(efuseMac, 16));
 }
 
 uint64_t Modem::getUTCTimestamp()

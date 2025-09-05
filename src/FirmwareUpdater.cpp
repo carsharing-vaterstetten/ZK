@@ -22,16 +22,19 @@ bool FirmwareUpdater::downloadAndPerformUpdate()
         return false;
     }
 
-    const bool downloadSuccess = Modem::downloadFile(LATEST_FIRMWARE_DOWNLOAD_PATH, downloadFile);
+    const DownloadResult downloadResult = Modem::downloadFile(LATEST_FIRMWARE_DOWNLOAD_PATH, downloadFile);
     downloadFile.close(); // Just to make sure
 
-    File updateFile = StorageManager::openFirmware(FILE_READ);
-
-    if (!downloadSuccess)
+    switch (downloadResult)
     {
-        fileLog.errorln("Failed to download new firmware");
+    case DownloadResult::HTTP_REQUEST_ERROR:
+    case DownloadResult::UNEXPECTED_STATUS_CODE:
         return false;
+    case DownloadResult::SUCCESS:
+        break;
     }
+
+    File updateFile = StorageManager::openFirmware(FILE_READ);
 
     const size_t fileSize = updateFile.size();
 

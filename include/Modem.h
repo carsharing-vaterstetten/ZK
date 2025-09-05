@@ -6,6 +6,26 @@
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 
+#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, SUCCESS
+#define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, SUCCESS
+
+enum class UploadResult
+{
+    BASE_UPLOAD_RESULTS,
+};
+
+enum class UploadWithSizeCheckResult
+{
+    BASE_UPLOAD_RESULTS,
+    UNEXPECTED_STATUS_CODE,
+    SIZE_CHECK_FAILED,
+};
+
+enum class DownloadResult
+{
+    BASE_DOWNLOAD_RESULTS,
+};
+
 class Modem
 {
     static void powerOn();
@@ -18,16 +38,17 @@ public:
 
     static bool init(bool secondTry = false);
     static void end();
-    static int uploadFile(const String& endpoint, File& f, String* response, const String& urlParams = "",
-                          int bufferSize = 512);
-    static bool uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams = "",
-                                        int bufferSize = 512);
-    static bool uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
+    static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
+                                   const String& urlParams = "", int bufferSize = 512);
+    static UploadWithSizeCheckResult uploadFileWithSizeCheck(const String& endpoint, File& f,
+                                                             const String& urlParams = "",
+                                                             int bufferSize = 512);
+    static void uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
                                                  bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
                                                  const String& urlParams, int bufferSize = 512);
     static int simpleGet(const String& aUrlPath, String* responseBody);
-    static bool downloadFile(const String& remotePath, File& f, int bufferSize = 512);
-    static bool uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    static DownloadResult downloadFile(const String& remotePath, File& f, int bufferSize = 512);
+    static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
