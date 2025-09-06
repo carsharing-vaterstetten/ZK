@@ -18,6 +18,7 @@
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
 unsigned long nextWatchdogResetMs;
+unsigned long nextGPSUpdate;
 unsigned long targetMillis;
 
 
@@ -37,6 +38,10 @@ void checkNFCTag()
         else
         {
             AccessControl::login(readValue);
+            currentRFIDConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(readValue);
+            fileLog.infoln(currentRFIDConsentsToGPSTracking
+                               ? "Logged in RFID consents to GPS tracking"
+                               : "Logged in RFID does not consent to GPS tracking");
         }
     }
     else
@@ -77,17 +82,19 @@ void enableFileLogging(const bool forceFlash)
 {
     if (forceFlash)
     {
-        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
+        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS, SPIFFS, SPIFFS);
 
         fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
+        gpsLog.enableFlashLogging(GPS_FILE_PATH);
 
         fileLog.infoln("Forced to use flash. Now logging to file(s)");
         return;
     }
 
-    StorageManager::setFS(SD, SPIFFS, SD);
+    StorageManager::setFS(SD, SPIFFS, SD, SD, SPIFFS);
 
     fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
+    gpsLog.enableSDCardLogging(GPS_FILE_PATH);
 
     fileLog.infoln("Now logging to file(s)");
 }
@@ -202,6 +209,7 @@ void setup()
     statusLed.setColor(Color::Blue);
 
     RFIDs::downloadRfidsIfChanged();
+    RFIDs::downloadGPSTrackingConsentedRFIDs();
 
     Modem::uploadLog(true, true, 1);
 
@@ -224,10 +232,34 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
 
+        Modem::uploadGPSFile(true, true, 3);
         Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyways
 
         ESP.restart();
     }
 
     checkNFCTag();
+
+    if (millis() >= nextGPSUpdate)
+    {
+        if (!isLoggedIn || currentRFIDConsentsToGPSTracking)
+        {
+            GPS_DATA_t gpsData;
+            const bool gpsSuccess = Modem::getGPS(gpsData);
+
+            if (gpsSuccess)
+            {
+                const auto parsedBytes = reinterpret_cast<uint8_t*>(&gpsData);
+                serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
+                gpsLog.write(parsedBytes, sizeof(GPS_DATA_t));
+            }
+            else
+            {
+                serialOnlyLog.debugln("Failed to get GPS");
+            }
+        }
+
+        nextGPSUpdate = millis() + (
+            isLoggedIn ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
+    }
 }

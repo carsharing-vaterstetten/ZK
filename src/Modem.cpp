@@ -32,6 +32,43 @@ void Modem::powerOff()
     digitalWrite(PWR_PIN, HIGH);
 }
 
+bool Modem::enableGPS()
+{
+    gsmModem->sendAT("+CGPIO=0,48,1,1");
+
+    if (gsmModem->waitResponse(10000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power HIGH Failed");
+    }
+
+    fileLog.infoln("Enabling GPS... ");
+
+    const bool success = gsmModem->enableGPS();
+
+    fileLog.logInfoOrErrorln(success, "Enabled GPS", "Failed to enable GPS");
+
+    return success;
+}
+
+
+bool Modem::disableGPS()
+{
+    gsmModem->sendAT("+CGPIO=0,48,1,0");
+
+    if (gsmModem->waitResponse(10000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power LOW Failed");
+    }
+
+    fileLog.infoln("Disabling GPS...");
+
+    const bool success = gsmModem->disableGPS();
+
+    fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
+
+    return success;
+}
+
 bool Modem::init(const uint8_t retries)
 {
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
@@ -71,6 +108,8 @@ bool Modem::init(const uint8_t retries)
         const bool networkSuccess = gsmModem->waitForNetwork();
         fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
                                    "The modem did not connect to the network even after waiting");
+
+        enableGPS();
 
         if (gsmModem->isNetworkConnected() && gsmModem->isGprsConnected())
         {
@@ -407,3 +446,21 @@ uint64_t Modem::getUTCTimestamp()
 
     return mktime(&datetime);
 }
+
+bool Modem::getGPS(GPS_DATA_t& out)
+{
+    return gsmModem->getGPS(&out.lat, &out.lon, &out.speed, &out.alt, reinterpret_cast<int*>(&out.vsat),
+                            reinterpret_cast<int*>(&out.usat), &out.accuracy, reinterpret_cast<int*>(&out.year),
+                            reinterpret_cast<int*>(&out.month), reinterpret_cast<int*>(&out.day),
+                            reinterpret_cast<int*>(&out.hour), reinterpret_cast<int*>(&out.minute),
+                            reinterpret_cast<int*>(&out.second));
+}
+
+void Modem::uploadGPSFile(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+{
+    fileLog.infoln("Uploading GPS log");
+    uploadFileWithSizeCheckAndDelete(GPS_FILE_UPLOAD_ENDPOINT, *StorageManager::gpsFs, GPS_FILE_PATH,
+                                     deleteIfSuccess, deleteAfterRetrying, retries,
+                                     "efuse_mac=" + String(efuseMac, 16));
+}
+

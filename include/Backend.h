@@ -4,12 +4,16 @@
 
 // Server router paths
 #define LOG_ROUTE SERVER_VERSION_ROUTE "/log"
+#define GPS_ROUTE SERVER_VERSION_ROUTE "/gps"
 #define FIRMWARE_ROUTE SERVER_VERSION_ROUTE "/firmware"
 #define RFIDS_ROUTE SERVER_VERSION_ROUTE "/rfids"
 #define STATIC_ROUTE SERVER_VERSION_ROUTE "/static"
 
 // Log route
 #define LOG_FILE_UPLOAD_ENDPOINT LOG_ROUTE "/upload"
+
+// Gps route
+#define GPS_FILE_UPLOAD_ENDPOINT GPS_ROUTE "/upload"
 
 // Firmware route
 #define LATEST_FIRMWARE_ENDPOINT FIRMWARE_ROUTE "/latest"
@@ -20,3 +24,4 @@
 // RFIDs route
 #define REMOTE_RFID_MD5_CHECKSUM_PATH RFIDS_ROUTE "/md5-checksum"
 #define REMOTE_RFID_PATH RFIDS_ROUTE "/download"
+#define REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH RFIDS_ROUTE "/gps-tracking-consented/download"

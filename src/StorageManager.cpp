@@ -16,12 +16,16 @@ bool StorageManager::sdCardIsMounted = false;
 FS* StorageManager::logFileFs = nullptr;
 FS* StorageManager::rfidsFs = nullptr;
 FS* StorageManager::firmwareFs = nullptr;
+FS* StorageManager::gpsFs = nullptr;
+FS* StorageManager::consentToGPSTrackingRfidsFs = nullptr;
 
-void StorageManager::setFS(FS& logFile, FS& rfids, FS& firmware)
+void StorageManager::setFS(FS& logFile, FS& rfids, FS& firmware, FS& gps, FS& consentToGPSTrackingRfids)
 {
     logFileFs = &logFile;
     rfidsFs = &rfids;
     firmwareFs = &firmware;
+    gpsFs = &gps;
+    consentToGPSTrackingRfidsFs = &consentToGPSTrackingRfids;
 }
 
 bool StorageManager::mountEEPROM()

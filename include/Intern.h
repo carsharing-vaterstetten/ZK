@@ -9,6 +9,8 @@
 #define TMP_RFID_FILE_PATH "/tmp_rfids.bin"
 #define FIRMWARE_FILE_PATH "/firmware.bin"
 #define LOG_FILE_PATH "/log.log"
+#define GPS_FILE_PATH "/gps.bin"
+#define GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH "/rfids_gps_consent.bin"
 
 #define CONFIG_START_ADDRESS 0
 #define CONFIG_VERSION 2

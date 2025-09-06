@@ -127,3 +127,75 @@ void RFIDs::downloadRfidsIfChanged()
         break;
     }
 }
+
+bool RFIDs::downloadGPSTrackingConsentedRFIDs()
+{
+    fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
+
+    File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
+
+    if (!file)
+    {
+        fileLog.warningln("Failed to open temp RFIDs file. Download canceled");
+        return false;
+    }
+
+    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file);
+
+    switch (downloadResult)
+    {
+    case DownloadResult::HTTP_REQUEST_ERROR:
+    case DownloadResult::UNEXPECTED_STATUS_CODE:
+        fileLog.errorln("Download failed");
+        StorageManager::removeTmpRFIDs();
+        return false;
+    case DownloadResult::SUCCESS:
+        break;
+    }
+
+    fileLog.infoln("Successfully downloaded file");
+
+    const bool removeOldSuccess = StorageManager::remove(*StorageManager::consentToGPSTrackingRfidsFs,
+                                                         GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH);
+
+    fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
+                               "Failed to remove old RFIDs file");
+
+    const bool renameSuccess = StorageManager::rfidsFs->rename(
+        TMP_RFID_FILE_PATH, GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH);
+
+    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed file",
+                               "Failed to rename file. RFIDs not updated");
+
+    StorageManager::removeTmpRFIDs();
+
+    return renameSuccess;
+}
+
+
+bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid)
+{
+    File file = StorageManager::consentToGPSTrackingRfidsFs->open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, FILE_READ);
+
+    if (!file)
+    {
+        fileLog.errorln("Failed to open GPS consent RFIDs file for reading");
+        return false;
+    }
+
+    const size_t rfidsCount = file.size() / 4;
+    uint32_t buffer;
+
+    for (int i = 0; i < rfidsCount; i++)
+    {
+        file.read(reinterpret_cast<uint8_t*>(&buffer), 4);
+        if (buffer == rfid)
+        {
+            file.close();
+            return true;
+        }
+    }
+
+    file.close();
+    return false;
+}

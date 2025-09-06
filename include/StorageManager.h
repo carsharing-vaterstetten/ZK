@@ -14,10 +14,12 @@ public:
     static FS* logFileFs;
     static FS* rfidsFs;
     static FS* firmwareFs;
+    static FS* gpsFs;
+    static FS* consentToGPSTrackingRfidsFs;
 
     StorageManager() = delete; // Prevent instantiation
 
-    static void setFS(FS& logFile, FS& rfids, FS& firmware);
+    static void setFS(FS& logFile, FS& rfids, FS& firmware, FS& gps, FS& consentToGPSTrackingRfids);
     static bool mountEEPROM();
     static bool mountSSPIFFS();
     static bool mountSDCard();
@@ -51,6 +53,11 @@ public:
     static File openFirmware(const char* mode, const bool create = false)
     {
         return firmwareFs->open(FIRMWARE_FILE_PATH, mode, create);
+    }
+
+    static File openGPS(const char* mode, const bool create = false)
+    {
+        return gpsFs->open(GPS_FILE_PATH, mode, create);
     }
 
     static bool remove(FS& fs, const String& path, bool notExistingOk = true);
