@@ -24,7 +24,11 @@ bool RFIDs::isRegisteredRFID(const uint32_t rfid)
     for (int i = 0; i < rfidsCount; i++)
     {
         file.read(reinterpret_cast<uint8_t*>(&buffer), 4);
-        if (buffer == rfid)return true;
+        if (buffer == rfid)
+        {
+            file.close();
+            return true;
+        }
     }
 
     file.close();
