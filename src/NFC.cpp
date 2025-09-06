@@ -43,7 +43,7 @@ uint32_t NFC::readTag()
     uint8_t uid[7] = {};
     uint8_t uidLength;
 
-    const bool success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 1000);
+    const bool success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100);
 
     if (!success || uidLength < 4) return 0;
 
