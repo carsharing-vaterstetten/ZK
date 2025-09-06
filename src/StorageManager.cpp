@@ -40,7 +40,7 @@ bool StorageManager::mountSDCard()
 {
     if (sdCardIsMounted) return true;
     SD_MMC.setPins(14, 15, 2);
-    sdCardIsMounted = SD_MMC.begin("/sdcard", true, true, 10000);
+    sdCardIsMounted = SD_MMC.begin("/sdcard", true, true, 10000, 10);
     return sdCardIsMounted;
 }
 
