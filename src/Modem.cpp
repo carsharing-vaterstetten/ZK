@@ -10,7 +10,8 @@
 #include "Backend.h"
 #include "StorageManager.h"
 
-#define SerialAT Serial1
+#define SERIAL_AT Serial1
+#define SERIAL_AT_BAUD 115200U
 
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
@@ -39,12 +40,12 @@ bool Modem::init(const uint8_t retries)
         delete gsmModem;
         delete gsmClient;
 
-        gsmModem = new TinyGsmSim7000{SerialAT};
+        gsmModem = new TinyGsmSim7000{SERIAL_AT};
         gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
 
         fileLog.infoln("Initializing modem...");
         powerOn();
-        SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
+        SERIAL_AT.begin(SERIAL_AT_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
 
         while (!gsmModem->testAT())
             delay(10);

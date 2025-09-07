@@ -79,7 +79,7 @@ void enableFileLogging(const bool forceFlash)
     {
         StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
 
-        fileLog.enableFlashLogging(LOG_FILE_PATH);
+        fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
 
         fileLog.infoln("Forced to use flash. Now logging to file(s)");
         return;
@@ -87,7 +87,7 @@ void enableFileLogging(const bool forceFlash)
 
     StorageManager::setFS(SD_MMC, SPIFFS, SD_MMC);
 
-    fileLog.enableSDCardLogging(LOG_FILE_PATH);
+    fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
 
     fileLog.infoln("Now logging to file(s)");
 }
@@ -108,8 +108,10 @@ void setup()
     {
     }
 
-    fileLog.enableSerialLogging();
-    serialOnlyLog.enableSerialLogging();
+#if ENABLE_SERIAL_LOGGING
+    fileLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
+    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
+#endif
 
     const esp_reset_reason_t reset_reason = esp_reset_reason();
 

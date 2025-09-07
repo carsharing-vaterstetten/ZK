@@ -2,6 +2,7 @@
 
 #include <SPIFFS.h>
 
+#include "Config.h"
 #include "Modem.h"
 #include "SD_MMC.h"
 
@@ -12,7 +13,6 @@
 #define COLOR_BLUE    "\033[34m"
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
-#define COLORIZE_SERIAL
 
 void Log::enableSerialLogging(const uint8_t loggingLevel)
 {
@@ -101,11 +101,11 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
     {
         finalStr += "[" + getLoggingLevelChar(level) + "]";
         finalSerialStr += "[";
-#ifdef COLORIZE_SERIAL
+#if COLORIZE_SERIAL_LOGGING
         finalSerialStr += getLoggingLevelColor(level);
 #endif
         finalSerialStr += getLoggingLevelChar(level);
-#ifdef COLORIZE_SERIAL
+#if COLORIZE_SERIAL_LOGGING
         finalSerialStr += COLOR_RESET;
 #endif
         finalSerialStr += "]";
@@ -123,7 +123,7 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
 
     finalStr += " " + msg;
 
-#ifdef COLORIZE_SERIAL
+#if COLORIZE_SERIAL_LOGGING
     if (level >= LOGGING_LEVEL_ERROR)
         finalSerialStr += " " BACKGROUND_COLOR_RED + msg + COLOR_RESET;
     else
@@ -182,8 +182,9 @@ void Log::appendLineToFileOnFlash(const String& msg) const
     file.close();
 }
 
-void Log::writeLineToSerial(const String& msg)
+void Log::writeLineToSerial(const String& msg) const
 {
+    if (!logToSerial) return;
     Serial.println(msg);
 }
 

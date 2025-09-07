@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 
-#include <utility>
-
 #define LOGGING_LEVEL_DEBUG 0
 #define LOGGING_LEVEL_INFO 1
 #define LOGGING_LEVEL_WARNING 2
@@ -86,7 +84,7 @@ private:
     uint8_t sdCardLoggingLevel = LOGGING_LEVEL_DEBUG;
 
     void appendLineToFileOnFlash(const String& msg) const;
-    static void writeLineToSerial(const String& msg);
+    void writeLineToSerial(const String& msg) const;
 
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);

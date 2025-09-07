@@ -1,5 +1,16 @@
 #pragma once
 
+#include "Log.h"
+
+// Serial debugging
+#define ENABLE_SERIAL_LOGGING false // Enable for serial printing
+#define COLORIZE_SERIAL_LOGGING true
+#if ENABLE_SERIAL_LOGGING
+#define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
+#endif
+#define FLASH_LOGGING_LEVEL LOGGING_LEVEL_INFO
+#define SD_CARD_LOGGING_LEVEL LOGGING_LEVEL_INFO
+
 #define UART_BAUD 115200U
 
 #define TINY_GSM_MODEM_SIM7000
