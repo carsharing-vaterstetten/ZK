@@ -65,10 +65,6 @@ void HelperUtils::parseConfigString(const String& inputString, Config& c)
             {
                 c.port = value.toInt();
             }
-            else if (key == "username")
-            {
-                value.toCharArray(c.username, sizeof(c.username));
-            }
             else if (key == "password")
             {
                 value.toCharArray(c.password, sizeof(c.password));
@@ -89,8 +85,7 @@ void HelperUtils::parseConfigString(const String& inputString, Config& c)
 String HelperUtils::getConfigHumanReadable(const Config& c)
 {
     return "Config version: " + String(c.version) + " apn=" + c.apn + " gprsUser=" + c.gprsUser +
-        " GSM_PIN=" + c.GSM_PIN + " server=" + c.server + " port=" + String(c.port) + " username=" +
-        c.username
+        " GSM_PIN=" + c.GSM_PIN + " server=" + c.server + " port=" + String(c.port)
         + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
 }
 
@@ -98,7 +93,6 @@ String HelperUtils::getConfigFormat(const Config& c)
 {
     return "apn=\"" + String(c.apn) + "\";gprsUser=\"" + c.gprsUser +
         "\";GSM_PIN=\"" + c.GSM_PIN + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +
-        "\";username=\"" + c.username
         + "\";password=\"" + c.password + "\";preferSDCard=\"" + String(c.preferSDCard) + "\";";
 }
 
@@ -163,7 +157,6 @@ void HelperUtils::requestConfig(Config& c)
         "",
         "example.com",
         80,
-        "test user",
         "XXX",
         true,
     };

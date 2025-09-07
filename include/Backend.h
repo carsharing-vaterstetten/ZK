@@ -18,7 +18,4 @@
 
 // RFIDs route
 #define REMOTE_RFID_MD5_CHECKSUM_PATH RFIDS_ROUTE "/md5-checksum"
-
-// Static route
-#define REMOTE_RFID_PATH STATIC_ROUTE "/rfids.bin"
-
+#define REMOTE_RFID_PATH RFIDS_ROUTE "/download"

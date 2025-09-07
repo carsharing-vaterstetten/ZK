@@ -45,9 +45,11 @@ public:
                                                              int bufferSize = 512);
     static void uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
                                                  bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
-                                                 const String& urlParams, int bufferSize = 512);
-    static int simpleGet(const String& aUrlPath, String* responseBody);
-    static DownloadResult downloadFile(const String& remotePath, File& f, int bufferSize = 512);
+                                                 const String& urlParams = "", int bufferSize = 512);
+    static int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
+                                       const String& password = "");
+    static DownloadResult downloadFile(const String& remotePath, File& f, const String& username = "",
+                                       const String& password = "", int bufferSize = 512);
     static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück

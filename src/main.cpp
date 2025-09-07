@@ -159,8 +159,9 @@ void setup()
     statusLed.setColor(Color::White);
 
     efuseMac = ESP.getEfuseMac();
+    efuseMacHex = String(efuseMac, 16);
 
-    fileLog.infoln("Efuse chip ID: 0x" + String(efuseMac, 16));
+    fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
 
     Modem::init();
 

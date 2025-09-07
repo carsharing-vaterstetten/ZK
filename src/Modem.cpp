@@ -103,8 +103,7 @@ void Modem::end()
 }
 
 UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                               const String& urlParams,
-                               const int bufferSize)
+                               const String& urlParams, const int bufferSize)
 {
     const String filePath = f.path();
     const bool isFileLogFile = filePath == LOG_FILE_PATH;
@@ -132,7 +131,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
     // Append URL parameters if provided
     String fullEndpoint = endpoint;
-    if (urlParams.length() > 0)
+    if (!urlParams.isEmpty())
     {
         fullEndpoint += "?" + urlParams;
     }
@@ -150,7 +149,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::HTTP_REQUEST_ERROR;
     }
 
-    uploadHttp.sendBasicAuth(config.username, config.password);
+    uploadHttp.sendBasicAuth(efuseMacHex, config.password);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
     uploadHttp.sendHeader("Content-Length", String(fileSize));
     uploadHttp.beginBody();
@@ -291,7 +290,8 @@ endLoop:;
 
 
 /// returns response status
-int Modem::simpleGet(const String& aUrlPath, String* responseBody)
+int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String& username,
+                     const String& password)
 {
     HttpClient http{*gsmClient, config.server, config.port};
     http.beginRequest();
@@ -303,7 +303,8 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody)
         return err;
     }
 
-    http.sendBasicAuth(config.username, config.password);
+    if (!username.isEmpty() && !password.isEmpty())
+        http.sendBasicAuth(username, password);
     http.endRequest();
 
     const int responseStatus = http.responseStatusCode();
@@ -320,7 +321,8 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody)
 }
 
 
-DownloadResult Modem::downloadFile(const String& remotePath, File& f, const int bufferSize)
+DownloadResult Modem::downloadFile(const String& remotePath, File& f, const String& username,
+                                   const String& password, const int bufferSize)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
     HttpClient downloadHttp{*gsmClient, config.server, config.port};
@@ -336,7 +338,9 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const int 
         return DownloadResult::HTTP_REQUEST_ERROR;
     }
 
-    downloadHttp.sendBasicAuth(config.username, config.password);
+    if (!username.isEmpty() && !password.isEmpty())
+        downloadHttp.sendBasicAuth(username, password);
+
     downloadHttp.endRequest();
 
     const int status = downloadHttp.responseStatusCode();
@@ -389,8 +393,7 @@ void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying
 {
     fileLog.infoln("Uploading log");
     uploadFileWithSizeCheckAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH,
-                                     deleteIfSuccess, deleteAfterRetrying, retries,
-                                     "efuse_mac=" + String(efuseMac, 16));
+                                     deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 uint64_t Modem::getUTCTimestamp()

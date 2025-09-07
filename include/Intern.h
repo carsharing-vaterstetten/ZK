@@ -22,7 +22,6 @@ struct Config
   char GSM_PIN[16];
   char server[64];
   uint16_t port;
-  char username[32];
   char password[64];
   bool preferSDCard;
 };
