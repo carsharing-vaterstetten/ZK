@@ -36,7 +36,7 @@ public:
 
     Modem() = delete;
 
-    static bool init(bool secondTry = false);
+    static bool init(uint8_t retries = 2);
     static void end();
     static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
                                    const String& urlParams = "", int bufferSize = 512);

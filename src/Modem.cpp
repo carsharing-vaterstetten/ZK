@@ -32,63 +32,54 @@ void Modem::powerOff()
     digitalWrite(PWR_PIN, HIGH);
 }
 
-bool Modem::init(const bool secondTry)
+bool Modem::init(const uint8_t retries)
 {
-    delete gsmModem;
-    delete gsmClient;
-
-    gsmModem = new TinyGsmSim7000{SerialAT};
-    gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
-
-    fileLog.infoln("Initializing modem...");
-
-    powerOn();
-
-    SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-
-    while (!gsmModem->testAT())
+    for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
-        delay(10);
-    }
+        delete gsmModem;
+        delete gsmClient;
 
-    fileLog.infoln("Modem connected");
+        gsmModem = new TinyGsmSim7000{SerialAT};
+        gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
 
-    const bool modemInitSuccess = gsmModem->init();
+        fileLog.infoln("Initializing modem...");
+        powerOn();
+        SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
 
-    // Most of the time the modem works event if it returns an error
-    fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
-                               "There was an error while initializing the modem");
+        while (!gsmModem->testAT())
+            delay(10);
 
-    fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
+        fileLog.infoln("Modem connected to serial");
 
-    if (gsmModem->getSimStatus() != SIM_ANTITHEFT_LOCKED)
-    {
-        const bool simUnlockSuccess = gsmModem->simUnlock(config.GSM_PIN);
-        fileLog.logInfoOrWarningln(simUnlockSuccess, "SIM unlocked successfully", "SIM unlocking failed");
-    }
+        const bool modemInitSuccess = gsmModem->init();
+        fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
+                                   "There was an error while initializing the modem");
 
-    fileLog.infoln("Connecting Modem...");
+        fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
-    const bool gprsSuccess = gsmModem->gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+        if (gsmModem->getSimStatus() != SIM_ANTITHEFT_LOCKED)
+        {
+            const bool simUnlockSuccess = gsmModem->simUnlock(config.GSM_PIN);
+            fileLog.logInfoOrWarningln(simUnlockSuccess, "SIM unlocked successfully", "SIM unlocking failed");
+        }
 
-    fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+        fileLog.infoln("Connecting GPRS...");
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+        fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
-    fileLog.infoln("Waiting for network...");
+        fileLog.infoln("Waiting for network...");
+        const bool networkSuccess = gsmModem->waitForNetwork();
+        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
+                                   "The modem did not connect to the network even after waiting");
 
-    const bool networkSuccess = gsmModem->waitForNetwork();
-    fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
-                               "The modem did not connect to the network even after waiting");
+        if (gsmModem->isNetworkConnected() && gsmModem->isGprsConnected())
+        {
+            isInit = true;
+            return true;
+        }
 
-    if (gsmModem->isNetworkConnected())
-    {
-        isInit = true;
-        return true;
-    }
-
-    if (!secondTry)
-    {
-        fileLog.infoln("Modem failed to connect on first attempt. Giving it another try.");
-        return init(true);
+        fileLog.warningln("Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) + " failed");
+        powerOff();
     }
 
     return false;
