@@ -1,11 +1,12 @@
 #pragma once
 
-// Server router paths
+#define SERVER_VERSION_ROUTE "/v1"
 
-#define LOG_ROUTE "/log"
-#define FIRMWARE_ROUTE "/firmware"
-#define RFIDS_ROUTE "/rfids"
-#define STATIC_ROUTE "/static"
+// Server router paths
+#define LOG_ROUTE SERVER_VERSION_ROUTE "/log"
+#define FIRMWARE_ROUTE SERVER_VERSION_ROUTE "/firmware"
+#define RFIDS_ROUTE SERVER_VERSION_ROUTE "/rfids"
+#define STATIC_ROUTE SERVER_VERSION_ROUTE "/static"
 
 // Log route
 #define LOG_FILE_UPLOAD_ENDPOINT LOG_ROUTE "/upload"
