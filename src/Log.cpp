@@ -92,14 +92,14 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
 
     if (logTime)
     {
-        finalStr += "[" + timeStr + "] ";
+        finalStr += "[" + timeStr + "]";
     }
 
     String finalSerialStr = finalStr;
 
     if (logLoggingLevel)
     {
-        finalStr += "[" + getLoggingLevelChar(level) + "] ";
+        finalStr += "[" + getLoggingLevelChar(level) + "]";
         finalSerialStr += "[";
 #ifdef COLORIZE_SERIAL
         finalSerialStr += getLoggingLevelColor(level);
@@ -108,27 +108,27 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
 #ifdef COLORIZE_SERIAL
         finalSerialStr += COLOR_RESET;
 #endif
-        finalSerialStr += "] ";
+        finalSerialStr += "]";
     }
 
     String nameString = "";
 
     if (!loggerName.isEmpty())
     {
-        nameString = "[" + loggerName + "] ";
+        nameString = "[" + loggerName + "]";
     }
 
     finalStr += nameString;
     finalSerialStr += nameString;
 
-    finalStr += msg;
+    finalStr += " " + msg;
 
 #ifdef COLORIZE_SERIAL
     if (level >= LOGGING_LEVEL_ERROR)
-        finalSerialStr += BACKGROUND_COLOR_RED + msg + COLOR_RESET;
+        finalSerialStr += " " BACKGROUND_COLOR_RED + msg + COLOR_RESET;
     else
 #endif
-        finalSerialStr += msg;
+        finalSerialStr += " " + msg;
 
     if (level >= serialLoggingLevel)
         writeLineToSerial(finalSerialStr);
