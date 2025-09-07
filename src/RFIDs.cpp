@@ -140,7 +140,8 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file);
+    const DownloadResult downloadResult = Modem::downloadFile(
+        REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, efuseMacHex, config.password);
 
     switch (downloadResult)
     {
