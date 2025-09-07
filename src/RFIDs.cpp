@@ -45,15 +45,6 @@ RfidsChecksumResult RFIDs::compareChecksums()
         return RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST;
     }
 
-    uint8_t md5Hash[16];
-
-    File f = StorageManager::openRFIDs(FILE_READ);
-    HelperUtils::md5File(f, md5Hash);
-
-    f.close();
-
-    const String md5Hex = HelperUtils::md5ToHex(md5Hash);
-
     String response;
     const int statusCode = Modem::simpleGet(REMOTE_RFID_MD5_CHECKSUM_PATH, &response, efuseMacHex, config.password);
 
@@ -62,6 +53,14 @@ RfidsChecksumResult RFIDs::compareChecksums()
         fileLog.warningln("Unexpected status code " + String(statusCode));
         return RfidsChecksumResult::ERROR;
     }
+
+    uint8_t md5Hash[16];
+
+    File f = StorageManager::openRFIDs(FILE_READ);
+    HelperUtils::md5File(f, md5Hash);
+    f.close();
+
+    const String md5Hex = HelperUtils::md5ToHex(md5Hash);
 
     if (response == "\"" + md5Hex + "\"")
     {
