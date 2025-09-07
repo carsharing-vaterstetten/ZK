@@ -15,7 +15,7 @@ bool NFC::init()
 
     if (!nfcInitSuccess)
     {
-        fileLog.errorln("Failed to initialize NFC board");
+        fileLog.criticalln("Failed to initialize NFC board");
         return false;
     }
 
@@ -25,7 +25,7 @@ bool NFC::init()
 
     if (!versionData)
     {
-        fileLog.warningln("Could not get NFC chip version data");
+        fileLog.criticalln("Could not get NFC chip version data");
         return false;
     }
 
