@@ -11,6 +11,7 @@
 #define COLOR_YELLOW  "\033[33m"
 #define COLOR_BLUE    "\033[34m"
 #define COLOR_MAGENTA "\033[35m"
+#define BACKGROUND_COLOR_RED "\033[41m"
 #define COLORIZE_SERIAL
 
 void Log::enableSerialLogging(const uint8_t loggingLevel)
@@ -121,7 +122,13 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
     finalSerialStr += nameString;
 
     finalStr += msg;
-    finalSerialStr += msg;
+
+#ifdef COLORIZE_SERIAL
+    if (level >= LOGGING_LEVEL_ERROR)
+        finalSerialStr += BACKGROUND_COLOR_RED + msg + COLOR_RESET;
+    else
+#endif
+        finalSerialStr += msg;
 
     if (level >= serialLoggingLevel)
         writeLineToSerial(finalSerialStr);
