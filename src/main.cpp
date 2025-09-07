@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Modem.h>
-#include <NFC.h>
+#include <NFCCardReader.h>
 #include <HelperUtils.h>
 #include <LED.h>
 #include <esp32-hal.h>
@@ -23,7 +23,7 @@ unsigned long targetMillis;
 
 void checkNFCTag()
 {
-    const uint32_t readValue = cardReader.readTag();
+    const uint32_t readValue = NFCCardReader::readTag();
 
     if (readValue == 0) return; // No card present
 
@@ -179,7 +179,7 @@ void setup()
 
     AccessControl::init();
 
-    cardReader.init();
+    NFCCardReader::init();
 
     initTime();
 

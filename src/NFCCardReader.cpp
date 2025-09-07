@@ -1,27 +1,25 @@
-#include "NFC.h"
+#include "NFCCardReader.h"
+
+#include <SPI.h>
 
 #include "Config.h"
 #include "Globals.h"
 
-NFC::NFC() : nfc(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS)
+PN532* NFCCardReader::nfc = nullptr;
+PN532_SPI* NFCCardReader::pn532spi = nullptr;
+SPIClass* NFCCardReader::spi = nullptr;
+
+bool NFCCardReader::init()
 {
-}
+    spi = new SPIClass(VSPI);
+    spi->begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
+    pn532spi = new PN532_SPI(*spi, NFC_SS);
+    nfc = new PN532(*pn532spi);
+    nfc->begin();
 
-bool NFC::init()
-{
-    sleep(1);
-    const bool nfcInitSuccess = nfc.begin();
-    sleep(1);
+    fileLog.infoln("NFC board initialized");
 
-    if (!nfcInitSuccess)
-    {
-        fileLog.criticalln("Failed to initialize NFC board");
-        return false;
-    }
-
-    fileLog.infoln("NFC board successfully initialized");
-
-    const uint32_t versionData = nfc.getFirmwareVersion();
+    const uint32_t versionData = nfc->getFirmwareVersion();
 
     if (!versionData)
     {
@@ -35,15 +33,17 @@ bool NFC::init()
 
     fileLog.infoln("Got NFC chip version data: " + chipName + " " + firmwareVersion);
 
+    nfc->SAMConfig();
+
     return true;
 }
 
-uint32_t NFC::readTag()
+uint32_t NFCCardReader::readTag()
 {
     uint8_t uid[7] = {};
     uint8_t uidLength;
 
-    const bool success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100);
+    const bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
 
     if (!success || uidLength < 4) return 0;
 

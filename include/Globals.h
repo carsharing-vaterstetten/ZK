@@ -3,7 +3,6 @@
 #include "Intern.h"
 #include "LED.h"
 #include "Log.h"
-#include "NFC.h"
 
 extern Log serialOnlyLog;
 extern Log fileLog;
@@ -12,5 +11,4 @@ extern String efuseMacHex;
 extern LED statusLed;
 extern bool isLoggedIn;
 extern uint32_t loggedInRFID;
-extern NFC cardReader;
 extern Config config;
