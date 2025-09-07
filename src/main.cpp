@@ -8,7 +8,7 @@
 #include <esp_task_wdt.h>
 #include <SD_MMC.h>
 #include <SPIFFS.h>
-
+#include "esp_log.h"
 #include "AccessControl.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
@@ -92,6 +92,15 @@ void enableFileLogging(const bool forceFlash)
     fileLog.infoln("Now logging to file(s)");
 }
 
+int espLogHandler(const char* fmt, const va_list args)
+{
+    char buf[256];
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    serialOnlyLog.debugln(buf);
+    // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-card
+    return 0;
+}
+
 void setup()
 {
     Serial.begin(UART_BAUD);
@@ -112,6 +121,9 @@ void setup()
     // This ensures that if the main loop doesn't reset the watchdog in time,
     // the ESP32 will reset itself.
     HelperUtils::subscribeTaskToWatchdog();
+
+    // redirect ESP logs
+    esp_log_set_vprintf(&espLogHandler);
 
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
     StorageManager::mountEEPROM();
@@ -166,8 +178,8 @@ void setup()
     Modem::init();
 
     fileLog.infoln(
-        "Time calibration: Millis: " + String(millis()) + " ms, Local time: " + Modem::getLocalTime() +
-        " UTC timestamp " + String(Modem::getUTCTimestamp()));
+        "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getLocalTime() +
+        ", UTC: " + String(Modem::getUTCTimestamp()));
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
