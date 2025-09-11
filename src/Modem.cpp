@@ -5,7 +5,6 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
-#include <SD_MMC.h>
 
 #include "Backend.h"
 #include "StorageManager.h"

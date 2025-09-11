@@ -11,8 +11,8 @@ SPIClass* NFCCardReader::spi = nullptr;
 
 bool NFCCardReader::init()
 {
-    spi = new SPIClass(VSPI);
-    spi->begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
+    spi = new SPIClass(HSPI);
+    spi->begin(NFC_SCLK, NFC_MISO, NFC_MOSI);
     pn532spi = new PN532_SPI(*spi, NFC_SS);
     nfc = new PN532(*pn532spi);
     nfc->begin();

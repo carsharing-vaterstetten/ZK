@@ -1,9 +1,10 @@
 #include "StorageManager.h"
 
 #include <EEPROM.h>
-#include <SD_MMC.h>
+#include <SD.h>
 #include <SPIFFS.h>
 
+#include "Config.h"
 #include "Globals.h"
 #include "Intern.h"
 
@@ -39,8 +40,8 @@ bool StorageManager::mountSSPIFFS()
 bool StorageManager::mountSDCard()
 {
     if (sdCardIsMounted) return true;
-    SD_MMC.setPins(14, 15, 2);
-    sdCardIsMounted = SD_MMC.begin("/sdcard", true, true, 10000, 10);
+    SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+    sdCardIsMounted = SD.begin(SD_CS, SPI);
     return sdCardIsMounted;
 }
 

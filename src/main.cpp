@@ -6,7 +6,7 @@
 #include <esp32-hal.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
-#include <SD_MMC.h>
+#include <SD.h>
 #include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
@@ -85,7 +85,7 @@ void enableFileLogging(const bool forceFlash)
         return;
     }
 
-    StorageManager::setFS(SD_MMC, SPIFFS, SD_MMC);
+    StorageManager::setFS(SD, SPIFFS, SD);
 
     fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
 

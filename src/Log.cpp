@@ -1,10 +1,10 @@
 #include "Log.h"
 
 #include <SPIFFS.h>
+#include <SD.h>
 
 #include "Config.h"
 #include "Modem.h"
-#include "SD_MMC.h"
 
 #define COLOR_RESET   "\033[0m"
 #define COLOR_RED     "\033[31m"
@@ -23,10 +23,10 @@ void Log::enableSerialLogging(const uint8_t loggingLevel)
 /// Make sure the pins of the sd card aren't used by something else!
 bool Log::enableSDCardLogging(const String& SDCardLogFileName, const uint8_t loggingLevel)
 {
-    if (!SD_MMC.exists(SDCardLogFileName))
+    if (!SD.exists(SDCardLogFileName))
     {
         // Let's ignore directories for now
-        File file = SD_MMC.open(SDCardLogFileName, FILE_WRITE, true);
+        File file = SD.open(SDCardLogFileName, FILE_WRITE, true);
         if (!file)
             return false;
 
@@ -158,7 +158,7 @@ void Log::write(const uint8_t* buffer, const size_t size) const
 
     if (logToSDCard)
     {
-        File file = SD_MMC.open(SDCardLogPath, FILE_APPEND);
+        File file = SD.open(SDCardLogPath, FILE_APPEND);
         file.write(buffer, size);
         file.close();
     }
@@ -168,7 +168,7 @@ void Log::appendLineToFileOnSDCard(const String& msg) const
 {
     if (!logToSDCard) return;
 
-    File file = SD_MMC.open(SDCardLogPath, FILE_APPEND);
+    File file = SD.open(SDCardLogPath, FILE_APPEND);
     file.println(msg);
     file.close();
 }
