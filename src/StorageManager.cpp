@@ -6,6 +6,7 @@
 
 #include "Config.h"
 #include "Globals.h"
+#include "HardwareManager.h"
 #include "Intern.h"
 
 bool StorageManager::eepromIsMounted = false;
@@ -40,8 +41,8 @@ bool StorageManager::mountSSPIFFS()
 bool StorageManager::mountSDCard()
 {
     if (sdCardIsMounted) return true;
-    SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
-    sdCardIsMounted = SD.begin(SD_CS, SPI);
+    HardwareManager::ensureSDSPIInitialized();
+    sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);
     return sdCardIsMounted;
 }
 

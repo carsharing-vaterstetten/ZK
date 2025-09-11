@@ -1,19 +1,17 @@
 #include "NFCCardReader.h"
 
-#include <SPI.h>
-
 #include "Config.h"
 #include "Globals.h"
+#include "HardwareManager.h"
 
 PN532* NFCCardReader::nfc = nullptr;
 PN532_SPI* NFCCardReader::pn532spi = nullptr;
-SPIClass* NFCCardReader::spi = nullptr;
 
 bool NFCCardReader::init()
 {
-    spi = new SPIClass(HSPI);
-    spi->begin(NFC_SCLK, NFC_MISO, NFC_MOSI);
-    pn532spi = new PN532_SPI(*spi, NFC_SS);
+    HardwareManager::ensureNFCSPIInitialized();
+
+    pn532spi = new PN532_SPI(*HardwareManager::nfcSpi, NFC_SS);
     nfc = new PN532(*pn532spi);
     nfc->begin();
 

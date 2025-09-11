@@ -31,11 +31,19 @@
 #define OPEN_KEY 21
 #define CLOSE_KEY 22
 
+// SD Card pins
+#define SD_MISO 2
+#define SD_MOSI 15
+#define SD_SCLK 14
+#define SD_CS 13
+#define SD_SPI VSPI
+
 // NFC Modul Pins
 #define NFC_MOSI 23
 #define NFC_MISO 19
 #define NFC_SCLK 18
 #define NFC_SS 5
+#define NFC_SPI HSPI
 
 // Restart the esp at this time
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
