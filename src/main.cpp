@@ -96,7 +96,7 @@ int espLogHandler(const char* fmt, const va_list args)
 {
     char buf[256];
     vsnprintf(buf, sizeof(buf), fmt, args);
-    serialOnlyLog.debugln(buf);
+    fileLog.errorln(buf);
     // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-card
     return 0;
 }
