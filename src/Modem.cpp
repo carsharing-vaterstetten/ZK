@@ -469,7 +469,6 @@ void Modem::uploadGPSFile(const bool deleteIfSuccess, const bool deleteAfterRetr
 {
     fileLog.infoln("Uploading GPS log");
     uploadFileWithSizeCheckAndDelete(GPS_FILE_UPLOAD_ENDPOINT, *StorageManager::gpsFs, GPS_FILE_PATH,
-                                     deleteIfSuccess, deleteAfterRetrying, retries,
-                                     "efuse_mac=" + String(efuseMac, 16));
+                                     deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
