@@ -48,6 +48,9 @@ bool StorageManager::mountSDCard()
 
 bool StorageManager::isSDCardConnected()
 {
+    // Don't worry about these errors:
+    // [ 28611][E][sd_diskio.cpp:806] sdcard_mount(): f_mount failed: (3) The physical drive cannot work
+    // [ 29120][E][sd_diskio.cpp:126] sdSelectCard(): Select Failed
     HardwareManager::ensureSDSPIInitialized();
     SD.end();
     sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);

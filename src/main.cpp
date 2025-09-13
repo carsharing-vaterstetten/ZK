@@ -92,6 +92,37 @@ void enableFileLogging(const bool forceFlash)
     fileLog.infoln("Now logging to file(s)");
 }
 
+void initializeStorage()
+{
+    if (config.preferSDCard)
+    {
+        if (StorageManager::isSDCardConnected())
+        {
+            serialOnlyLog.infoln("Using SD-card as preferred storage");
+
+            // Should already be mounted after isSDCardConnected()
+            const bool sdInitSuccess = StorageManager::mountSDCard();
+
+            if (!sdInitSuccess)
+            {
+                serialOnlyLog.warningln("Failed to initialize SD-card");
+            }
+
+            enableFileLogging(!sdInitSuccess);
+        }
+        else
+        {
+            serialOnlyLog.warningln("SD-card is not inserted");
+            enableFileLogging(true);
+        }
+    }
+    else
+    {
+        serialOnlyLog.infoln("Using flash as preferred storage");
+        enableFileLogging(true);
+    }
+}
+
 int espLogHandler(const char* fmt, const va_list args)
 {
     char buf[256];
@@ -142,22 +173,7 @@ void setup()
         StorageManager::saveConfigToEEPROM(config);
     }
 
-    if (StorageManager::isSDCardConnected() && config.preferSDCard)
-    {
-        serialOnlyLog.infoln("Using SD-card as preferred storage");
-
-        const bool sdInitSuccess = StorageManager::mountSDCard(); // Should already be mounted after isSDCardConnected()
-        if (!sdInitSuccess)
-        {
-            serialOnlyLog.warningln("Failed to initialize SD-card");
-        }
-        enableFileLogging(!sdInitSuccess);
-    }
-    else
-    {
-        serialOnlyLog.infoln("Using flash as preferred storage");
-        enableFileLogging(true);
-    }
+    initializeStorage();
 
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
 
@@ -207,7 +223,7 @@ void setup()
 
     RFIDs::downloadRfidsIfChanged();
 
-    Modem::uploadLogsFromAllFileSystems(true, true, 1);
+    Modem::uploadLogsFromAllFileSystems(false, true, 1);
 
     statusLed.clear();
 
