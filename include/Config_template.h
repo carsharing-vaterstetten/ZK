@@ -53,4 +53,5 @@
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 
 #define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup,
+#define SKIP_ALL_CONNECTION_SPEED_TESTS false
 #define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates

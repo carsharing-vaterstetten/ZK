@@ -521,6 +521,7 @@ esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
 
 void Modem::performConnectionSpeedTest()
 {
+#if !SKIP_ALL_CONNECTION_SPEED_TESTS
     fileLog.infoln("Performing connection speed test");
 
     // Use SPIFFS for simplicity and reliability
@@ -568,4 +569,5 @@ void Modem::performConnectionSpeedTest()
     {
         fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed));
     }
+#endif
 }
