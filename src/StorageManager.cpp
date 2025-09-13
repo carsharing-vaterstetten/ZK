@@ -49,6 +49,7 @@ bool StorageManager::mountSDCard()
 bool StorageManager::isSDCardConnected()
 {
     HardwareManager::ensureSDSPIInitialized();
+    SD.end();
     sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);
     return sdCardIsMounted && SD.cardType() != CARD_NONE;
 }
