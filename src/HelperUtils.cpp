@@ -46,18 +46,6 @@ void HelperUtils::parseConfigString(const String& inputString, Config& c)
             {
                 value.toCharArray(c.apn, sizeof(c.apn));
             }
-            else if (key == "gprsUser")
-            {
-                value.toCharArray(c.gprsUser, sizeof(c.gprsUser));
-            }
-            else if (key == "gprsPass")
-            {
-                value.toCharArray(c.gprsPass, sizeof(c.gprsPass));
-            }
-            else if (key == "GSM_PIN")
-            {
-                value.toCharArray(c.GSM_PIN, sizeof(c.GSM_PIN));
-            }
             else if (key == "server")
             {
                 value.toCharArray(c.server, sizeof(c.server));
@@ -85,15 +73,13 @@ void HelperUtils::parseConfigString(const String& inputString, Config& c)
 
 String HelperUtils::getConfigHumanReadable(const Config& c)
 {
-    return "Config version: " + String(c.version) + " apn=" + c.apn + " gprsUser=" + c.gprsUser +
-        " GSM_PIN=" + c.GSM_PIN + " server=" + c.server + " port=" + String(c.port)
+    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
         + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
 }
 
 String HelperUtils::getConfigFormat(const Config& c)
 {
-    return "apn=\"" + String(c.apn) + "\";gprsUser=\"" + c.gprsUser +
-        "\";GSM_PIN=\"" + c.GSM_PIN + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +
+    return "apn=\"" + String(c.apn) + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +
         + "\";password=\"" + c.password + "\";preferSDCard=\"" + String(c.preferSDCard) + "\";";
 }
 
@@ -103,9 +89,6 @@ void HelperUtils::requestConfig(Config& c)
     constexpr Config exampleConfig = {
         CONFIG_VERSION,
         "iot.1nce.net",
-        "",
-        "",
-        "",
         "example.com",
         80,
         "XXX",

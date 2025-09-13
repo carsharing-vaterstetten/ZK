@@ -18,9 +18,6 @@ struct Config
 {
   uint8_t version; // Wird verwendet, um eine Versionsnummer oder Signatur zu speichern
   char apn[32];
-  char gprsUser[32];
-  char gprsPass[32];
-  char GSM_PIN[16];
   char server[64];
   uint16_t port;
   char password[64];

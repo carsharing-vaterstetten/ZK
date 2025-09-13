@@ -62,14 +62,8 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
-        if (gsmModem->getSimStatus() != SIM_ANTITHEFT_LOCKED)
-        {
-            const bool simUnlockSuccess = gsmModem->simUnlock(config.GSM_PIN);
-            fileLog.logInfoOrWarningln(simUnlockSuccess, "SIM unlocked successfully", "SIM unlocking failed");
-        }
-
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem->gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
         fileLog.infoln("Waiting for network...");
