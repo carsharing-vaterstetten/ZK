@@ -84,14 +84,6 @@ bool Modem::init(const uint8_t retries)
     return false;
 }
 
-void Modem::end()
-{
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, LOW);
-    gsmModem->gprsDisconnect();
-    fileLog.infoln("Modem disconnected");
-}
-
 UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
                                const String& urlParams, const int bufferSize, unsigned long* uploadStartMs,
                                unsigned long* uploadEndMs)

@@ -1,7 +1,10 @@
 #pragma once
 
 #include <Arduino.h>
-#include "Config.h" // Needed for TinyGsmClientSIM7000.h. Do not remove
+
+#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_RX_BUFFER 1024 // 1KiB
+
 #include <TinyGsmClientSIM7000.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
@@ -47,7 +50,6 @@ public:
     Modem() = delete;
 
     static bool init(uint8_t retries = 2);
-    static void end();
     static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
                                    const String& urlParams = "", int bufferSize = 512,
                                    unsigned long* uploadStartMs = nullptr, unsigned long* uploadEndMs = nullptr);

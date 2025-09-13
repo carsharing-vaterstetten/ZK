@@ -9,6 +9,7 @@
 #include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
+#include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
 #include "RFIDs.h"
