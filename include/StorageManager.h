@@ -24,7 +24,7 @@ public:
     static bool mountSSPIFFS();
     static bool mountSDCard();
 
-    static bool isSDCardInserted();
+    static bool isSDCardConnected();
 
     static void saveConfigToEEPROM(Config& c);
     static bool loadConfigFromEEPROM(Config& c);

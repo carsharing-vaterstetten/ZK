@@ -50,16 +50,11 @@ bool StorageManager::mountSDCard()
     return sdCardIsMounted;
 }
 
-bool StorageManager::isSDCardInserted()
+bool StorageManager::isSDCardConnected()
 {
-    return config.preferSDCard; // This must do it for now
-    // TODO This will just halt until watchdog reset when no sd card is inserted...
-    // For some reason writing to a file breaks when the mountpoint is passed in a variable??? I tried it in a clean project and there it works???
-    // for unknown reasons sdmmc_frequency must be 10000 https://github.com/espressif/esp-idf/issues/10194
-    // sdCardIsMounted = SD_MMC.begin("/sdcard", true, true, 10000);
-    // Will quietly fail when no SD card connected and program execution stops.
-    // sdCardIsMounted = SD_MMC.cardType() != CARD_NONE;
-    // return sdCardIsMounted;
+    HardwareManager::ensureSDSPIInitialized();
+    sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);
+    return sdCardIsMounted && SD.cardType() != CARD_NONE;
 }
 
 void StorageManager::saveConfigToEEPROM(Config& c)

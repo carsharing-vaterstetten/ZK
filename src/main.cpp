@@ -149,11 +149,11 @@ void setup()
         StorageManager::saveConfigToEEPROM(config);
     }
 
-    if (StorageManager::isSDCardInserted() && config.preferSDCard)
+    if (StorageManager::isSDCardConnected() && config.preferSDCard)
     {
         serialOnlyLog.infoln("Using SD-card as preferred storage");
 
-        const bool sdInitSuccess = StorageManager::mountSDCard();
+        const bool sdInitSuccess = StorageManager::mountSDCard(); // Should already be mounted after isSDCardConnected()
         if (!sdInitSuccess)
         {
             serialOnlyLog.warningln("Failed to initialize SD-card");
