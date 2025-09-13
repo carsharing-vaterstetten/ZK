@@ -149,11 +149,25 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     size_t totalBytesUploaded = 0;
     size_t nextPrint = fileSize / 10;
 
-    while (f.available())
+    while (f.available() && totalBytesUploaded < fileSize)
     {
-        const size_t bytesRead = f.read(buffer, sizeof(buffer));
-        uploadHttp.write(buffer, bytesRead);
-        totalBytesUploaded += bytesRead;
+        size_t readLength = bufferSize;
+        if (totalBytesUploaded + readLength > fileSize)
+        {
+            readLength = fileSize - totalBytesUploaded;
+        }
+
+        if (readLength <= 0) break;
+
+        const size_t bytesRead = f.read(buffer, readLength);
+
+        if (bytesRead <= 0) break;
+
+        const size_t bytesSent = uploadHttp.write(buffer, bytesRead);
+
+        if (bytesSent <= 0) break; // This happens, when the server does not allow the request size.
+
+        totalBytesUploaded += bytesSent;
 
         if (totalBytesUploaded >= nextPrint)
         {
