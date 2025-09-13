@@ -242,8 +242,8 @@ void loop()
     {
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
-        statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
-
+        statusLed.setColor(Color::Blue);
+        Modem::performConnectionSpeedTest();
         Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyways
 
         ESP.restart();
