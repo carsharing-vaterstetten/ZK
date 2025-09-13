@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Log.h"
+#include "Backend.h"
 
 // Serial debugging
 #define ENABLE_SERIAL_LOGGING false // Enable for serial printing
@@ -50,3 +51,6 @@
 
 #define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
+
+#define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup,
+#define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates

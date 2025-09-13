@@ -187,6 +187,10 @@ void setup()
 
     statusLed.setColor(Color::Purple);
 
+#if !SKIP_INITIAL_CONNECTION_SPEED_TEST
+    Modem::performConnectionSpeedTest();
+#endif
+
     FirmwareUpdater::doUpdateIfAvailable();
 
     statusLed.setColor(Color::Orange);

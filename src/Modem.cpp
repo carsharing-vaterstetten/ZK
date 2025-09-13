@@ -5,6 +5,7 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
+#include <SPIFFS.h>
 
 #include "Backend.h"
 #include "StorageManager.h"
@@ -16,6 +17,8 @@
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
 bool Modem::isInit = false;
+uint32_t Modem::estimatedUploadSpeed = 5000; // [B/s]
+uint32_t Modem::estimatedDownloadSpeed = 5000; // [B/s]
 
 void Modem::powerOn()
 {
@@ -95,7 +98,8 @@ void Modem::end()
 }
 
 UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                               const String& urlParams, const int bufferSize)
+                               const String& urlParams, const int bufferSize, unsigned long* uploadStartMs,
+                               unsigned long* uploadEndMs)
 {
     const String filePath = f.path();
     const bool isFileLogFile = filePath == LOG_FILE_PATH;
@@ -158,6 +162,8 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     size_t totalBytesUploaded = 0;
     size_t nextPrint = fileSize / 10;
 
+    if (uploadStartMs) *uploadStartMs = millis();
+
     while (f.available() && totalBytesUploaded < fileSize)
     {
         size_t readLength = bufferSize;
@@ -196,6 +202,9 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     }
 
     uploadHttp.endRequest();
+
+    if (uploadEndMs) *uploadEndMs = millis();
+
     if (statusCode) *statusCode = uploadHttp.responseStatusCode();
     const String responseBody = uploadHttp.responseBody();
 
@@ -213,14 +222,16 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 }
 
 UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
-                                                         const int bufferSize)
+                                                         const int bufferSize, unsigned long* uploadStartMs,
+                                                         unsigned long* uploadEndMs)
 {
     const size_t fileSize = f.size();
 
     String resp;
     int responseStatusCode;
 
-    const UploadResult uploadResult = uploadFile(endpoint, f, &responseStatusCode, &resp, urlParams, bufferSize);
+    const UploadResult uploadResult = uploadFile(endpoint, f, &responseStatusCode, &resp, urlParams, bufferSize,
+                                                 uploadStartMs, uploadEndMs);
 
     switch (uploadResult)
     {
@@ -252,15 +263,15 @@ UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint,
     return UploadWithSizeCheckResult::SUCCESS;
 }
 
-void Modem::uploadFileWithSizeCheckAndDelete(
-    const String& endpoint, FS& fileFs, const String& filePath,
-    const bool deleteIfSuccess, const bool deleteAfterRetrying,
-    const uint32_t retries, const String& urlParams, const int bufferSize)
+UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
+    const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
+    const bool deleteAfterRetrying, const uint32_t retries, const String& urlParams, const int bufferSize,
+    unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
     if (!fileFs.exists(filePath))
     {
         fileLog.errorln(filePath + " does not exist");
-        return;
+        return UploadWithSizeCheckResultAndRetries::FILE_DOES_NOT_EXIST;
     }
 
     UploadWithSizeCheckResult uploadResult;
@@ -273,10 +284,10 @@ void Modem::uploadFileWithSizeCheckAndDelete(
         if (!f)
         {
             fileLog.errorln("Failed to open " + filePath);
-            return;
+            return UploadWithSizeCheckResultAndRetries::FAILED_TO_OPEN_FILE;
         }
 
-        uploadResult = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize);
+        uploadResult = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize, uploadStartMs, uploadEndMs);
 
         switch (uploadResult)
         {
@@ -306,6 +317,26 @@ endLoop:;
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }
+
+    switch (uploadResult)
+    {
+    case UploadWithSizeCheckResult::FILE_IS_EMPTY:
+        return UploadWithSizeCheckResultAndRetries::FILE_IS_EMPTY;
+    case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
+        return UploadWithSizeCheckResultAndRetries::HTTP_REQUEST_ERROR;
+    case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadWithSizeCheckResultAndRetries::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    case UploadWithSizeCheckResult::SUCCESS:
+        if (attemptNo == 0) return UploadWithSizeCheckResultAndRetries::SUCCESS;
+        return UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING;
+    case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
+        return UploadWithSizeCheckResultAndRetries::UNEXPECTED_STATUS_CODE;
+    case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
+        return UploadWithSizeCheckResultAndRetries::SIZE_CHECK_FAILED;
+    }
+
+    // ReSharper disable once CppDFAUnreachableCode
+    throw std::invalid_argument("Invalid result");
 }
 
 
@@ -342,7 +373,8 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 
 
 DownloadResult Modem::downloadFile(const String& remotePath, File& f, const String& username,
-                                   const String& password, const int bufferSize)
+                                   const String& password, const int bufferSize, unsigned long* downloadStartMs,
+                                   unsigned long* downloadEndMs)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
     HttpClient downloadHttp{*gsmClient, config.server, config.port};
@@ -392,6 +424,8 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
         return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
 
+    if (downloadStartMs) *downloadStartMs = millis();
+
     while (downloadHttp.connected() || downloadHttp.available())
     {
         while (downloadHttp.available())
@@ -409,6 +443,9 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     }
 
     downloadHttp.stop();
+
+    if (downloadEndMs) *downloadEndMs = millis();
+
     f.close();
 
     WatchdogHandler::revertTempSet();
@@ -450,16 +487,66 @@ esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
 {
     constexpr uint32_t uploadSpeed = 9500; // [B/s] TODO: measure speed
     const uint32_t uploadTime = fileSize / uploadSpeed; // [s]
-    if (uploadTime == 0) return ESP_OK;
+    if (uploadTime <= HW_WATCHDOG_DEFAULT_TIMEOUT / 5) return ESP_OK; // Doesnt really matter
     const uint32_t newWatchdogTime = uploadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
     return WatchdogHandler::setTempTimeout(newWatchdogTime);
 }
 
 esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
 {
-    constexpr uint32_t uploadSpeed = 8500; // [B/s] TODO: measure speed
-    const uint32_t downloadTime = fileSize / uploadSpeed; // [s]
-    if (downloadTime == 0) return ESP_OK;
+    const uint32_t downloadTime = fileSize / estimatedDownloadSpeed; // [s]
+    if (downloadTime <= HW_WATCHDOG_DEFAULT_TIMEOUT / 5) return ESP_OK; // Doesnt really matter
     const uint32_t newWatchdogTime = downloadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
     return WatchdogHandler::setTempTimeout(newWatchdogTime);
+}
+
+void Modem::performConnectionSpeedTest()
+{
+    fileLog.infoln("Performing connection speed test");
+
+    // Use SPIFFS for simplicity and reliability
+    File df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
+
+    unsigned long downloadStart, downloadEnd;
+    const DownloadResult downloadResult = downloadFile(
+        REMOTE_SPEED_TEST_FILE, df, "", "", 512, &downloadStart, &downloadEnd);
+    df.close();
+
+    df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
+    const size_t fileSize = df.size();
+    df.close();
+
+    if (downloadResult == DownloadResult::SUCCESS)
+    {
+        const float downloadSeconds = static_cast<float>(downloadEnd - downloadStart) / 1000.0f;
+        estimatedDownloadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / downloadSeconds);
+        if (estimatedDownloadSpeed == 0) estimatedDownloadSpeed = 1;
+        fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
+    }
+    else
+    {
+        fileLog.errorln(
+            "Download test failed. Aborting further tests. Defaulting to " + String(estimatedUploadSpeed) + " B/s UP, "
+            + String(estimatedDownloadSpeed) + " B/s DOWN");
+        SPIFFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
+        return;
+    }
+
+    unsigned long uploadStart, uploadEnd;
+    const UploadWithSizeCheckResultAndRetries uploadResult = uploadFileWithSizeCheckAndDelete(
+        "/v1/upload-speed-test", SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, "",
+        512, &uploadStart, &uploadEnd);
+
+    if (uploadResult == UploadWithSizeCheckResultAndRetries::SUCCESS || uploadResult ==
+        UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING)
+    {
+        const float uploadSeconds = static_cast<float>(uploadEnd - downloadStart) / 1000.0f;
+        estimatedUploadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / uploadSeconds);
+        if (estimatedUploadSpeed == 0) estimatedUploadSpeed = 1;
+        fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
+    }
+    else
+    {
+        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed));
+    }
 }
