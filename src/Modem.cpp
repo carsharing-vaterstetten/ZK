@@ -5,6 +5,7 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
+#include <SD.h>
 #include <SPIFFS.h>
 
 #include "Backend.h"
@@ -455,11 +456,29 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     return DownloadResult::SUCCESS;
 }
 
-void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
+                                        const bool deleteAfterRetrying, const uint32_t retries)
 {
-    fileLog.infoln("Uploading log");
-    uploadFileWithSizeCheckAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH,
-                                     deleteIfSuccess, deleteAfterRetrying, retries);
+    if (SPIFFS.exists(filePath))
+    {
+        fileLog.infoln("Uploading " + filePath + " from SPIFFS");
+        uploadFileWithSizeCheckAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
+                                         deleteAfterRetrying, retries, "filesystem=SPIFFS");
+    }
+
+    if (StorageManager::isSDCardConnected() && SD.exists(filePath))
+    {
+        fileLog.infoln("Uploading " + filePath + " from SD-card");
+        uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
+                                         deleteAfterRetrying, retries, "filesystem=SD-card");
+    }
+}
+
+void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
+                                         const uint32_t retries)
+{
+    fileLog.infoln("Uploading log file(s)");
+    uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 uint64_t Modem::getUTCTimestamp()

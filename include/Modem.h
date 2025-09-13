@@ -67,7 +67,9 @@ public:
                                        const String& password = "", int bufferSize = 512,
                                        unsigned long* downloadStartMs = nullptr,
                                        unsigned long* downloadEndMs = nullptr);
-    static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    static void uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, bool deleteIfSuccess,
+                                            bool deleteAfterRetrying, uint32_t retries);
+    static void uploadLogsFromAllFileSystems(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
