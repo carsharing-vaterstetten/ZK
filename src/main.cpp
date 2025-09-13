@@ -5,7 +5,6 @@
 #include <LED.h>
 #include <esp32-hal.h>
 #include <esp_system.h>
-#include <esp_task_wdt.h>
 #include <SD.h>
 #include <SPIFFS.h>
 #include "esp_log.h"
@@ -14,6 +13,7 @@
 #include "Globals.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
+#include "WatchdogHandler.h"
 
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
@@ -118,11 +118,11 @@ void setup()
     // Initialize the watchdog.
     // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
     // That could possibly lead to an infinite resetting loop.
-    HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
+    WatchdogHandler::resetTimeout();
     // Add the current task to be monitored by the watchdog.
     // This ensures that if the main loop doesn't reset the watchdog in time,
     // the ESP32 will reset itself.
-    HelperUtils::subscribeTaskToWatchdog();
+    WatchdogHandler::subscribeTask();
 
     // redirect ESP logs
     esp_log_set_vprintf(&espLogHandler);
@@ -166,7 +166,7 @@ void setup()
 
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
 
-    fileLog.infoln("Hardware startup reason: " + HelperUtils::getResetReasonHumanReadable(reset_reason));
+    fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(reset_reason));
 
     statusLed.init();
 
@@ -214,7 +214,7 @@ void loop()
 {
     if (millis() >= nextWatchdogResetMs)
     {
-        esp_task_wdt_reset(); // Reset the watchdog timer
+        WatchdogHandler::taskWDTReset();
         nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
     }
 

@@ -6,8 +6,8 @@
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 
-#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, SUCCESS
-#define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, SUCCESS
+#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
+#define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
 
 enum class UploadResult
 {
@@ -65,6 +65,8 @@ public:
     }
 
     static uint64_t getUTCTimestamp();
+    static esp_err_t increaseWatchdogTimeoutForFileUpload(size_t fileSize);
+    static esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize);
 
     static bool isInitialized()
     {

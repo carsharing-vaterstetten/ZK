@@ -29,6 +29,7 @@ bool FirmwareUpdater::downloadAndPerformUpdate()
     {
     case DownloadResult::HTTP_REQUEST_ERROR:
     case DownloadResult::UNEXPECTED_STATUS_CODE:
+    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
         return false;
     case DownloadResult::SUCCESS:
         break;
@@ -90,30 +91,6 @@ long FirmwareUpdater::getLatestFirmwareSize()
     return latestFirmwareSize;
 }
 
-
-bool FirmwareUpdater::doFirmwareUpdateWithWatchdog()
-{
-    // Increase the HW Watchdog timeout to allow for longer OTA updates
-
-    esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
-    if (hwd_err != ESP_OK)
-    {
-        fileLog.errorln("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
-        return false;
-    }
-
-    const bool success = downloadAndPerformUpdate();
-
-    // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
-    hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
-    if (hwd_err != ESP_OK)
-    {
-        fileLog.warningln("Failed to reset HW Watchdog timeout after OTA update.");
-    }
-
-    return success;
-}
-
 FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
 {
     fileLog.infoln("Checking for firmware update");
@@ -149,7 +126,7 @@ bool FirmwareUpdater::doUpdateIfAvailable()
 {
     if (checkForFirmwareUpdate() == FirmwareUpdateCheckResult::UPDATE_AVAILABLE)
     {
-        return doFirmwareUpdateWithWatchdog();
+        return downloadAndPerformUpdate();
     }
     return false;
 }

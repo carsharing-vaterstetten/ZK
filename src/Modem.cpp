@@ -8,6 +8,7 @@
 
 #include "Backend.h"
 #include "StorageManager.h"
+#include "WatchdogHandler.h"
 
 #define SERIAL_AT Serial1
 #define SERIAL_AT_BAUD 115200U
@@ -140,6 +141,14 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::HTTP_REQUEST_ERROR;
     }
 
+    if (increaseWatchdogTimeoutForFileUpload(fileSize) != ESP_OK)
+    {
+        f.close();
+        uploadHttp.stop();
+        fileLog.errorln("Failed to increase TWDT timeout. Upload aborted");
+        return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    }
+
     uploadHttp.sendBasicAuth(efuseMacHex, config.password);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
     uploadHttp.sendHeader("Content-Length", String(fileSize));
@@ -187,15 +196,18 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     }
 
     uploadHttp.endRequest();
-    *statusCode = uploadHttp.responseStatusCode();
+    if (statusCode) *statusCode = uploadHttp.responseStatusCode();
     const String responseBody = uploadHttp.responseBody();
 
     f.close();
     uploadHttp.stop();
 
-    fileLog.infoln("Response status code: " + String(*statusCode));
+    WatchdogHandler::revertTempSet();
 
-    *response = responseBody;
+    if (statusCode)
+        fileLog.infoln("Response status code: " + String(*statusCode));
+
+    if (response) *response = responseBody;
 
     return UploadResult::SUCCESS;
 }
@@ -216,6 +228,8 @@ UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint,
         return UploadWithSizeCheckResult::FILE_IS_EMPTY;
     case UploadResult::HTTP_REQUEST_ERROR:
         return UploadWithSizeCheckResult::HTTP_REQUEST_ERROR;
+    case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     case UploadResult::SUCCESS:
         break;
     }
@@ -272,6 +286,7 @@ void Modem::uploadFileWithSizeCheckAndDelete(
             goto endLoop;
         case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
         case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
+        case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
             break;
         }
 
@@ -369,6 +384,14 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 
     fileLog.infoln("Downloading " + String(totalLen) + " B");
 
+    if (increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
+    {
+        downloadHttp.stop();
+        f.close();
+        fileLog.errorln("Failed to increase TWDT timeout. Download aborted");
+        return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    }
+
     while (downloadHttp.connected() || downloadHttp.available())
     {
         while (downloadHttp.available())
@@ -386,8 +409,9 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     }
 
     downloadHttp.stop();
-
     f.close();
+
+    WatchdogHandler::revertTempSet();
 
     fileLog.infoln("Download complete");
 
@@ -420,4 +444,22 @@ uint64_t Modem::getUTCTimestamp()
     datetime.tm_isdst = -1;
 
     return mktime(&datetime);
+}
+
+esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
+{
+    constexpr uint32_t uploadSpeed = 9500; // [B/s] TODO: measure speed
+    const uint32_t uploadTime = fileSize / uploadSpeed; // [s]
+    if (uploadTime == 0) return ESP_OK;
+    const uint32_t newWatchdogTime = uploadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
+    return WatchdogHandler::setTempTimeout(newWatchdogTime);
+}
+
+esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
+{
+    constexpr uint32_t uploadSpeed = 8500; // [B/s] TODO: measure speed
+    const uint32_t downloadTime = fileSize / uploadSpeed; // [s]
+    if (downloadTime == 0) return ESP_OK;
+    const uint32_t newWatchdogTime = downloadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
+    return WatchdogHandler::setTempTimeout(newWatchdogTime);
 }
