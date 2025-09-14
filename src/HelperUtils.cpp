@@ -80,7 +80,7 @@ String HelperUtils::getConfigHumanReadable(const Config& c)
 String HelperUtils::getConfigFormat(const Config& c)
 {
     return "apn=\"" + String(c.apn) + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +
-        + "\";password=\"" + c.password + "\";preferSDCard=\"" + String(c.preferSDCard) + "\";";
+        +"\";password=\"" + c.password + "\";preferSDCard=\"" + String(c.preferSDCard) + "\";";
 }
 
 void HelperUtils::requestConfig(Config& c)
@@ -140,4 +140,30 @@ String HelperUtils::md5ToHex(const uint8_t md5[16])
         hex += buf;
     }
     return hex;
+}
+
+uint64_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, const int day, const int hour,
+                                              const int minute, const int second)
+{
+    tm datetime{};
+
+    datetime.tm_year = year - 1900; // Number of years since 1900
+    datetime.tm_mon = month - 1; // Number of months since January
+    datetime.tm_mday = day;
+    datetime.tm_hour = hour;
+    datetime.tm_min = minute;
+    datetime.tm_sec = second;
+    // Daylight Savings must be specified
+    // -1 uses the computer's timezone setting
+    datetime.tm_isdst = -1;
+
+    return mktime(&datetime);
+}
+
+void HelperUtils::dateTimeToString(char* buf, const int year, const int month, const int day, const int hour,
+                                   const int minute,
+                                   const int second)
+{
+    snprintf(buf, dateTimeStrLength, "%04d-%02d-%02d %02d:%02d:%02d",
+             year, month, day, hour, minute, second);
 }

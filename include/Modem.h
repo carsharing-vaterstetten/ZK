@@ -85,7 +85,7 @@ public:
         return gsmModem->getNetworkTime(year, month, day, hour, minute, second, timezone);
     }
 
-    static uint64_t getUTCTimestamp();
+    static uint64_t getUnixTimestamp();
     static esp_err_t increaseWatchdogTimeoutForFileUpload(size_t fileSize);
     static esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize);
     static void performConnectionSpeedTest();

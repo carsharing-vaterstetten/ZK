@@ -467,25 +467,11 @@ void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool 
     uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
-uint64_t Modem::getUTCTimestamp()
+uint64_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
-    float timeZone;
-    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timeZone);
-
-    tm datetime{};
-
-    datetime.tm_year = year - 1900; // Number of years since 1900
-    datetime.tm_mon = month - 1; // Number of months since January
-    datetime.tm_mday = day;
-    datetime.tm_hour = hour;
-    datetime.tm_min = minute;
-    datetime.tm_sec = second;
-    // Daylight Savings must be specified
-    // -1 uses the computer's timezone setting
-    datetime.tm_isdst = -1;
-
-    return mktime(&datetime);
+    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, nullptr);
+    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second);
 }
 
 esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)

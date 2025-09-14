@@ -142,7 +142,7 @@ void setup()
 
 #if ENABLE_SERIAL_LOGGING
     fileLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
-    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
+    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL, "Serial");
 #endif
 
     const esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -198,7 +198,7 @@ void setup()
 
     fileLog.infoln(
         "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getLocalTime() +
-        ", UTC: " + String(Modem::getUTCTimestamp()));
+        ", Unix timestamp: " + String(Modem::getUnixTimestamp()));
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
