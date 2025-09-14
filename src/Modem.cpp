@@ -467,7 +467,7 @@ void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool 
     uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
-uint64_t Modem::getUnixTimestamp()
+time_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
     float timezone;

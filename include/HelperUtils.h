@@ -18,4 +18,6 @@ public:
     static time_t dateTimeToUnixTimestamp(int year, int month, int day, int hour, int minute, int second,
                                           float timezone);
     static void dateTimeToString(char* buf, int year, int month, int day, int hour, int minute, int second);
+    static bool updateSystemTimeWithModem();
+    static uint64_t systemTimeMillisecondsSinceEpoche();
 };

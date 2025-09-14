@@ -195,10 +195,12 @@ void setup()
     fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
 
     Modem::init();
+    HelperUtils::updateSystemTimeWithModem();
 
     fileLog.infoln(
         "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
-        ", Unix timestamp: " + String(Modem::getUnixTimestamp()));
+        ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
+            HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
