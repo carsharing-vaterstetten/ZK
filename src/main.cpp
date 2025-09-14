@@ -269,7 +269,7 @@ void loop()
             if (gpsSuccess)
             {
                 serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
-                GPS::logData(gpsData);
+                GPS::logDataBuffered(gpsData);
             }
             else
             {

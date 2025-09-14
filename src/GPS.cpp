@@ -6,6 +6,9 @@
 #include "Modem.h"
 #include "StorageManager.h"
 
+uint16_t GPS::logBufferIndex = 0;
+GPS_DATA_t GPS::logBuffer[GPS_LOG_BUFFER_SIZE];
+
 void GPS::uploadFileFromAllFilesystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
                                        const uint32_t retries)
 {
@@ -14,10 +17,38 @@ void GPS::uploadFileFromAllFilesystems(const bool deleteIfSuccess, const bool de
                                        retries);
 }
 
-void GPS::logData(const GPS_DATA_t& data)
+bool GPS::writeLogBufferToFile()
 {
-    const auto dataBytes = reinterpret_cast<const uint8_t*>(&data);
+    const auto dataBytes = reinterpret_cast<const uint8_t*>(&logBuffer);
     File f = StorageManager::openGPS(FILE_APPEND, true);
-    f.write(dataBytes, sizeof(GPS_DATA_t));
+    if (!f)
+    {
+        fileLog.errorln("Failed to open GPS log file for appending");
+        return false;
+    }
+    f.write(dataBytes, GPS_DATA_SIZE * logBufferIndex);
     f.close();
+    return true;
+}
+
+void GPS::logDataBuffered(const GPS_DATA_t& data)
+{
+    logBuffer[logBufferIndex] = data;
+    ++logBufferIndex;
+
+    if (logBufferIndex >= GPS_LOG_BUFFER_SIZE)
+    {
+        writeLogBufferToFile();
+        logBufferIndex = 0;
+    }
+}
+
+bool GPS::flush()
+{
+    const bool success = writeLogBufferToFile();
+    if (success)
+    {
+        logBufferIndex = 0;
+    }
+    return success;
 }

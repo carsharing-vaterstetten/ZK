@@ -21,9 +21,18 @@ struct GPS_DATA_t
 };
 #pragma pack(pop)
 
+#define GPS_DATA_SIZE sizeof(GPS_DATA_t)
+#define GPS_LOG_BUFFER_SIZE 20U
+
 class GPS
 {
+    static GPS_DATA_t logBuffer[GPS_LOG_BUFFER_SIZE];
+    static uint16_t logBufferIndex;
+
+    static bool writeLogBufferToFile();
+
 public:
     static void uploadFileFromAllFilesystems(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
-    static void logData(const GPS_DATA_t& data);
+    static void logDataBuffered(const GPS_DATA_t& data);
+    static bool flush();
 };
