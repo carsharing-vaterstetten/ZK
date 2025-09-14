@@ -585,9 +585,13 @@ void Modem::performConnectionSpeedTest()
 
 bool Modem::getGPS(GPS_DATA_t& out)
 {
-    return gsmModem->getGPS(&out.lat, &out.lon, &out.speed, &out.alt, reinterpret_cast<int*>(&out.vsat),
-                            reinterpret_cast<int*>(&out.usat), &out.accuracy, reinterpret_cast<int*>(&out.year),
-                            reinterpret_cast<int*>(&out.month), reinterpret_cast<int*>(&out.day),
-                            reinterpret_cast<int*>(&out.hour), reinterpret_cast<int*>(&out.minute),
-                            reinterpret_cast<int*>(&out.second));
+    int year, month, day, hour, minute, second;
+    const bool success = gsmModem->getGPS(&out.lat, &out.lon, &out.speed, &out.alt, reinterpret_cast<int*>(&out.vsat),
+                                    reinterpret_cast<int*>(&out.usat), &out.accuracy, &year, &month, &day, &hour,
+                                    &minute, &second);
+    if (!success) return false;
+
+    out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
+
+    return true;
 }
