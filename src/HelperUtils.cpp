@@ -142,8 +142,8 @@ String HelperUtils::md5ToHex(const uint8_t md5[16])
     return hex;
 }
 
-uint64_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, const int day, const int hour,
-                                              const int minute, const int second)
+time_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, const int day, const int hour,
+                                            const int minute, const int second, const float timezone)
 {
     tm datetime{};
 
@@ -157,12 +157,15 @@ uint64_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, c
     // -1 uses the computer's timezone setting
     datetime.tm_isdst = -1;
 
-    return mktime(&datetime);
+    time_t time = mktime(&datetime);
+
+    time -= static_cast<time_t>(timezone * 3600.0f);
+
+    return time;
 }
 
 void HelperUtils::dateTimeToString(char* buf, const int year, const int month, const int day, const int hour,
-                                   const int minute,
-                                   const int second)
+                                   const int minute, const int second)
 {
     snprintf(buf, dateTimeStrLength, "%04d-%02d-%02d %02d:%02d:%02d",
              year, month, day, hour, minute, second);

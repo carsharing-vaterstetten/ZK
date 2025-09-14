@@ -470,8 +470,9 @@ void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool 
 uint64_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
-    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, nullptr);
-    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second);
+    float timezone;
+    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
 esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)

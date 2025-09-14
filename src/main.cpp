@@ -197,7 +197,7 @@ void setup()
     Modem::init();
 
     fileLog.infoln(
-        "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getLocalTime() +
+        "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
         ", Unix timestamp: " + String(Modem::getUnixTimestamp()));
 
     StorageManager::removeFirmwareFile(); // Cleanup
