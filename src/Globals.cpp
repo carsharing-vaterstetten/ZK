@@ -2,9 +2,8 @@
 
 #include "Config.h"
 
-Log serialOnlyLog{true, true, "Serial"};
-Log fileLog{true, true};
-Log gpsLog{false, false};
+Log serialOnlyLog{};
+Log fileLog{};
 uint64_t efuseMac = 0;
 String efuseMacHex = "";
 LED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};

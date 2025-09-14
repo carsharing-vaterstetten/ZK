@@ -4,6 +4,7 @@
 #include <SD.h>
 
 #include "Config.h"
+#include "HelperUtils.h"
 #include "Modem.h"
 
 #define COLOR_RESET   "\033[0m"
@@ -14,10 +15,11 @@
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
-void Log::enableSerialLogging(const uint8_t loggingLevel)
+void Log::enableSerialLogging(const uint8_t loggingLevel, const String& serialName)
 {
     logToSerial = true;
     serialLoggingLevel = loggingLevel;
+    serialLoggingName = serialName;
 }
 
 /// Make sure the pins of the sd card aren't used by something else!
@@ -86,56 +88,55 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
 
 void Log::logMsgln(const String& msg, const uint8_t level) const
 {
-    String finalStr = "";
+    // Takes around 10 ms for modem timestamp and 20 ms total when logging to file
 
-    const String timeStr = getTimeString();
+    char timeStr[HelperUtils::dateTimeStrLength];
+    int year, month, day, hour, minute, second;
+    uint64_t timestamp;
 
-    if (logTime)
+    if (Modem::isInitialized())
     {
-        finalStr += "[" + timeStr + "]";
+        Modem::getNetworkTime(&year, &month, &day, &hour, &minute, &second, nullptr);
+        timestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second);
+        HelperUtils::dateTimeToString(timeStr, year, month, day, hour, minute, second);
     }
-
-    String finalSerialStr = finalStr;
-
-    if (logLoggingLevel)
-    {
-        finalStr += "[" + getLoggingLevelChar(level) + "]";
-        finalSerialStr += "[";
-#if COLORIZE_SERIAL_LOGGING
-        finalSerialStr += getLoggingLevelColor(level);
-#endif
-        finalSerialStr += getLoggingLevelChar(level);
-#if COLORIZE_SERIAL_LOGGING
-        finalSerialStr += COLOR_RESET;
-#endif
-        finalSerialStr += "]";
-    }
-
-    String nameString = "";
-
-    if (!loggerName.isEmpty())
-    {
-        nameString = "[" + loggerName + "]";
-    }
-
-    finalStr += nameString;
-    finalSerialStr += nameString;
-
-    finalStr += " " + msg;
-
-#if COLORIZE_SERIAL_LOGGING
-    if (level >= LOGGING_LEVEL_ERROR)
-        finalSerialStr += " " BACKGROUND_COLOR_RED + msg + COLOR_RESET;
     else
-#endif
-        finalSerialStr += " " + msg;
+    {
+        timestamp = millis();
+        sniprintf(timeStr, sizeof(timeStr), "%lu", millis());
+    }
 
-    if (level >= serialLoggingLevel)
-        writeLineToSerial(finalSerialStr);
-    if (level >= flashLoggingLevel)
-        appendLineToFileOnFlash(finalStr);
-    if (level >= sdCardLoggingLevel)
-        appendLineToFileOnSDCard(finalStr);
+
+    if (logToSerial && level >= serialLoggingLevel)
+    {
+        Serial.printf("[%s][%s%s%s]%s%s\n",
+                      timeStr,
+#if COLORIZE_SERIAL_LOGGING
+                      getLoggingLevelColor(level).c_str(),
+#else
+                      "",
+#endif
+                      getLoggingLevelChar(level).c_str(),
+#if COLORIZE_SERIAL_LOGGING
+                      COLOR_RESET,
+#else
+                      "",
+#endif
+                      serialLoggingName.isEmpty() ? " " : ("[" + serialLoggingName + "] ").c_str(),
+#if COLORIZE_SERIAL_LOGGING
+                      (level >= LOGGING_LEVEL_ERROR)
+                          ? (BACKGROUND_COLOR_RED + msg + COLOR_RESET).c_str()
+                          : msg.c_str()
+#else
+                      msg.c_str()
+#endif
+        );
+    }
+
+    if (logToFlash && level >= flashLoggingLevel)
+        appendRawMsgToFileOnFlash(timestamp, level, msg);
+    if (logToSDCard && level >= sdCardLoggingLevel)
+        appendRawMsgToFileOnSDCard(timestamp, level, msg);
 }
 
 
@@ -164,28 +165,34 @@ void Log::write(const uint8_t* buffer, const size_t size) const
     }
 }
 
-void Log::appendLineToFileOnSDCard(const String& msg) const
+void Log::appendRawMsgToFile(FS& fs, const String& path, const uint64_t timestamp, const uint8_t loggingLevel,
+                             const String& text)
 {
-    if (!logToSDCard) return;
+    File file = fs.open(path, FILE_APPEND);
+    if (!file) return;
 
-    File file = SD.open(SDCardLogPath, FILE_APPEND);
-    file.println(msg);
+    // Write 8-byte timestamp
+    file.write(reinterpret_cast<const uint8_t*>(&timestamp), sizeof(timestamp));
+
+    // Write 1-byte logging level
+    file.write(&loggingLevel, sizeof(loggingLevel));
+
+    // Write string length + data
+    const uint16_t len = text.length();
+    file.write(reinterpret_cast<const uint8_t*>(&len), sizeof(len));
+    file.write(reinterpret_cast<const uint8_t*>(text.c_str()), len);
+
     file.close();
 }
 
-void Log::appendLineToFileOnFlash(const String& msg) const
+void Log::appendRawMsgToFileOnSDCard(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
 {
-    if (!logToFlash) return;
-
-    File file = SPIFFS.open(flashLogPath, FILE_APPEND);
-    file.println(msg);
-    file.close();
+    appendRawMsgToFile(SD, SDCardLogPath, timestamp, loggingLevel, text);
 }
 
-void Log::writeLineToSerial(const String& msg) const
+void Log::appendRawMsgToFileOnFlash(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
 {
-    if (!logToSerial) return;
-    Serial.println(msg);
+    appendRawMsgToFile(SPIFFS, flashLogPath, timestamp, loggingLevel, text);
 }
 
 String Log::getLoggingLevelChar(const uint8_t level)
@@ -224,17 +231,4 @@ String Log::getLoggingLevelColor(const uint8_t level)
     default:
         throw std::invalid_argument("Invalid logging level");
     }
-}
-
-String Log::getTimeString()
-{
-    if (!Modem::isInitialized())
-    {
-        // Fallback solution
-        return String(millis());
-    }
-
-    const String currentTime = Modem::getLocalTime();
-    // Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-    return currentTime;
 }

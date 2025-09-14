@@ -13,7 +13,6 @@ class FirmwareUpdater
 {
     static bool downloadAndPerformUpdate();
     static long getLatestFirmwareSize();
-    static bool doFirmwareUpdateWithWatchdog();
 public:
     static FirmwareUpdateCheckResult checkForFirmwareUpdate();
     static bool doUpdateIfAvailable();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <FS.h>
 
 #define LOGGING_LEVEL_DEBUG 0
 #define LOGGING_LEVEL_INFO 1
@@ -11,12 +12,7 @@
 class Log
 {
 public:
-    Log(const bool logTime, const bool logLoggingLevel, String loggerName = "") : loggerName(std::move(loggerName)),
-        logTime(logTime), logLoggingLevel(logLoggingLevel)
-    {
-    }
-
-    void enableSerialLogging(uint8_t loggingLevel = LOGGING_LEVEL_DEBUG);
+    void enableSerialLogging(uint8_t loggingLevel = LOGGING_LEVEL_DEBUG, const String& serialName = "");
     bool enableSDCardLogging(const String& SDCardLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
     bool enableFlashLogging(const String& flashLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
 
@@ -72,23 +68,20 @@ public:
 private:
     String flashLogPath;
     String SDCardLogPath;
-    String loggerName;
+    String serialLoggingName;
     bool logToSDCard = false;
     bool logToFlash = false;
     bool logToSerial = false;
-    const bool logTime;
-    const bool logLoggingLevel;
 
     uint8_t serialLoggingLevel = LOGGING_LEVEL_DEBUG;
     uint8_t flashLoggingLevel = LOGGING_LEVEL_DEBUG;
     uint8_t sdCardLoggingLevel = LOGGING_LEVEL_DEBUG;
 
-    void appendLineToFileOnFlash(const String& msg) const;
-    void writeLineToSerial(const String& msg) const;
+    void appendRawMsgToFileOnFlash(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
+    void appendRawMsgToFileOnSDCard(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
+    static void appendRawMsgToFile(FS& fs, const String& path, uint64_t timestamp, uint8_t loggingLevel,
+                                   const String& text);
 
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);
-    static String getTimeString();
-
-    void appendLineToFileOnSDCard(const String& msg) const;
 };

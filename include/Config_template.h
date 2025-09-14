@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Log.h"
+#include "Backend.h"
 
 // Serial debugging
 #define ENABLE_SERIAL_LOGGING false // Enable for serial printing
@@ -12,9 +13,6 @@
 #define SD_CARD_LOGGING_LEVEL LOGGING_LEVEL_INFO
 
 #define UART_BAUD 115200U
-
-#define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
 #define GPS_UPDATE_INTERVAL_WHILE_DRIVING 500 // ms
 #define GPS_UPDATE_INTERVAL_WHILE_STANDING 1000 // ms
@@ -49,5 +47,8 @@
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
 #define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
-#define HW_WATCHDOG_OTA_UPDATE_TIMEOUT 3600U // [s] same as HW_WATCHDOG_DEFAULT_TIMEOUT but when performing an ota update
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
+
+#define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
+#define SKIP_ALL_CONNECTION_SPEED_TESTS false
+#define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates

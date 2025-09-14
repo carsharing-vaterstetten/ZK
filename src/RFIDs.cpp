@@ -89,6 +89,7 @@ bool RFIDs::downloadRfids()
 
     switch (downloadResult)
     {
+    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
     case DownloadResult::HTTP_REQUEST_ERROR:
     case DownloadResult::UNEXPECTED_STATUS_CODE:
         fileLog.errorln("RFIDs file download failed");

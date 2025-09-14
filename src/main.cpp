@@ -5,15 +5,16 @@
 #include <LED.h>
 #include <esp32-hal.h>
 #include <esp_system.h>
-#include <esp_task_wdt.h>
 #include <SD.h>
 #include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
+#include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
+#include "WatchdogHandler.h"
 
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
@@ -85,7 +86,6 @@ void enableFileLogging(const bool forceFlash)
         StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS, SPIFFS, SPIFFS);
 
         fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
-        gpsLog.enableFlashLogging(GPS_FILE_PATH);
 
         fileLog.infoln("Forced to use flash. Now logging to file(s)");
         return;
@@ -94,9 +94,39 @@ void enableFileLogging(const bool forceFlash)
     StorageManager::setFS(SD, SPIFFS, SD, SD, SPIFFS);
 
     fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
-    gpsLog.enableSDCardLogging(GPS_FILE_PATH);
 
     fileLog.infoln("Now logging to file(s)");
+}
+
+void initializeStorage()
+{
+    if (config.preferSDCard)
+    {
+        if (StorageManager::isSDCardConnected())
+        {
+            serialOnlyLog.infoln("Using SD-card as preferred storage");
+
+            // Should already be mounted after isSDCardConnected()
+            const bool sdInitSuccess = StorageManager::mountSDCard();
+
+            if (!sdInitSuccess)
+            {
+                serialOnlyLog.warningln("Failed to initialize SD-card");
+            }
+
+            enableFileLogging(!sdInitSuccess);
+        }
+        else
+        {
+            serialOnlyLog.warningln("SD-card is not inserted");
+            enableFileLogging(true);
+        }
+    }
+    else
+    {
+        serialOnlyLog.infoln("Using flash as preferred storage");
+        enableFileLogging(true);
+    }
 }
 
 int espLogHandler(const char* fmt, const va_list args)
@@ -117,7 +147,7 @@ void setup()
 
 #if ENABLE_SERIAL_LOGGING
     fileLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
-    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
+    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL, "Serial");
 #endif
 
     const esp_reset_reason_t reset_reason = esp_reset_reason();
@@ -125,11 +155,11 @@ void setup()
     // Initialize the watchdog.
     // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
     // That could possibly lead to an infinite resetting loop.
-    HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
+    WatchdogHandler::resetTimeout();
     // Add the current task to be monitored by the watchdog.
     // This ensures that if the main loop doesn't reset the watchdog in time,
     // the ESP32 will reset itself.
-    HelperUtils::subscribeTaskToWatchdog();
+    WatchdogHandler::subscribeTask();
 
     // redirect ESP logs
     esp_log_set_vprintf(&espLogHandler);
@@ -149,22 +179,7 @@ void setup()
         StorageManager::saveConfigToEEPROM(config);
     }
 
-    if (StorageManager::isSDCardConnected() && config.preferSDCard)
-    {
-        serialOnlyLog.infoln("Using SD-card as preferred storage");
-
-        const bool sdInitSuccess = StorageManager::mountSDCard(); // Should already be mounted after isSDCardConnected()
-        if (!sdInitSuccess)
-        {
-            serialOnlyLog.warningln("Failed to initialize SD-card");
-        }
-        enableFileLogging(!sdInitSuccess);
-    }
-    else
-    {
-        serialOnlyLog.infoln("Using flash as preferred storage");
-        enableFileLogging(true);
-    }
+    initializeStorage();
 
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
 
@@ -173,7 +188,7 @@ void setup()
 
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
 
-    fileLog.infoln("Hardware startup reason: " + HelperUtils::getResetReasonHumanReadable(reset_reason));
+    fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(reset_reason));
 
     statusLed.init();
 
@@ -188,11 +203,15 @@ void setup()
 
     fileLog.infoln(
         "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getLocalTime() +
-        ", UTC: " + String(Modem::getUTCTimestamp()));
+        ", Unix timestamp: " + String(Modem::getUnixTimestamp()));
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
     statusLed.setColor(Color::Purple);
+
+#if !SKIP_INITIAL_CONNECTION_SPEED_TEST
+    Modem::performConnectionSpeedTest();
+#endif
 
     FirmwareUpdater::doUpdateIfAvailable();
 
@@ -211,7 +230,7 @@ void setup()
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
 
-    Modem::uploadLog(true, true, 1);
+    Modem::uploadLogsFromAllFileSystems(false, true, 1);
 
     statusLed.clear();
 
@@ -222,7 +241,7 @@ void loop()
 {
     if (millis() >= nextWatchdogResetMs)
     {
-        esp_task_wdt_reset(); // Reset the watchdog timer
+        WatchdogHandler::taskWDTReset();
         nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
     }
 
@@ -230,10 +249,9 @@ void loop()
     {
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
-        statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
-
-        Modem::uploadGPSFile(true, true, 3);
-        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyways
+        statusLed.setColor(Color::Blue);
+        Modem::performConnectionSpeedTest();
+        Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyways
 
         ESP.restart();
     }
