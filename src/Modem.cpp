@@ -509,14 +509,14 @@ void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool 
 uint64_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
-    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, nullptr);
-    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second);
+    float timezone;
+    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
 esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
 {
-    constexpr uint32_t uploadSpeed = 9500; // [B/s] TODO: measure speed
-    const uint32_t uploadTime = fileSize / uploadSpeed; // [s]
+    const uint32_t uploadTime = fileSize / estimatedUploadSpeed; // [s]
     if (uploadTime <= HW_WATCHDOG_DEFAULT_TIMEOUT / 5) return ESP_OK; // Doesnt really matter
     const uint32_t newWatchdogTime = uploadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
     return WatchdogHandler::setTempTimeout(newWatchdogTime);

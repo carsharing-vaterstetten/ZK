@@ -15,6 +15,7 @@ public:
     static void requestConfig(Config& c);
     static bool md5File(File file, uint8_t out[16]);
     static String md5ToHex(const uint8_t md5[16]);
-    static uint64_t dateTimeToUnixTimestamp(int year, int month, int day, int hour, int minute, int second);
+    static time_t dateTimeToUnixTimestamp(int year, int month, int day, int hour, int minute, int second,
+                                          float timezone);
     static void dateTimeToString(char* buf, int year, int month, int day, int hour, int minute, int second);
 };

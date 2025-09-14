@@ -62,11 +62,12 @@ public:
                                                              int bufferSize = 512,
                                                              unsigned long* uploadStartMs = nullptr,
                                                              unsigned long* uploadEndMs = nullptr);
-    static UploadWithSizeCheckResultAndRetries uploadFileWithSizeCheckAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
-                                                 bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
-                                                 const String& urlParams = "", int bufferSize = 512,
-                                                 unsigned long* uploadStartMs = nullptr,
-                                                 unsigned long* uploadEndMs = nullptr);
+    static UploadWithSizeCheckResultAndRetries uploadFileWithSizeCheckAndDelete(
+        const String& endpoint, FS& fileFs, const String& filePath,
+        bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
+        const String& urlParams = "", int bufferSize = 512,
+        unsigned long* uploadStartMs = nullptr,
+        unsigned long* uploadEndMs = nullptr);
     static int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
                          const String& password = "");
     static DownloadResult downloadFile(const String& remotePath, File& f, const String& username = "",
@@ -79,7 +80,7 @@ public:
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-    static String getLocalTime(const TinyGSMDateTimeFormat format = DATE_FULL)
+    static String getGSMDateTime(const TinyGSMDateTimeFormat format = DATE_FULL)
     {
         return gsmModem->getGSMDateTime(format);
     }

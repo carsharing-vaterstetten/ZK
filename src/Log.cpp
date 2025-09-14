@@ -91,13 +91,14 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
     // Takes around 10 ms for modem timestamp and 20 ms total when logging to file
 
     char timeStr[HelperUtils::dateTimeStrLength];
-    int year, month, day, hour, minute, second;
     uint64_t timestamp;
 
     if (Modem::isInitialized())
     {
-        Modem::getNetworkTime(&year, &month, &day, &hour, &minute, &second, nullptr);
-        timestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second);
+        int year, month, day, hour, minute, second;
+        float timezone;
+        Modem::getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+        timestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
         HelperUtils::dateTimeToString(timeStr, year, month, day, hour, minute, second);
     }
     else
