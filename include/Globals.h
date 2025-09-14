@@ -6,7 +6,6 @@
 
 extern Log serialOnlyLog;
 extern Log fileLog;
-extern Log gpsLog;
 extern uint64_t efuseMac;
 extern String efuseMacHex;
 extern LED statusLed;

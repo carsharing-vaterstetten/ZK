@@ -591,11 +591,3 @@ bool Modem::getGPS(GPS_DATA_t& out)
                             reinterpret_cast<int*>(&out.hour), reinterpret_cast<int*>(&out.minute),
                             reinterpret_cast<int*>(&out.second));
 }
-
-void Modem::uploadGPSFile(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
-{
-    fileLog.infoln("Uploading GPS log");
-    uploadFileWithSizeCheckAndDelete(GPS_FILE_UPLOAD_ENDPOINT, *StorageManager::gpsFs, GPS_FILE_PATH,
-                                     deleteIfSuccess, deleteAfterRetrying, retries);
-}
-

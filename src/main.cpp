@@ -12,6 +12,7 @@
 #include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
+#include "GPS.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
 #include "WatchdogHandler.h"
@@ -267,9 +268,8 @@ void loop()
 
             if (gpsSuccess)
             {
-                const auto parsedBytes = reinterpret_cast<uint8_t*>(&gpsData);
                 serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
-                gpsLog.write(parsedBytes, sizeof(GPS_DATA_t));
+                GPS::logData(gpsData);
             }
             else
             {

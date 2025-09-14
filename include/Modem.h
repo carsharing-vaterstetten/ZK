@@ -9,6 +9,8 @@
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 
+#include "GPS.h"
+
 #define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
 #define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
 #define UPLOAD_WITH_SIZE_CHECK_RESULTS BASE_UPLOAD_RESULTS, UNEXPECTED_STATUS_CODE, SIZE_CHECK_FAILED
@@ -35,25 +37,6 @@ enum class DownloadResult
 {
     BASE_DOWNLOAD_RESULTS,
 };
-
-#pragma pack(push, 1)
-struct GPS_DATA_t
-{
-    float lat = 0.0;
-    float lon = 0.0;
-    float speed = 0;
-    float alt = 0;
-    uint8_t vsat = 0;
-    uint8_t usat = 0;
-    float accuracy = 0;
-    uint16_t year = 0;
-    uint8_t month = 0;
-    uint8_t day = 0;
-    uint8_t hour = 0;
-    uint8_t minute = 0;
-    uint8_t second = 0;
-};
-#pragma pack(pop)
 
 class Modem
 {
@@ -111,7 +94,6 @@ public:
     static esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize);
     static void performConnectionSpeedTest();
     static bool getGPS(GPS_DATA_t& out);
-    static void uploadGPSFile(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     static bool isInitialized()
     {
