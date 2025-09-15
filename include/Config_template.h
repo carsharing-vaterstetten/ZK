@@ -46,6 +46,7 @@
 // Restart the esp at this time
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
+#define HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT 1200U // [s]
 #define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 

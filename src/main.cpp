@@ -150,7 +150,7 @@ void setup()
     // Initialize the watchdog.
     // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
     // That could possibly lead to an infinite resetting loop.
-    WatchdogHandler::resetTimeout();
+    WatchdogHandler::setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
     // Add the current task to be monitored by the watchdog.
     // This ensures that if the main loop doesn't reset the watchdog in time,
     // the ESP32 will reset itself.
@@ -229,6 +229,8 @@ void setup()
     Modem::uploadLogsFromAllFileSystems(false, true, 1);
 
     statusLed.clear();
+
+    WatchdogHandler::resetTimeout();
 
     fileLog.infoln("Setup done");
 }
