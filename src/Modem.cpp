@@ -18,8 +18,8 @@
 TinyGsmSim7000SSL* Modem::gsmModem = nullptr;
 TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL* Modem::gsmClient = nullptr;
 bool Modem::isInit = false;
-uint32_t Modem::estimatedUploadSpeed = 5000; // [B/s]
-uint32_t Modem::estimatedDownloadSpeed = 5000; // [B/s]
+uint32_t Modem::estimatedUploadSpeed = 500; // [B/s]
+uint32_t Modem::estimatedDownloadSpeed = 500; // [B/s]
 
 void Modem::powerOn()
 {
@@ -120,9 +120,8 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     }
 
     HttpClient uploadHttp{*gsmClient, config.server, config.port};
-
-    uploadHttp.beginRequest();
     uploadHttp.connectionKeepAlive();
+    uploadHttp.beginRequest();
     const int err = uploadHttp.post(fullEndpoint);
 
     if (err != 0)
@@ -166,11 +165,9 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
         if (bytesRead <= 0) break;
 
-        const size_t bytesSent = uploadHttp.write(buffer, bytesRead);
+        uploadHttp.write(buffer, bytesRead); // For some reason the bytes written returned by this function is always 0.
 
-        if (bytesSent <= 0) break; // This happens, when the server does not allow the request size.
-
-        totalBytesUploaded += bytesSent;
+        totalBytesUploaded += bytesRead;
 
         if (totalBytesUploaded >= nextPrint)
         {
@@ -367,9 +364,8 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
     HttpClient downloadHttp{*gsmClient, config.server, config.port};
-
-    downloadHttp.beginRequest();
     downloadHttp.connectionKeepAlive();
+    downloadHttp.beginRequest();
     const int err = downloadHttp.get(remotePath);
 
     if (err != 0)
