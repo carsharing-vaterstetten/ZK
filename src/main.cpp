@@ -188,7 +188,7 @@ void setup()
 
     statusLed.init();
 
-    statusLed.setColor(Color::White);
+    statusLed.setStatusColor(StatusColor::InitializationPhase);
 
     efuseMac = ESP.getEfuseMac();
     efuseMacHex = String(efuseMac, 16);
@@ -205,7 +205,7 @@ void setup()
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
-    statusLed.setColor(Color::Purple);
+    statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
 
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
     Modem::performConnectionSpeedTest();
@@ -213,7 +213,7 @@ void setup()
 
     FirmwareUpdater::doUpdateIfAvailable();
 
-    statusLed.setColor(Color::Orange);
+    statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
 
     AccessControl::init();
 
@@ -223,9 +223,9 @@ void setup()
 
     fileLog.infoln("Initialization phase complete.");
 
-    statusLed.setColor(Color::Blue);
-
     RFIDs::downloadRfidsIfChanged();
+
+    statusLed.setStatusColor(StatusColor::UploadingLogs);
 
     Modem::uploadLogsFromAllFileSystems(false, true, 1);
 
@@ -248,7 +248,7 @@ void loop()
     {
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
-        statusLed.setColor(Color::Blue);
+        statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
         Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyways
 

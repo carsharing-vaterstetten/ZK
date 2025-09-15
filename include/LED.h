@@ -5,7 +5,10 @@
 
 enum class StatusColor
 {
+    InitializationPhase,
     PerformingOTAUpdate,
+    UpdatingRFIDs,
+    UploadingLogs,
     Error,
 };
 
