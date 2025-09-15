@@ -7,8 +7,7 @@
 
 uint32_t WatchdogHandler::currentTimeout = UINT32_MAX;
 uint32_t WatchdogHandler::timeoutBeforeTempSet = UINT32_MAX;
-bool WatchdogHandler::tempTimeoutSetSuccessfully = false;
-
+bool WatchdogHandler::tempTimeoutSet = false;
 
 String WatchdogHandler::getResetReasonHumanReadable(const esp_reset_reason_t reset_reason)
 {
@@ -46,26 +45,23 @@ uint32_t WatchdogHandler::getCurrentTimeout()
     return currentTimeout;
 }
 
-/// Can be used to increase the TWDT timeout and then later revert it to the timout that it was before with revertTempSet
-esp_err_t WatchdogHandler::setTempTimeout(const uint32_t timeout)
+/// Can be used to increase the TWDT timeout and then later revert it to the timout it was before with revertTempSet
+esp_err_t WatchdogHandler::increaseTimeoutTemporarily(const uint32_t timeout)
 {
-    const esp_err_t err = setTimeout(timeout);
-    tempTimeoutSetSuccessfully = err == ESP_OK;
-    if (tempTimeoutSetSuccessfully)
+    const uint32_t oldTimeout = currentTimeout;
+    const esp_err_t err = setTimeout(timeout + currentTimeout);
+    if (err == ESP_OK)
     {
-        timeoutBeforeTempSet = timeout;
+        timeoutBeforeTempSet = oldTimeout;
+        tempTimeoutSet = true;
     }
     return err;
 }
 
-esp_err_t WatchdogHandler::revertTempSet()
+esp_err_t WatchdogHandler::revertTemporaryIncrease()
 {
-    if (tempTimeoutSetSuccessfully)
-    {
-        return setTimeout(timeoutBeforeTempSet);
-    }
-
-    return ESP_OK;
+    if (!tempTimeoutSet) return ESP_OK;
+    return setTimeout(timeoutBeforeTempSet);
 }
 
 /// This function configures and initializes the TWDT. If the TWDT is already initialized when this function is called, this function will update the TWDT's timeout period
@@ -80,6 +76,7 @@ esp_err_t WatchdogHandler::setTimeout(const uint32_t timeout)
     if (watchdog_init_err == ESP_OK)
     {
         currentTimeout = timeout;
+        tempTimeoutSet = false;
     }
     return watchdog_init_err;
 }
