@@ -11,6 +11,7 @@ public:
 
     static void parseConfigString(const String& inputString, Config& c);
     static String getConfigHumanReadable(const Config& c);
+    static String getConfigHumanReadableHideSecrets(const Config& c);
     static String getConfigFormat(const Config& c);
     static void requestConfig(Config& c);
     static bool md5File(File file, uint8_t out[16]);

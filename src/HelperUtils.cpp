@@ -78,6 +78,12 @@ String HelperUtils::getConfigHumanReadable(const Config& c)
         + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
 }
 
+String HelperUtils::getConfigHumanReadableHideSecrets(const Config& c)
+{
+    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
+        + " preferSDCard=" + String(c.preferSDCard);
+}
+
 String HelperUtils::getConfigFormat(const Config& c)
 {
     return "apn=\"" + String(c.apn) + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +

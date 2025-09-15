@@ -176,7 +176,8 @@ void setup()
 
     initializeStorage();
 
-    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
+    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
+    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
 
     fileLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
                                      "Flash initialization failed");
