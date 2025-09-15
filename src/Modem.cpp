@@ -15,8 +15,8 @@
 #define SERIAL_AT Serial1
 #define SERIAL_AT_BAUD 115200U
 
-TinyGsmSim7000* Modem::gsmModem = nullptr;
-TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
+TinyGsmSim7000SSL* Modem::gsmModem = nullptr;
+TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL* Modem::gsmClient = nullptr;
 bool Modem::isInit = false;
 uint32_t Modem::estimatedUploadSpeed = 5000; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000; // [B/s]
@@ -44,8 +44,8 @@ bool Modem::init(const uint8_t retries)
         delete gsmModem;
         delete gsmClient;
 
-        gsmModem = new TinyGsmSim7000{SERIAL_AT};
-        gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
+        gsmModem = new TinyGsmSim7000SSL{SERIAL_AT};
+        gsmClient = new TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL{*gsmModem};
 
         fileLog.infoln("Initializing modem...");
         powerOn();
@@ -122,6 +122,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     HttpClient uploadHttp{*gsmClient, config.server, config.port};
 
     uploadHttp.beginRequest();
+    uploadHttp.connectionKeepAlive();
     const int err = uploadHttp.post(fullEndpoint);
 
     if (err != 0)
@@ -333,6 +334,7 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 {
     HttpClient http{*gsmClient, config.server, config.port};
     http.beginRequest();
+    http.connectionKeepAlive();
     const int err = http.get(aUrlPath);
 
     if (err != HTTP_SUCCESS)
@@ -367,6 +369,7 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     HttpClient downloadHttp{*gsmClient, config.server, config.port};
 
     downloadHttp.beginRequest();
+    downloadHttp.connectionKeepAlive();
     const int err = downloadHttp.get(remotePath);
 
     if (err != 0)

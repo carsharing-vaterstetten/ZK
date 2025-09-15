@@ -2,10 +2,10 @@
 
 #include <Arduino.h>
 
-#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_MODEM_SIM7000SSL
 #define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
-#include <TinyGsmClientSIM7000.h>
+#include <TinyGsmClientSIM7000SSL.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 
@@ -45,7 +45,7 @@ class Modem
     static uint32_t estimatedUploadSpeed;
 
 public:
-    static TinyGsmSim7000::GsmClientSim7000* gsmClient;
+    static TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL* gsmClient;
 
     Modem() = delete;
 
@@ -98,5 +98,5 @@ public:
 
 private:
     static bool isInit;
-    static TinyGsmSim7000* gsmModem;
+    static TinyGsmSim7000SSL* gsmModem;
 };
