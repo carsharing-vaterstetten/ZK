@@ -7,6 +7,7 @@
 #include <FS.h>
 
 #include "Config.h"
+#include "Modem.h"
 
 
 void HelperUtils::parseConfigString(const String& inputString, Config& c)
@@ -75,6 +76,12 @@ String HelperUtils::getConfigHumanReadable(const Config& c)
 {
     return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
         + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
+}
+
+String HelperUtils::getConfigHumanReadableHideSecrets(const Config& c)
+{
+    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
+        + " preferSDCard=" + String(c.preferSDCard);
 }
 
 String HelperUtils::getConfigFormat(const Config& c)
@@ -169,4 +176,24 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
 {
     snprintf(buf, dateTimeStrLength, "%04d-%02d-%02d %02d:%02d:%02d",
              year, month, day, hour, minute, second);
+}
+
+bool HelperUtils::updateSystemTimeWithModem()
+{
+    if (!Modem::isInitialized())
+        return false;
+
+    const time_t seconds = Modem::getUnixTimestamp();
+    const timeval now = {.tv_sec = seconds, .tv_usec = 0};
+    settimeofday(&now, nullptr);
+
+    return true;
+}
+
+/// Same as millis() if system time is not initialized
+uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
+{
+    static timeval now{};
+    gettimeofday(&now, nullptr);
+    return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
 }

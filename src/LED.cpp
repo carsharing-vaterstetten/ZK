@@ -59,9 +59,15 @@ uint32_t LED::getStatusColorValue(const StatusColor color)
     switch (color)
     {
     case StatusColor::PerformingOTAUpdate:
-        return 0x0000FF;
+        return 0x800080;
     case StatusColor::Error:
         return 0xFF0000;
+    case StatusColor::InitializationPhase:
+        return 0xFFFFFF;
+    case StatusColor::UpdatingRFIDs:
+        return 0xFFA500;
+    case StatusColor::UploadingLogs:
+        return 0x0000FF;
     default:
         return 0;
     }

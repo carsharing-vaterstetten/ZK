@@ -6,7 +6,7 @@ class WatchdogHandler
 {
     static uint32_t currentTimeout;
     static uint32_t timeoutBeforeTempSet;
-    static bool tempTimeoutSetSuccessfully;
+    static bool tempTimeoutSet;
 public:
     static esp_err_t setTimeout(uint32_t timeout);
     static esp_err_t resetTimeout();
@@ -15,6 +15,6 @@ public:
     static String getResetReasonHumanReadable(esp_reset_reason_t reset_reason);
     static uint32_t getCurrentTimeout();
 
-    static esp_err_t setTempTimeout(uint32_t timeout);
-    static esp_err_t revertTempSet();
+    static esp_err_t increaseTimeoutTemporarily(uint32_t timeout);
+    static esp_err_t revertTemporaryIncrease();
 };

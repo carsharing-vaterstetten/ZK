@@ -237,7 +237,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     f.close();
     uploadHttp.stop();
 
-    WatchdogHandler::revertTempSet();
+    WatchdogHandler::revertTemporaryIncrease();
 
     if (statusCode)
         fileLog.infoln("Response status code: " + String(*statusCode));
@@ -474,7 +474,7 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 
     f.close();
 
-    WatchdogHandler::revertTempSet();
+    WatchdogHandler::revertTemporaryIncrease();
 
     fileLog.infoln("Download complete");
 
@@ -506,7 +506,7 @@ void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool 
     uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
-uint64_t Modem::getUnixTimestamp()
+time_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
     float timezone;
@@ -517,17 +517,15 @@ uint64_t Modem::getUnixTimestamp()
 esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
 {
     const uint32_t uploadTime = fileSize / estimatedUploadSpeed; // [s]
-    if (uploadTime <= HW_WATCHDOG_DEFAULT_TIMEOUT / 5) return ESP_OK; // Doesnt really matter
-    const uint32_t newWatchdogTime = uploadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
-    return WatchdogHandler::setTempTimeout(newWatchdogTime);
+    if (uploadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return WatchdogHandler::increaseTimeoutTemporarily(uploadTime);
 }
 
 esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
 {
     const uint32_t downloadTime = fileSize / estimatedDownloadSpeed; // [s]
-    if (downloadTime <= HW_WATCHDOG_DEFAULT_TIMEOUT / 5) return ESP_OK; // Doesnt really matter
-    const uint32_t newWatchdogTime = downloadTime + HW_WATCHDOG_DEFAULT_TIMEOUT; // [s]
-    return WatchdogHandler::setTempTimeout(newWatchdogTime);
+    if (downloadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return WatchdogHandler::increaseTimeoutTemporarily(downloadTime);
 }
 
 void Modem::performConnectionSpeedTest()

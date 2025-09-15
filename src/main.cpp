@@ -156,7 +156,7 @@ void setup()
     // Initialize the watchdog.
     // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
     // That could possibly lead to an infinite resetting loop.
-    WatchdogHandler::resetTimeout();
+    WatchdogHandler::setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
     // Add the current task to be monitored by the watchdog.
     // This ensures that if the main loop doesn't reset the watchdog in time,
     // the ESP32 will reset itself.
@@ -182,7 +182,8 @@ void setup()
 
     initializeStorage();
 
-    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
+    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
+    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
 
     fileLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
                                      "Flash initialization failed");
@@ -193,7 +194,7 @@ void setup()
 
     statusLed.init();
 
-    statusLed.setColor(Color::White);
+    statusLed.setStatusColor(StatusColor::InitializationPhase);
 
     efuseMac = ESP.getEfuseMac();
     efuseMacHex = String(efuseMac, 16);
@@ -201,14 +202,16 @@ void setup()
     fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
 
     Modem::init();
+    HelperUtils::updateSystemTimeWithModem();
 
     fileLog.infoln(
         "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
-        ", Unix timestamp: " + String(Modem::getUnixTimestamp()));
+        ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
+            HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
 
     StorageManager::removeFirmwareFile(); // Cleanup
 
-    statusLed.setColor(Color::Purple);
+    statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
 
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
     Modem::performConnectionSpeedTest();
@@ -216,7 +219,7 @@ void setup()
 
     FirmwareUpdater::doUpdateIfAvailable();
 
-    statusLed.setColor(Color::Orange);
+    statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
 
     AccessControl::init();
 
@@ -226,14 +229,16 @@ void setup()
 
     fileLog.infoln("Initialization phase complete.");
 
-    statusLed.setColor(Color::Blue);
-
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
+
+    statusLed.setStatusColor(StatusColor::UploadingLogs);
 
     Modem::uploadLogsFromAllFileSystems(false, true, 1);
 
     statusLed.clear();
+
+    WatchdogHandler::resetTimeout();
 
     fileLog.infoln("Setup done");
 }
@@ -250,7 +255,7 @@ void loop()
     {
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
-        statusLed.setColor(Color::Blue);
+        statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
         Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyways
 

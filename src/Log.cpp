@@ -88,22 +88,20 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
 
 void Log::logMsgln(const String& msg, const uint8_t level) const
 {
-    // Takes around 10 ms for modem timestamp and 20 ms total when logging to file
+    // = millis() if modem is not initialized
+    const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
 
-    char timeStr[HelperUtils::dateTimeStrLength];
-    uint64_t timestamp;
+    char timeStr[HelperUtils::dateTimeStrLength]; // For human-readable time
 
     if (Modem::isInitialized())
     {
         int year, month, day, hour, minute, second;
         float timezone;
         Modem::getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
-        timestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
         HelperUtils::dateTimeToString(timeStr, year, month, day, hour, minute, second);
     }
     else
     {
-        timestamp = millis();
         sniprintf(timeStr, sizeof(timeStr), "%lu", millis());
     }
 
@@ -135,9 +133,9 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
     }
 
     if (logToFlash && level >= flashLoggingLevel)
-        appendRawMsgToFileOnFlash(timestamp, level, msg);
+        appendRawMsgToFileOnFlash(timestampMs, level, msg);
     if (logToSDCard && level >= sdCardLoggingLevel)
-        appendRawMsgToFileOnSDCard(timestamp, level, msg);
+        appendRawMsgToFileOnSDCard(timestampMs, level, msg);
 }
 
 
