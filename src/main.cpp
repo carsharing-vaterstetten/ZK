@@ -139,6 +139,32 @@ int espLogHandler(const char* fmt, const va_list args)
     return 0;
 }
 
+void checkGPS()
+{
+    if (isLoggedIn && !currentRFIDConsentsToGPSTracking) return;
+
+    if (StorageManager::gpsFs == &SPIFFS && SPIFFS.totalBytes() - SPIFFS.usedBytes() < 128 * 1024)
+    {
+        // GPS is logging to flash and storage is low
+        serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
+        nextGPSUpdate = millis() + 5 * 60 * 1000;
+        return;
+    }
+
+    GPS_DATA_t gpsData;
+    const bool gpsSuccess = Modem::getGPS(gpsData);
+
+    if (!gpsSuccess)
+    {
+        serialOnlyLog.debugln("No GPS data received");
+        return;
+    }
+
+    serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
+
+    GPS::logDataBuffered(gpsData);
+}
+
 void setup()
 {
     Serial.begin(UART_BAUD);
@@ -266,23 +292,8 @@ void loop()
 
     if (millis() >= nextGPSUpdate)
     {
-        if (!isLoggedIn || currentRFIDConsentsToGPSTracking)
-        {
-            GPS_DATA_t gpsData;
-            const bool gpsSuccess = Modem::getGPS(gpsData);
-
-            if (gpsSuccess)
-            {
-                serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
-                GPS::logDataBuffered(gpsData);
-            }
-            else
-            {
-                serialOnlyLog.debugln("Failed to get GPS");
-            }
-        }
-
         nextGPSUpdate = millis() + (
             isLoggedIn ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
+        checkGPS();
     }
 }
