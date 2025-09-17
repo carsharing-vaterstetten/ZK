@@ -133,6 +133,22 @@ int espLogHandler(const char* fmt, const va_list args)
     return 0;
 }
 
+void loadConfig() {
+#if OVERRIDE_CONFIG
+    serialOnlyLog.infoln("Using compiled config");
+#else
+    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
+
+    if (!configLoadedSuccess)
+    {
+        serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
+        HelperUtils::requestConfig(config);
+        WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
+        StorageManager::saveConfigToEEPROM(config);
+    }
+#endif
+}
+
 void setup()
 {
     Serial.begin(UART_BAUD);
@@ -162,17 +178,10 @@ void setup()
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
     StorageManager::mountEEPROM();
 
-    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
+    loadConfig();
 
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
                                            "Flash initialization failed");
-
-    if (!configLoadedSuccess)
-    {
-        serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        HelperUtils::requestConfig(config);
-        StorageManager::saveConfigToEEPROM(config);
-    }
 
     initializeStorage();
 
