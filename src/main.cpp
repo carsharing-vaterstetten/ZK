@@ -133,7 +133,8 @@ int espLogHandler(const char* fmt, const va_list args)
     return 0;
 }
 
-void loadConfig() {
+void loadConfig()
+{
 #if OVERRIDE_CONFIG
     serialOnlyLog.infoln("Using compiled config");
 #else
@@ -176,27 +177,26 @@ void setup()
     esp_log_set_vprintf(&espLogHandler);
 
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
-    StorageManager::mountEEPROM();
+
+    serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
+                                           "Flash initialization failed");
+
+    const bool eepromInitSuccess = StorageManager::mountEEPROM();
+
+    serialOnlyLog.logInfoOrCriticalErrorln(eepromInitSuccess, "EEPROM initialized successfully",
+                                           "EEPROM initialization failed");
 
     loadConfig();
 
-    serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
-                                           "Flash initialization failed");
+    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
 
     initializeStorage();
 
-    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
-
-    fileLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
-                                     "Flash initialization failed");
-
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
-
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(reset_reason));
 
     statusLed.init();
-
     statusLed.setStatusColor(StatusColor::InitializationPhase);
 
     efuseMac = ESP.getEfuseMac();
