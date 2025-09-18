@@ -90,17 +90,24 @@ bool Modem::init(const uint8_t retries)
             continue;
         }
 
-        fileLog.infoln("Synchronizing time with NTP server");
-        const byte ntpServerSyncErr = gsmModem->NTPServerSync();
-        const bool ntpSyncSuccess = ntpServerSyncErr == 1;
-        const String ntpSyncMsg = "NTP sync result: " + gsmModem->ShowNTPError(ntpServerSyncErr);
-        fileLog.logInfoOrWarningln(ntpSyncSuccess, ntpSyncMsg, ntpSyncMsg);
+        fileLog.infoln("Syncing time");
+        constexpr uint8_t maxNetTimeSyncAttempts = 10;
+        uint8_t syncAttempt = 0;
+        for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
+        {
+            int year;
+            gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            if (year < 2070 && year >= 2025) break;
+            fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+        }
+        const bool timeSyncSuccess = syncAttempt < maxNetTimeSyncAttempts;
+        fileLog.logInfoOrWarningln(timeSyncSuccess, "Time synced successfully", "Failed to sync time");
 
-        if (!ntpSyncSuccess)
+        if (!timeSyncSuccess)
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the the modem could not synchronise time with NTP server. Retrying...");
+                " failed because the the modem could not synchronise time. Retrying...");
             powerOff();
             continue;
         }
