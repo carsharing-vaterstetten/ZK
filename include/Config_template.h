@@ -53,3 +53,13 @@
 #define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
 #define SKIP_ALL_CONNECTION_SPEED_TESTS false
 #define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates
+
+#define OVERRIDE_CONFIG false // Useful for development or mass deployment
+#if OVERRIDE_CONFIG
+#define OVERRIDE_CONFIG_VERSION 2
+#define OVERRIDE_CONFIG_APN ""
+#define OVERRIDE_CONFIG_SERVER ""
+#define OVERRIDE_CONFIG_PORT 80
+#define OVERRIDE_CONFIG_PASSWORD ""
+#define OVERRIDE_CONFIG_PREFER_SD_CARD true
+#endif

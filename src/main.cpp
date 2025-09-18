@@ -139,6 +139,23 @@ int espLogHandler(const char* fmt, const va_list args)
     return 0;
 }
 
+void loadConfig()
+{
+#if OVERRIDE_CONFIG
+    serialOnlyLog.infoln("Using compiled config");
+#else
+    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
+
+    if (!configLoadedSuccess)
+    {
+        serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
+        HelperUtils::requestConfig(config);
+        WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
+        StorageManager::saveConfigToEEPROM(config);
+    }
+#endif
+}
+
 void checkGPS()
 {
     if (isLoggedIn && !currentRFIDConsentsToGPSTracking) return;
@@ -192,34 +209,26 @@ void setup()
     esp_log_set_vprintf(&espLogHandler);
 
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
-    StorageManager::mountEEPROM();
 
-    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
-
-    serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
+    serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
-    if (!configLoadedSuccess)
-    {
-        serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        HelperUtils::requestConfig(config);
-        StorageManager::saveConfigToEEPROM(config);
-    }
+    const bool eepromInitSuccess = StorageManager::mountEEPROM();
+
+    serialOnlyLog.logInfoOrCriticalErrorln(eepromInitSuccess, "EEPROM initialized successfully",
+                                           "EEPROM initialization failed");
+
+    loadConfig();
+
+    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
 
     initializeStorage();
 
-    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
-
-    fileLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialization succeeded",
-                                     "Flash initialization failed");
-
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
-
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(reset_reason));
 
     statusLed.init();
-
     statusLed.setStatusColor(StatusColor::InitializationPhase);
 
     efuseMac = ESP.getEfuseMac();

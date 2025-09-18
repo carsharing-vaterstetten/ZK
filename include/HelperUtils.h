@@ -9,7 +9,7 @@ class HelperUtils
 public:
     static constexpr uint8_t dateTimeStrLength = 32;
 
-    static void parseConfigString(const String& inputString, Config& c);
+    static bool parseConfigString(const String& inputString, Config& c);
     static String getConfigHumanReadable(const Config& c);
     static String getConfigHumanReadableHideSecrets(const Config& c);
     static String getConfigFormat(const Config& c);

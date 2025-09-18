@@ -12,4 +12,9 @@ extern LED statusLed;
 extern bool isLoggedIn;
 extern bool currentRFIDConsentsToGPSTracking;
 extern uint32_t loggedInRFID;
+
+#if OVERRIDE_CONFIG
+extern const Config config;
+#else
 extern Config config;
+#endif
