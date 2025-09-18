@@ -51,7 +51,7 @@ void checkNFCTag()
     statusLed.clear();
 }
 
-void initTime()
+void calculateNextRestartTime()
 {
     int hour, minute, second;
 
@@ -152,6 +152,7 @@ void loadConfig()
 
 void setup()
 {
+    // Start serial communication
     Serial.begin(UART_BAUD);
     while (!Serial)
     {
@@ -162,86 +163,73 @@ void setup()
     serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL, "Serial");
 #endif
 
-    const esp_reset_reason_t reset_reason = esp_reset_reason();
-
-    // Initialize the watchdog.
-    // WARNING: If this setup function does not complete within the given HW_WATCHDOG_TIMEOUT the watchdog will perform a reset.
-    // That could possibly lead to an infinite resetting loop.
+    // Start watchdog
     WatchdogHandler::setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
-    // Add the current task to be monitored by the watchdog.
-    // This ensures that if the main loop doesn't reset the watchdog in time,
-    // the ESP32 will reset itself.
     WatchdogHandler::subscribeTask();
 
-    // redirect ESP logs
-    esp_log_set_vprintf(&espLogHandler);
-
+    // Mount filesystems
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
-
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
-
     const bool eepromInitSuccess = StorageManager::mountEEPROM();
-
     serialOnlyLog.logInfoOrCriticalErrorln(eepromInitSuccess, "EEPROM initialized successfully",
                                            "EEPROM initialization failed");
-
-    loadConfig();
-
+    loadConfig(); // Config is now needed because it contains information whether the SD-Card should be used
     serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
-
     initializeStorage();
 
+    // Logging to files is now possible
+    esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
-    fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(reset_reason));
+    fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
+    StorageManager::logFSConfiguration();
+    StorageManager::logFilesystemsInformation();
 
+    // Cleanup of leftover firmware update
+    StorageManager::removeFirmwareFile();
+
+    // Now that critical system hardware has been initialized when can begin initializing external hardware
+    // First we start the LED to communicate the system status
     statusLed.init();
-    statusLed.setStatusColor(StatusColor::InitializationPhase);
 
+    // We need the efuseMac for communicating with the server therefore it is needed before we do anything with the modem
     efuseMac = ESP.getEfuseMac();
     efuseMacHex = String(efuseMac, 16);
-
     fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
 
+    // Now let's start the modem and set the system time fetched by the Modem network
+    statusLed.setStatusColor(StatusColor::InitializationPhase);
     Modem::init();
     HelperUtils::updateSystemTimeWithModem();
-
     fileLog.infoln(
         "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
         ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
             HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
+    calculateNextRestartTime();
 
-    StorageManager::removeFirmwareFile(); // Cleanup
-
-    statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
-
+    // Do the connection speed test before any up-/downloads
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
     Modem::performConnectionSpeedTest();
 #endif
 
+    // Now we are ready to check for a firmware update
+    statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
     FirmwareUpdater::doUpdateIfAvailable();
 
+    // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
-
     AccessControl::init();
-
     NFCCardReader::init();
-
-    initTime();
-
-    fileLog.infoln("Initialization phase complete.");
-
     RFIDs::downloadRfidsIfChanged();
 
+    // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-
     Modem::uploadLogsFromAllFileSystems(false, true, 1);
-
     statusLed.clear();
 
+    // Set the watchdog to a shorter timeout for the main loop
     WatchdogHandler::resetTimeout();
-
     fileLog.infoln("Setup done");
 }
 
@@ -259,7 +247,7 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
-        Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyways
+        Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyway
 
         ESP.restart();
     }

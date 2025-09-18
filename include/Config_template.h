@@ -29,14 +29,14 @@
 #define OPEN_KEY 21
 #define CLOSE_KEY 22
 
-// SD Card pins
+// SD-Card pins
 #define SD_MISO 2
 #define SD_MOSI 15
 #define SD_SCLK 14
 #define SD_CS 13
 #define SD_SPI VSPI
 
-// NFC Modul Pins
+// NFC modul Pins
 #define NFC_MOSI 23
 #define NFC_MISO 19
 #define NFC_SCLK 18
@@ -46,14 +46,17 @@
 // Restart the esp at this time
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
+// Hardware watchdog
 #define HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT 1200U // [s]
 #define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 
+// Connection speed test
 #define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
 #define SKIP_ALL_CONNECTION_SPEED_TESTS false
 #define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates
 
+// Config override
 #define OVERRIDE_CONFIG false // Useful for development or mass deployment
 #if OVERRIDE_CONFIG
 #define OVERRIDE_CONFIG_VERSION 2
