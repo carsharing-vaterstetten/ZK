@@ -18,8 +18,8 @@
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
 bool Modem::isInit = false;
-uint32_t Modem::estimatedUploadSpeed = 5000; // [B/s]
-uint32_t Modem::estimatedDownloadSpeed = 5000; // [B/s]
+uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
+uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
 void Modem::powerOn()
 {
