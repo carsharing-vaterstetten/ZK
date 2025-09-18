@@ -18,8 +18,8 @@
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
 bool Modem::isInit = false;
-uint32_t Modem::estimatedUploadSpeed = 5000; // [B/s]
-uint32_t Modem::estimatedDownloadSpeed = 5000; // [B/s]
+uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
+uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
 void Modem::powerOn()
 {
@@ -113,10 +113,11 @@ bool Modem::init(const uint8_t retries)
         if (gsmModem->isNetworkConnected() && gsmModem->isGprsConnected())
         {
             isInit = true;
+            fileLog.infoln("Modem startup completed successfully");
             return true;
         }
 
-        fileLog.warningln("Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) + " failed");
+        fileLog.warningln("Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) + " failed. Retrying...");
         powerOff();
     }
 
@@ -484,18 +485,34 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
                                         const bool deleteAfterRetrying, const uint32_t retries)
 {
+    bool uploadedSomething = false;
+
     if (SPIFFS.exists(filePath))
     {
         fileLog.infoln("Uploading " + filePath + " from SPIFFS");
+        uploadedSomething = true;
         uploadFileWithSizeCheckAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
                                          deleteAfterRetrying, retries, "filesystem=SPIFFS");
     }
 
-    if (StorageManager::isSDCardConnected() && SD.exists(filePath))
+    if (StorageManager::isSDCardConnected())
     {
-        fileLog.infoln("Uploading " + filePath + " from SD-card");
-        uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
-                                         deleteAfterRetrying, retries, "filesystem=SD-card");
+        if (SD.exists(filePath))
+        {
+            fileLog.infoln("Uploading " + filePath + " from SD-Card");
+            uploadedSomething = true;
+            uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
+                                             deleteAfterRetrying, retries, "filesystem=SD-card");
+        }
+    }
+    else if (config.preferSDCard)
+    {
+        fileLog.warningln("SD-Card not inserted -> Cannot upload " + filePath + " from there");
+    }
+
+    if (!uploadedSomething)
+    {
+        fileLog.warningln("Could not find " + filePath + " on any FS for uploading");
     }
 }
 

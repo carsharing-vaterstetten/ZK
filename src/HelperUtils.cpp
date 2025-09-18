@@ -5,6 +5,7 @@
 #include <EEPROM.h>
 #include "mbedtls/md5.h"
 #include <FS.h>
+#include <sd_defines.h>
 
 #include "Modem.h"
 
@@ -250,4 +251,22 @@ uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
     static timeval now{};
     gettimeofday(&now, nullptr);
     return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
+}
+
+const char* HelperUtils::sdCardTypeName(const sdcard_type_t type)
+{
+    switch (type)
+    {
+    case CARD_NONE:
+        return "None";
+    case CARD_MMC:
+        return "MMC";
+    case CARD_SD:
+        return "SD";
+    case CARD_SDHC:
+        return "SDHC";
+    case CARD_UNKNOWN:
+        return "UNKNOWN";
+    }
+    return "UNKNOWN";
 }
