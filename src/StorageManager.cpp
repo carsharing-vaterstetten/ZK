@@ -105,6 +105,8 @@ void StorageManager::logFSConfiguration()
     String msg = "Filesystem configuration: " LOG_FILE_PATH ": " + fsName(logFileFs);
     msg += ", " RFID_FILE_PATH ": " + fsName(rfidsFs);
     msg += ", " FIRMWARE_FILE_PATH ": " + fsName(firmwareFs);
+    msg += ", " GPS_FILE_PATH ": " + fsName(gpsFs);
+    msg += ", " GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH ": " + fsName(consentToGPSTrackingRfidsFs);
     fileLog.infoln(msg);
 }
 
