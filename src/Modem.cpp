@@ -62,25 +62,55 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
+
         fileLog.infoln("Connecting GPRS...");
         const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+        if (!gsmModem->isGprsConnected())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the GPRS failed to connect. Retrying...");
+            powerOff();
+            continue;
+        }
 
         fileLog.infoln("Waiting for network...");
         const bool networkSuccess = gsmModem->waitForNetwork();
         fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
                                    "The modem did not connect to the network even after waiting");
 
-        if (gsmModem->isNetworkConnected() && gsmModem->isGprsConnected())
+        if (!gsmModem->isNetworkConnected())
         {
-            isInit = true;
-            fileLog.infoln("Modem startup completed successfully");
-            return true;
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the network is not connected. Retrying...");
+            powerOff();
+            continue;
         }
 
-        fileLog.warningln("Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) + " failed. Retrying...");
-        powerOff();
+        fileLog.infoln("Synchronizing time with NTP server");
+        const byte ntpServerSyncErr = gsmModem->NTPServerSync();
+        const bool ntpSyncSuccess = ntpServerSyncErr == 1;
+        const String ntpSyncMsg = "NTP sync result: " + gsmModem->ShowNTPError(ntpServerSyncErr);
+        fileLog.logInfoOrWarningln(ntpSyncSuccess, ntpSyncMsg, ntpSyncMsg);
+
+        if (!ntpSyncSuccess)
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the the modem could not synchronise time with NTP server. Retrying...");
+            powerOff();
+            continue;
+        }
+
+        isInit = true;
+        fileLog.infoln("Modem startup completed successfully");
+        return true;
     }
+
+    fileLog.criticalln("Failed to start and connect the modem");
 
     return false;
 }
