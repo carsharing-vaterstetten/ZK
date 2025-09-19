@@ -1,6 +1,8 @@
 #pragma once
 
 #include <FS.h>
+#include <SD.h>
+#include <SPIFFS.h>
 
 #include "Intern.h"
 
@@ -79,4 +81,22 @@ public:
     {
         return remove(*firmwareFs, FIRMWARE_FILE_PATH, notExistingOk);
     }
+
+    static void logFSConfiguration();
+    static void logDirTree(FS& fs, const char* dirname, const uint8_t maxDepth)
+    {
+        logDirTree(fs, dirname, maxDepth, 0);
+    }
+    static void logFilesystemTree(FS* fs, uint8_t maxDepth);
+
+    static void logFilesystemTrees(const uint8_t maxDepth = 10)
+    {
+        logFilesystemTree(&SPIFFS, maxDepth);
+        logFilesystemTree(&SD, maxDepth);
+    }
+
+    static void logFilesystemsInformation();
+
+private:
+    static void logDirTree(FS& fs, const char* dirname, uint8_t maxDepth, uint8_t indent);
 };

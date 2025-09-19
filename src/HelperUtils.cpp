@@ -5,77 +5,115 @@
 #include <EEPROM.h>
 #include "mbedtls/md5.h"
 #include <FS.h>
+#include <sd_defines.h>
 
-#include "Config.h"
 #include "Modem.h"
 
 
-void HelperUtils::parseConfigString(const String& inputString, Config& c)
+bool HelperUtils::parseConfigString(const String& inputString, Config& c)
 {
-    // String anhand von ';' aufteilen
     int start = 0;
+    bool success = true;
+
+    bool hasApn = false, hasServer = false, hasPort = false, hasPassword = false, hasPreferSDCard = false;
 
     while (start < inputString.length())
     {
         int end = inputString.indexOf(';', start);
-
-        if (end == -1)
-        {
-            end = inputString.length();
-        }
+        if (end == -1) end = inputString.length();
 
         String token = inputString.substring(start, end);
+        token.trim();
 
-        // Token verarbeiten, sollte in der Form key="value" oder key=value sein
-        const int eqIndex = token.indexOf('=');
-
-        if (eqIndex != -1)
+        if (token.isEmpty())
         {
-            String key = token.substring(0, eqIndex);
-            String value = token.substring(eqIndex + 1);
+            start = end + 1;
+            continue;
+        }
 
-            value.trim();
+        int eqIndex = token.indexOf('=');
+        if (eqIndex == -1)
+        {
+            fileLog.warningln("Invalid config token (missing '='): '" + token + "'");
+            success = false;
+            start = end + 1;
+            continue;
+        }
 
-            if (value.startsWith("\"") && value.endsWith("\""))
-            {
-                value = value.substring(1, value.length() - 1);
-            }
+        String key = token.substring(0, eqIndex);
+        String value = token.substring(eqIndex + 1);
 
-            key.trim();
+        key.trim();
+        value.trim();
 
-            if (key == "apn")
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\""))
+        {
+            value = value.substring(1, value.length() - 1);
+        }
+
+        if (key == "apn")
+        {
+            value.toCharArray(c.apn, sizeof(c.apn));
+            hasApn = true;
+        }
+        else if (key == "server")
+        {
+            value.toCharArray(c.server, sizeof(c.server));
+            hasServer = true;
+        }
+        else if (key == "port")
+        {
+            if (value.length() == 0)
             {
-                value.toCharArray(c.apn, sizeof(c.apn));
-            }
-            else if (key == "server")
-            {
-                value.toCharArray(c.server, sizeof(c.server));
-            }
-            else if (key == "port")
-            {
-                c.port = value.toInt();
-            }
-            else if (key == "password")
-            {
-                value.toCharArray(c.password, sizeof(c.password));
-            }
-            else if (key == "preferSDCard")
-            {
-                c.preferSDCard = value.toInt();
+                fileLog.warningln("Invalid port value, using default");
+                success = false;
             }
             else
             {
-                fileLog.warningln("Encountered an unknown key while decoding user input config: '" + key + "'");
+                c.port = value.toInt();
+                hasPort = true;
             }
         }
+        else if (key == "password")
+        {
+            value.toCharArray(c.password, sizeof(c.password));
+            hasPassword = true;
+        }
+        else if (key == "preferSDCard")
+        {
+            c.preferSDCard = (value.toInt() != 0);
+            hasPreferSDCard = true;
+        }
+        else
+        {
+            fileLog.warningln("Unknown config key: '" + key + "'");
+            success = false;
+        }
+
         start = end + 1;
     }
+
+    // Make sure all required keys were present
+    if (!hasApn || !hasServer || !hasPort || !hasPassword || !hasPreferSDCard)
+    {
+        fileLog.warningln("Missing required config keys!");
+        success = false;
+    }
+
+    return success;
 }
+
 
 String HelperUtils::getConfigHumanReadable(const Config& c)
 {
     return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
         + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
+}
+
+String HelperUtils::getConfigHumanReadableHideSecrets(const Config& c)
+{
+    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
+        + " preferSDCard=" + String(c.preferSDCard);
 }
 
 String HelperUtils::getConfigFormat(const Config& c)
@@ -86,7 +124,6 @@ String HelperUtils::getConfigFormat(const Config& c)
 
 void HelperUtils::requestConfig(Config& c)
 {
-    Serial.println("Please enter config data in this format:");
     constexpr Config exampleConfig = {
         CONFIG_VERSION,
         "iot.1nce.net",
@@ -95,21 +132,45 @@ void HelperUtils::requestConfig(Config& c)
         "XXX",
         true,
     };
-    Serial.println(getConfigFormat(exampleConfig));
+    const String exampleConfigFormat = getConfigFormat(exampleConfig);
 
     String inputString = "";
 
-    while (inputString.length() == 0)
+    const unsigned long oldTimeout = Serial.getTimeout();
+    Serial.setTimeout(100000000ULL);
+
+    while (true)
     {
-        if (Serial.available())
+        Serial.println("Please enter config data in this format:");
+        Serial.println(exampleConfigFormat);
+
+        while (!Serial.available())
         {
-            inputString = Serial.readStringUntil('\n');
         }
+
+        inputString = Serial.readStringUntil('\n');
+        inputString.trim();
+
+        if (inputString.isEmpty())
+        {
+            Serial.println("Entered config is empty");
+            continue;
+        }
+
+        Serial.println("Entered config string: " + inputString);
+
+        const bool parseSuccess = parseConfigString(inputString, c);
+
+        if (!parseSuccess)
+        {
+            Serial.println("Failed to parse config. Try again");
+            continue;
+        }
+
+        break;
     }
 
-    fileLog.infoln("User entered config String: " + inputString);
-
-    parseConfigString(inputString, c);
+    Serial.setTimeout(oldTimeout);
 }
 
 bool HelperUtils::md5File(File file, uint8_t out[16])
@@ -190,4 +251,22 @@ uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
     static timeval now{};
     gettimeofday(&now, nullptr);
     return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
+}
+
+const char* HelperUtils::sdCardTypeName(const sdcard_type_t type)
+{
+    switch (type)
+    {
+    case CARD_NONE:
+        return "None";
+    case CARD_MMC:
+        return "MMC";
+    case CARD_SD:
+        return "SD";
+    case CARD_SDHC:
+        return "SDHC";
+    case CARD_UNKNOWN:
+        return "UNKNOWN";
+    }
+    return "UNKNOWN";
 }

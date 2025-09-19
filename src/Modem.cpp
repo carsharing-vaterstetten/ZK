@@ -62,24 +62,62 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
+
         fileLog.infoln("Connecting GPRS...");
         const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+        if (!gsmModem->isGprsConnected())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the GPRS failed to connect. Retrying...");
+            powerOff();
+            continue;
+        }
 
         fileLog.infoln("Waiting for network...");
         const bool networkSuccess = gsmModem->waitForNetwork();
         fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
                                    "The modem did not connect to the network even after waiting");
 
-        if (gsmModem->isNetworkConnected() && gsmModem->isGprsConnected())
+        if (!gsmModem->isNetworkConnected())
         {
-            isInit = true;
-            return true;
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the network is not connected. Retrying...");
+            powerOff();
+            continue;
         }
 
-        fileLog.warningln("Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) + " failed");
-        powerOff();
+        fileLog.infoln("Syncing time");
+        constexpr uint8_t maxNetTimeSyncAttempts = 10;
+        uint8_t syncAttempt = 0;
+        for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
+        {
+            int year;
+            gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            if (year < 2070 && year >= 2025) break;
+            fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+        }
+        const bool timeSyncSuccess = syncAttempt < maxNetTimeSyncAttempts;
+        fileLog.logInfoOrWarningln(timeSyncSuccess, "Time synced successfully", "Failed to sync time");
+
+        if (!timeSyncSuccess)
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the the modem could not synchronise time. Retrying...");
+            powerOff();
+            continue;
+        }
+
+        isInit = true;
+        fileLog.infoln("Modem startup completed successfully");
+        return true;
     }
+
+    fileLog.criticalln("Failed to start and connect the modem");
 
     return false;
 }
@@ -444,18 +482,34 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
                                         const bool deleteAfterRetrying, const uint32_t retries)
 {
+    bool uploadedSomething = false;
+
     if (SPIFFS.exists(filePath))
     {
         fileLog.infoln("Uploading " + filePath + " from SPIFFS");
+        uploadedSomething = true;
         uploadFileWithSizeCheckAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
                                          deleteAfterRetrying, retries, "filesystem=SPIFFS");
     }
 
-    if (StorageManager::isSDCardConnected() && SD.exists(filePath))
+    if (StorageManager::isSDCardConnected())
     {
-        fileLog.infoln("Uploading " + filePath + " from SD-card");
-        uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
-                                         deleteAfterRetrying, retries, "filesystem=SD-card");
+        if (SD.exists(filePath))
+        {
+            fileLog.infoln("Uploading " + filePath + " from SD-Card");
+            uploadedSomething = true;
+            uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
+                                             deleteAfterRetrying, retries, "filesystem=SD-card");
+        }
+    }
+    else if (config.preferSDCard)
+    {
+        fileLog.warningln("SD-Card not inserted -> Cannot upload " + filePath + " from there");
+    }
+
+    if (!uploadedSomething)
+    {
+        fileLog.warningln("Could not find " + filePath + " on any FS for uploading");
     }
 }
 

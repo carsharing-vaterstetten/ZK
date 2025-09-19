@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "Config.h"
 
 #define FIRMWARE_VERSION "0.6.0"
 
@@ -12,7 +13,12 @@
 #define CONNECTION_SPEED_TEST_FILE_PATH "/speed_test.bin"
 
 #define CONFIG_START_ADDRESS 0
-#define CONFIG_VERSION 2
+
+#if OVERRIDE_CONFIG
+#define CONFIG_VERSION OVERRIDE_CONFIG_VERSION
+#else
+#define CONFIG_VERSION 2U
+#endif
 
 struct Config
 {
