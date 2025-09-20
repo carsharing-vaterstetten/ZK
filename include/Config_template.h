@@ -1,58 +1,68 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#pragma once
 
-#include <Intern.h>
+#include "Log.h"
+#include "Backend.h"
 
-#define UART_BAUD 115200
+// Serial debugging
+#define ENABLE_SERIAL_LOGGING false // Enable for serial printing
+#define COLORIZE_SERIAL_LOGGING true
+#if ENABLE_SERIAL_LOGGING
+#define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
+#endif
+#define FLASH_LOGGING_LEVEL LOGGING_LEVEL_INFO
+#define SD_CARD_LOGGING_LEVEL LOGGING_LEVEL_INFO
 
-#define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_T_PCIE
-#define TINY_GSM_RX_BUFFER 1024 // 1Kb
+#define UART_BAUD 115200U
+
+#define GPS_UPDATE_INTERVAL_WHILE_DRIVING 500 // ms
+#define GPS_UPDATE_INTERVAL_WHILE_STANDING 1000 // ms
 
 #define LED_PIN 12
 #define LED_COUNT 4
 
-// Modem Pins
+// Modem pins
 #define PIN_TX 27
 #define PIN_RX 26
 #define PWR_PIN 4
-#define POWER_PIN 25
 
-// Schlüssel knopfe
-#define OPEN_KEY 15
-#define CLOSE_KEY 14
+// Car key pins
+#define OPEN_KEY 21
+#define CLOSE_KEY 22
 
-/*
- *   2 Automatic
- *   13 GSM only
- *   38 LTE only
- *   51 GSM and LTE only
- */
-extern byte NETWORK_MODE;
+// SD-Card pins
+#define SD_MISO 2
+#define SD_MOSI 15
+#define SD_SCLK 14
+#define SD_CS 13
+#define SD_SPI VSPI
 
-/*
- *    1 CAT-M
- *    2 NB-Iot
- *    3 CAT-M and NB-IoT
- */
-extern byte PREFERRED_MODE;
-
-//#define NCF_I2C
-
-// NFC Modul Pins
+// NFC modul Pins
 #define NFC_MOSI 23
 #define NFC_MISO 19
 #define NFC_SCLK 18
 #define NFC_SS 5
+#define NFC_SPI HSPI
 
-#define NCF_SDA 21
-#define NCF_SCL 22
+// Restart the esp at this time
+#define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
-// ESP32 startet sich jeden tag um die Uhrzeit neu
-const unsigned long targetTimeToRestartESP32 = (03 * 3600 + 30 * 60) * 1000; // 03:30 Uhr
+// Hardware watchdog
+#define HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT 1200U // [s]
+#define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
+#define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 
-#define HW_WATCHDOG_DEFAULT_TIMEOUT (300) // [Sekunden] Maximal erlaubte Zeit ohne Reset – nach 5 Minuten startet der HW-Watchdog den Arduino neu
-#define HW_WATCHDOG_OTA_UPDATE_TIMEOUT (3600) // [Sekunden] Maximal erlaubte Zeit ohne Reset während eines OTA Updates
-#define HW_WATCHDOG_RESET_DELAY_MS (100) // [Millisekunden] Der Arduino muss spätestens alle 100ms den Watchdog zurücksetzen, damit der 5-Minuten-Timeout nicht abläuft
+// Connection speed test
+#define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
+#define SKIP_ALL_CONNECTION_SPEED_TESTS false
+#define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates
 
+// Config override
+#define OVERRIDE_CONFIG false // Useful for development or mass deployment
+#if OVERRIDE_CONFIG
+#define OVERRIDE_CONFIG_VERSION 2
+#define OVERRIDE_CONFIG_APN ""
+#define OVERRIDE_CONFIG_SERVER ""
+#define OVERRIDE_CONFIG_PORT 80
+#define OVERRIDE_CONFIG_PASSWORD ""
+#define OVERRIDE_CONFIG_PREFER_SD_CARD true
 #endif

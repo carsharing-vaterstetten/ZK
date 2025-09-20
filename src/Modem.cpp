@@ -1,399 +1,596 @@
 // Modem.cpp
 
 #include "Modem.h"
+#include "Config.h"
+#include "Globals.h"
+#include <HelperUtils.h>
+#include <ctime>
+#include <SD.h>
+#include <SPIFFS.h>
 
-#define SerialMon Serial
-#define SerialAT Serial1
+#include "Backend.h"
+#include "StorageManager.h"
+#include "WatchdogHandler.h"
 
-HttpClient *Modem::http = nullptr;
+#define SERIAL_AT Serial1
+#define SERIAL_AT_BAUD 115200U
 
-extern Config config;
+TinyGsmSim7000SSL* Modem::gsmModem = nullptr;
+TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL* Modem::gsmClient = nullptr;
+bool Modem::isInit = false;
+uint32_t Modem::estimatedUploadSpeed = 500; // [B/s]
+uint32_t Modem::estimatedDownloadSpeed = 500; // [B/s]
 
-Modem::Modem() : modem(SerialAT), client(modem) {}
-
-bool Modem::init(bool secoundTry)
+void Modem::powerOn()
 {
-    SerialMon.println("Initializing modem...");
-
-#ifdef TINY_GSM_T_PCIE
-    pinMode(POWER_PIN, OUTPUT);
-    digitalWrite(POWER_PIN, HIGH);
-    SerialMon.println("Set POWER_PIN HIGH");
-#endif
-
     pinMode(PWR_PIN, OUTPUT);
     digitalWrite(PWR_PIN, LOW);
-    SerialMon.println("Set PWR_PIN LOW");
     delay(1000);
     digitalWrite(PWR_PIN, HIGH);
-    SerialMon.println("Set PWR_PIN HIGH");
+}
 
-    SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-    SerialMon.println("SerialAT started");
-    sleep(1);
+void Modem::powerOff()
+{
+    pinMode(PWR_PIN, OUTPUT);
+    digitalWrite(PWR_PIN, LOW);
+    delay(1500);
+    digitalWrite(PWR_PIN, HIGH);
+}
 
-    modem.restart();
-    SerialMon.println("Modem restarted");
-    sleep(1);
-
-    String modemInfo = modem.getModemInfo();
-    SerialMon.println("Modem Info: " + modemInfo);
-
-    if (config.GSM_PIN && modem.getSimStatus() != 3)
+bool Modem::init(const uint8_t retries)
+{
+    for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
-        modem.simUnlock(config.GSM_PIN);
-    }
+        delete gsmModem;
+        delete gsmClient;
 
-    modem.gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+        gsmModem = new TinyGsmSim7000SSL{SERIAL_AT};
+        gsmClient = new TinyGsmSim7000SSL::GsmClientSecureSIM7000SSL{*gsmModem};
 
-    SerialMon.print("Network status: ");
-    if (!modem.waitForNetwork())
-    {
-        SerialMon.println(" fail");
-    }
+        fileLog.infoln("Initializing modem...");
+        powerOn();
+        SERIAL_AT.begin(SERIAL_AT_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
 
-    if (modem.isNetworkConnected())
-    {
-        SerialMon.println("Network connected");
+        while (!gsmModem->testAT())
+            delay(10);
+
+        fileLog.infoln("Modem connected to serial");
+
+        const bool modemInitSuccess = gsmModem->init();
+        fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
+                                   "There was an error while initializing the modem");
+
+        fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
+
+
+        fileLog.infoln("Connecting GPRS...");
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
+        fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+        if (!gsmModem->isGprsConnected())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the GPRS failed to connect. Retrying...");
+            powerOff();
+            continue;
+        }
+
+        fileLog.infoln("Waiting for network...");
+        const bool networkSuccess = gsmModem->waitForNetwork();
+        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
+                                   "The modem did not connect to the network even after waiting");
+
+        if (!gsmModem->isNetworkConnected())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the network is not connected. Retrying...");
+            powerOff();
+            continue;
+        }
+
+        fileLog.infoln("Syncing time");
+        constexpr uint8_t maxNetTimeSyncAttempts = 10;
+        uint8_t syncAttempt = 0;
+        for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
+        {
+            int year;
+            gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            if (year < 2070 && year >= 2025) break;
+            fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+        }
+        const bool timeSyncSuccess = syncAttempt < maxNetTimeSyncAttempts;
+        fileLog.logInfoOrWarningln(timeSyncSuccess, "Time synced successfully", "Failed to sync time");
+
+        if (!timeSyncSuccess)
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the the modem could not synchronise time. Retrying...");
+            powerOff();
+            continue;
+        }
+
+        isInit = true;
+        fileLog.infoln("Modem startup completed successfully");
         return true;
     }
-    else
-    {
-        if (!secoundTry)
-        {
-            return init(true);
-        }
-    }
+
+    fileLog.criticalln("Failed to start and connect the modem");
+
     return false;
 }
 
-void Modem::end()
+UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
+                               const String& urlParams, const int bufferSize, unsigned long* uploadStartMs,
+                               unsigned long* uploadEndMs)
 {
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, LOW);
-    http->stop();
-    modem.gprsDisconnect();
-    SerialMon.println("Modem disconnected");
-}
+    const String filePath = f.path();
+    const bool isFileLogFile = filePath == LOG_FILE_PATH;
 
-int Modem::sendRequest(String path, String method, String body)
-{
-    int err = 0;
-    if (http == nullptr)
+    f.flush();
+    const size_t fileSize = f.size();
+
+    String msg = "Uploading " + filePath + " (" + String(fileSize) + " B) to " + endpoint;
+
+    if (isFileLogFile)
     {
-        http = new HttpClient(client, config.server, config.port);
+        serialOnlyLog.infoln(msg);
     }
-    http->connectionKeepAlive();
-    http->beginRequest();
-
-    if (method == "GET")
+    else
     {
-        err = http->get(path);
-        http->sendBasicAuth(config.username, config.password);
+        fileLog.debugln(msg);
     }
-    else if (method == "POST")
+
+    if (fileSize == 0)
     {
-        err = http->post(path);
-        http->sendBasicAuth(config.username, config.password);
-        http->sendHeader("Content-Type", "application/json");
-        http->sendHeader("Content-Length", body.length());
-        http->beginBody();
-
-        const size_t chunkSize = 512;
-        size_t bodyLength = body.length();
-        for (size_t i = 0; i < bodyLength; i += chunkSize)
-        {
-            String chunk = body.substring(i, min(i + chunkSize, bodyLength));
-            http->print(chunk);
-        }
+        f.close();
+        fileLog.warningln("File is empty, not uploading");
+        return UploadResult::FILE_IS_EMPTY;
     }
-    http->endRequest();
-    return err;
-}
 
-// Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
-// @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-String Modem::getLocalTime()
-{
-    String time = modem.getGSMDateTime(DATE_FULL);
-    return time;
-}
+    // Append URL parameters if provided
+    String fullEndpoint = endpoint;
+    if (!urlParams.isEmpty())
+    {
+        fullEndpoint += "?" + urlParams;
+    }
 
-String *Modem::getRfids(int &arraySize)
-{
-    SerialMon.print(F("Performing HTTPS GET request... "));
-    int err = sendRequest("/rfids/", "GET");
+    HttpClient uploadHttp{*gsmClient, config.server, config.port};
+    uploadHttp.connectionKeepAlive();
+    uploadHttp.beginRequest();
+    const int err = uploadHttp.post(fullEndpoint);
+
     if (err != 0)
     {
-        SerialMon.println(F("failed to connect"));
-        SerialMon.println(err);
-        delay(10000);
-        return nullptr;
+        f.close();
+        uploadHttp.stop();
+        fileLog.errorln("Failed to upload file. Error " + String(err));
+        return UploadResult::HTTP_REQUEST_ERROR;
     }
 
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-    if (!status)
+    if (increaseWatchdogTimeoutForFileUpload(fileSize) != ESP_OK)
     {
-        SerialMon.println(F("no response"));
-        delay(10000);
-        http->stop();
-        return nullptr;
+        f.close();
+        uploadHttp.stop();
+        fileLog.errorln("Failed to increase TWDT timeout. Upload aborted");
+        return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
+
+    uploadHttp.sendBasicAuth(efuseMacHex, config.password);
+    uploadHttp.sendHeader("Content-Type", "application/octet-stream");
+    uploadHttp.sendHeader("Content-Length", String(fileSize));
+    uploadHttp.beginBody();
+
+    uint8_t buffer[bufferSize];
+    size_t totalBytesUploaded = 0;
+    size_t nextPrint = fileSize / 10;
+
+    if (uploadStartMs) *uploadStartMs = millis();
+
+    while (f.available() && totalBytesUploaded < fileSize)
+    {
+        size_t readLength = bufferSize;
+        if (totalBytesUploaded + readLength > fileSize)
+        {
+            readLength = fileSize - totalBytesUploaded;
+        }
+
+        if (readLength <= 0) break;
+
+        const size_t bytesRead = f.read(buffer, readLength);
+
+        if (bytesRead <= 0) break;
+
+        uploadHttp.write(buffer, bytesRead); // For some reason the bytes written returned by this function is always 0.
+
+        totalBytesUploaded += bytesRead;
+
+        if (totalBytesUploaded >= nextPrint)
+        {
+            msg = "Uploaded " + String(totalBytesUploaded) + " B of " + String(fileSize) + " B";
+
+            if (isFileLogFile)
+            {
+                serialOnlyLog.debugln(msg);
+            }
+            else
+            {
+                fileLog.debugln(msg);
+            }
+
+            nextPrint += fileSize / 10;
+        }
+    }
+
+    uploadHttp.endRequest();
+
+    if (uploadEndMs) *uploadEndMs = millis();
+
+    if (statusCode) *statusCode = uploadHttp.responseStatusCode();
+    const String responseBody = uploadHttp.responseBody();
+
+    f.close();
+    uploadHttp.stop();
+
+    WatchdogHandler::revertTemporaryIncrease();
+
+    if (statusCode)
+        fileLog.infoln("Response status code: " + String(*statusCode));
+
+    if (response) *response = responseBody;
+
+    return UploadResult::SUCCESS;
+}
+
+UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
+                                                         const int bufferSize, unsigned long* uploadStartMs,
+                                                         unsigned long* uploadEndMs)
+{
+    const size_t fileSize = f.size();
+
+    String resp;
+    int responseStatusCode;
+
+    const UploadResult uploadResult = uploadFile(endpoint, f, &responseStatusCode, &resp, urlParams, bufferSize,
+                                                 uploadStartMs, uploadEndMs);
+
+    switch (uploadResult)
+    {
+    case UploadResult::FILE_IS_EMPTY:
+        return UploadWithSizeCheckResult::FILE_IS_EMPTY;
+    case UploadResult::HTTP_REQUEST_ERROR:
+        return UploadWithSizeCheckResult::HTTP_REQUEST_ERROR;
+    case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    case UploadResult::SUCCESS:
+        break;
+    }
+
+    if (responseStatusCode != 200)
+    {
+        fileLog.errorln("Unexpected status code " + String(responseStatusCode));
+        return UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE;
+    }
+
+    const long responseSize = resp.toInt();
+
+    if (responseSize != fileSize)
+    {
+        fileLog.errorln(
+            "File size check failed: local: " + String(fileSize) + " B != uploaded: " + String(responseSize) + " B");
+        return UploadWithSizeCheckResult::SIZE_CHECK_FAILED;
+    }
+
+    return UploadWithSizeCheckResult::SUCCESS;
+}
+
+UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
+    const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
+    const bool deleteAfterRetrying, const uint32_t retries, const String& urlParams, const int bufferSize,
+    unsigned long* uploadStartMs, unsigned long* uploadEndMs)
+{
+    if (!fileFs.exists(filePath))
+    {
+        fileLog.errorln(filePath + " does not exist");
+        return UploadWithSizeCheckResultAndRetries::FILE_DOES_NOT_EXIST;
+    }
+
+    UploadWithSizeCheckResult uploadResult;
+    uint32_t attemptNo = 0;
+
+    do
+    {
+        File f = fileFs.open(filePath, FILE_READ);
+
+        if (!f)
+        {
+            fileLog.errorln("Failed to open " + filePath);
+            return UploadWithSizeCheckResultAndRetries::FAILED_TO_OPEN_FILE;
+        }
+
+        uploadResult = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize, uploadStartMs, uploadEndMs);
+
+        switch (uploadResult)
+        {
+        case UploadWithSizeCheckResult::FILE_IS_EMPTY:
+        case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
+        case UploadWithSizeCheckResult::SUCCESS:
+            goto endLoop;
+        case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
+        case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
+        case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+            break;
+        }
+
+        fileLog.errorln(
+            "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
+            " failed at uploading " + filePath + " to " + endpoint);
+
+        ++attemptNo;
+    }
+    while (attemptNo <= retries);
+
+endLoop:;
+
+    if (deleteAfterRetrying || (uploadResult == UploadWithSizeCheckResult::SUCCESS && deleteIfSuccess))
+    {
+        const bool removeSuccess = StorageManager::remove(fileFs, filePath);
+        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
+                                 "Failed to delete " + filePath);
+    }
+
+    switch (uploadResult)
+    {
+    case UploadWithSizeCheckResult::FILE_IS_EMPTY:
+        return UploadWithSizeCheckResultAndRetries::FILE_IS_EMPTY;
+    case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
+        return UploadWithSizeCheckResultAndRetries::HTTP_REQUEST_ERROR;
+    case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadWithSizeCheckResultAndRetries::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    case UploadWithSizeCheckResult::SUCCESS:
+        if (attemptNo == 0) return UploadWithSizeCheckResultAndRetries::SUCCESS;
+        return UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING;
+    case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
+        return UploadWithSizeCheckResultAndRetries::UNEXPECTED_STATUS_CODE;
+    case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
+        return UploadWithSizeCheckResultAndRetries::SIZE_CHECK_FAILED;
+    }
+
+    // ReSharper disable once CppDFAUnreachableCode
+    throw std::invalid_argument("Invalid result");
+}
+
+
+/// returns response status
+int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String& username,
+                     const String& password)
+{
+    HttpClient http{*gsmClient, config.server, config.port};
+    http.beginRequest();
+    http.connectionKeepAlive();
+    const int err = http.get(aUrlPath);
+
+    if (err != HTTP_SUCCESS)
+    {
+        http.stop();
+        return err;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        http.sendBasicAuth(username, password);
+    http.endRequest();
+
+    const int responseStatus = http.responseStatusCode();
+    http.skipResponseHeaders();
+
+    if (responseBody)
+    {
+        *responseBody = http.responseBody();
+    }
+
+    http.stop();
+
+    return responseStatus;
+}
+
+
+DownloadResult Modem::downloadFile(const String& remotePath, File& f, const String& username,
+                                   const String& password, const int bufferSize, unsigned long* downloadStartMs,
+                                   unsigned long* downloadEndMs)
+{
+    fileLog.infoln("Downloading " + remotePath + " to " + f.path());
+    HttpClient downloadHttp{*gsmClient, config.server, config.port};
+    downloadHttp.connectionKeepAlive();
+    downloadHttp.beginRequest();
+    const int err = downloadHttp.get(remotePath);
+
+    if (err != 0)
+    {
+        fileLog.errorln("Error " + String(err) + ". Download canceled");
+        downloadHttp.stop();
+        f.close();
+        return DownloadResult::HTTP_REQUEST_ERROR;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        downloadHttp.sendBasicAuth(username, password);
+
+    downloadHttp.endRequest();
+
+    const int status = downloadHttp.responseStatusCode();
+    downloadHttp.skipResponseHeaders();
+
+    fileLog.infoln("Response status: " + String(status));
 
     if (status != 200)
     {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return nullptr;
+        fileLog.errorln("Unexpected status (see above). Download canceled");
+        downloadHttp.stop();
+        f.close();
+        return DownloadResult::UNEXPECTED_STATUS_CODE;
     }
 
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
+    uint8_t buf[bufferSize];
+
+    const size_t totalLen = downloadHttp.contentLength();
+    size_t downloaded = 0;
+    size_t nextPrint = totalLen / 10;
+
+    fileLog.infoln("Downloading " + String(totalLen) + " B");
+
+    if (increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
     {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
+        downloadHttp.stop();
+        f.close();
+        fileLog.errorln("Failed to increase TWDT timeout. Download aborted");
+        return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
-    int contentLength = http->contentLength();
-    String responseBody = "";
-    if (contentLength > 0)
+
+    if (downloadStartMs) *downloadStartMs = millis();
+
+    while (downloadHttp.connected() || downloadHttp.available())
     {
-        int readBytes = 0;
-        char buffer[128];
-        while (readBytes < contentLength)
+        while (downloadHttp.available())
         {
-            int bytesToRead = http->readBytes(buffer, sizeof(buffer) - 1);
-            readBytes += bytesToRead;
-            buffer[bytesToRead] = '\0';
-            responseBody += buffer;
-        }
-    }
+            const size_t len = downloadHttp.readBytes(buf, bufferSize);
+            f.write(buf, len);
+            downloaded += len;
 
-    SerialMon.println(F("Response Body:"));
-    SerialMon.println(responseBody);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, responseBody);
-    if (error)
-    {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.f_str());
-        return nullptr;
-    }
-    JsonArray array = doc.as<JsonArray>();
-
-    arraySize = array.size();
-    String *rfidArray = new String[arraySize];
-
-    for (int i = 0; i < arraySize; i++)
-    {
-        rfidArray[i] = HelperUtils::toUpperCase(array[i]["rfid"].as<String>());
-    }
-
-    return rfidArray;
-}
-
-void printPercent(uint32_t readLength, uint32_t contentLength)
-{
-    if (contentLength != (uint32_t)-1)
-    {
-        SerialMon.print("\r ");
-        SerialMon.print((100.0 * readLength) / contentLength);
-        SerialMon.print('%');
-    }
-    else
-    {
-        SerialMon.println(readLength);
-    }
-}
-
-/// Make sure to increase the HW Watchdog timeout before calling this function or use `handleFirmwareUpdateWithWatchdog()`
-void Modem::firmwareCheckAndUpdateIfNeeded()
-{
-    JsonDocument body;
-    body["mac_address"] = MAC_ADDRESS;
-    body["firmware_version"] = FIRMWARE_VERSION;
-    serializeJsonPretty(body, SerialMon);
-
-    SerialMon.println("");
-
-    int err = sendRequest("/firmware/", "POST", body.as<String>());
-    if (err != 0)
-    {
-        SerialMon.println(F("failed to connect 'firmware'"));
-        SerialMon.println(err);
-        return;
-    }
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-
-    if (!status)
-    {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return;
-    }
-    if (status == 200)
-    {
-        SerialMon.println("kein Update notwendig");
-        http->stop();
-        return;
-    }
-    if (status != 210)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return;
-    }
-    else
-    {
-        SerialMon.println(F("Response Headers:"));
-        while (http->headerAvailable())
-        {
-            String headerName = http->readHeaderName();
-            String headerValue = http->readHeaderValue();
-            SerialMon.println("    " + headerName + " : " + headerValue);
-        }
-
-        if (!SPIFFS.begin(true))
-        {
-            Serial.println("SPIFFS Mount Failed");
-            return;
-        }
-        if (SPIFFS.exists(FIRMWARE_FILE_NAME))
-        {
-            SPIFFS.remove(FIRMWARE_FILE_NAME);
-        }
-        File file = SPIFFS.open(FIRMWARE_FILE_NAME, FILE_WRITE);
-        if (!file)
-        {
-            Serial.println("Failed to open file for writing");
-            return;
-        }
-
-        SerialMon.println("Getting Firmware data starting ...");
-        int contentLength = http->contentLength();
-        const size_t bufferSize = 2048;
-        uint8_t buffer[bufferSize];
-        size_t totalBytesRead = 0;
-        unsigned long startTime = millis();
-        while (http->connected() || http->available())
-        {
-            if (http->available())
+            if (downloaded >= nextPrint)
             {
-                size_t bytesRead = http->readBytes(buffer, bufferSize);
-                file.write(buffer, bytesRead);
-                totalBytesRead += bytesRead;
-                float percentage = ((float)totalBytesRead * 100) / contentLength;
-                unsigned long elapsedTime = millis() - startTime;
-                SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
-                if (totalBytesRead >= contentLength)
-                {
-                    break;
-                }                
+                fileLog.debugln("Downloaded " + String(downloaded) + " B of " + String(totalLen) + " B");
+                nextPrint += totalLen / 10;
             }
         }
-        SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
-        SerialMon.printf("\rProgress: %.2f%%", (float)totalBytesRead / contentLength * 100);
-        file.close();
-        http->stop();
-        SerialMon.println("File saved successfully");
-        SPIFFSUtils::performOTAUpdateFromSPIFFS();
+    }
+
+    downloadHttp.stop();
+
+    if (downloadEndMs) *downloadEndMs = millis();
+
+    f.close();
+
+    WatchdogHandler::revertTemporaryIncrease();
+
+    fileLog.infoln("Download complete");
+
+    return DownloadResult::SUCCESS;
+}
+
+void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
+                                        const bool deleteAfterRetrying, const uint32_t retries)
+{
+    bool uploadedSomething = false;
+
+    if (SPIFFS.exists(filePath))
+    {
+        fileLog.infoln("Uploading " + filePath + " from SPIFFS");
+        uploadedSomething = true;
+        uploadFileWithSizeCheckAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
+                                         deleteAfterRetrying, retries, "filesystem=SPIFFS");
+    }
+
+    if (StorageManager::isSDCardConnected())
+    {
+        if (SD.exists(filePath))
+        {
+            fileLog.infoln("Uploading " + filePath + " from SD-Card");
+            uploadedSomething = true;
+            uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
+                                             deleteAfterRetrying, retries, "filesystem=SD-card");
+        }
+    }
+    else if (config.preferSDCard)
+    {
+        fileLog.warningln("SD-Card not inserted -> Cannot upload " + filePath + " from there");
+    }
+
+    if (!uploadedSomething)
+    {
+        fileLog.warningln("Could not find " + filePath + " on any FS for uploading");
     }
 }
 
-void Modem::handleFirmwareUpdateWithWatchdog() {
+void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
+                                         const uint32_t retries)
+{
+    fileLog.infoln("Uploading log file(s)");
+    uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
+}
 
-    // Increase the HW Watchdog timeout to allow for longer OTA updates
+time_t Modem::getUnixTimestamp()
+{
+    int year, month, day, hour, minute, second;
+    float timezone;
+    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
+}
 
-    esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
+esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
+{
+    const uint32_t uploadTime = fileSize / estimatedUploadSpeed; // [s]
+    if (uploadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return WatchdogHandler::increaseTimeoutTemporarily(uploadTime);
+}
+
+esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
+{
+    const uint32_t downloadTime = fileSize / estimatedDownloadSpeed; // [s]
+    if (downloadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return WatchdogHandler::increaseTimeoutTemporarily(downloadTime);
+}
+
+void Modem::performConnectionSpeedTest()
+{
+#if !SKIP_ALL_CONNECTION_SPEED_TESTS
+    fileLog.infoln("Performing connection speed test");
+
+    // Use SPIFFS for simplicity and reliability
+    File df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
+
+    unsigned long downloadStart, downloadEnd;
+    const DownloadResult downloadResult = downloadFile(
+        REMOTE_SPEED_TEST_FILE, df, "", "", 512, &downloadStart, &downloadEnd);
+    df.close();
+
+    df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
+    const size_t fileSize = df.size();
+    df.close();
+
+    if (downloadResult == DownloadResult::SUCCESS)
+    {
+        const float downloadSeconds = static_cast<float>(downloadEnd - downloadStart) / 1000.0f;
+        estimatedDownloadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / downloadSeconds);
+        if (estimatedDownloadSpeed == 0) estimatedDownloadSpeed = 1;
+        fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
+    }
+    else
+    {
+        fileLog.errorln(
+            "Download test failed. Aborting further tests. Defaulting to " + String(estimatedUploadSpeed) + " B/s UP, "
+            + String(estimatedDownloadSpeed) + " B/s DOWN");
+        SPIFFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
         return;
     }
 
-    firmwareCheckAndUpdateIfNeeded();
+    unsigned long uploadStart, uploadEnd;
+    const UploadWithSizeCheckResultAndRetries uploadResult = uploadFileWithSizeCheckAndDelete(
+        "/v1/upload-speed-test", SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, "",
+        512, &uploadStart, &uploadEnd);
 
-    // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
-    hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to reset HW Watchdog timeout after OTA update.");
-    }
-}
-
-// liefert immer true zurück
-// rückgabe ist nur dafür da, damit der loop auf die funktion warten kann
-bool Modem::uploadLogs()
-{
-    if (!SPIFFS.begin())
+    if (uploadResult == UploadWithSizeCheckResultAndRetries::SUCCESS || uploadResult ==
+        UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING)
     {
-        SerialMon.println("SPIFFS Mount Failed.");
-        return true;
+        const float uploadSeconds = static_cast<float>(uploadEnd - downloadStart) / 1000.0f;
+        estimatedUploadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / uploadSeconds);
+        if (estimatedUploadSpeed == 0) estimatedUploadSpeed = 1;
+        fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
     }
-
-    File file = SPIFFS.open(LOG_FILE_NAME, FILE_READ);
-    if (!file)
+    else
     {
-        SerialMon.println("File doesn't exist. Creating a new one.");
-        return true;
+        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed));
     }
-
-    int contentLength = file.size();
-    if (contentLength == 0)
-    {
-        SerialMon.println("File is empty");
-        return true;
-    }
-    SerialMon.print("File size: ");
-    SerialMon.println(contentLength);
-
-    SerialMon.println("Uploading logs to server...");
-    int err = sendRequest("/logs/", "POST", file.readString());
-    if (err != 0)
-    {
-        SerialMon.println(F("failed to connect 'logs'"));
-        SerialMon.println(err);
-        return true;
-    }
-
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-
-    if (!status)
-    {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return true;
-    }
-
-    if (status != 201)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return true;
-    }
-
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
-    {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
-    }
-
-    SerialMon.println(F("Response Body:"));
-    while (http->available())
-    {
-        SerialMon.write(http->read());
-    }
-
-    http->stop();
-    file.close();
-    SPIFFS.remove(LOG_FILE_NAME);
-    SerialMon.println("Logs uploaded successfully");
-    return true;
+#endif
 }
