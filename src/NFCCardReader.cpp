@@ -37,17 +37,19 @@ bool NFCCardReader::init()
     return true;
 }
 
-uint32_t NFCCardReader::readTag()
+bool NFCCardReader::readTag(uint32_t &uid)
 {
-    uint8_t uid[7] = {};
+    uint8_t uidArr[7] = {};
     uint8_t uidLength;
 
-    const bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
+    const bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLength, 200);
 
-    if (!success || uidLength < 4) return 0;
+    if (!success || uidLength != 4) return false;
 
-    return static_cast<uint32_t>(uid[0]) << 24 |
-        static_cast<uint32_t>(uid[1]) << 16 |
-        static_cast<uint32_t>(uid[2]) << 8 |
-        static_cast<uint32_t>(uid[3]);
+    uid = static_cast<uint32_t>(uidArr[0]) << 24 |
+        static_cast<uint32_t>(uidArr[1]) << 16 |
+        static_cast<uint32_t>(uidArr[2]) << 8 |
+        static_cast<uint32_t>(uidArr[3]);
+
+    return true;
 }

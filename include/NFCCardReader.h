@@ -14,5 +14,5 @@ public:
     NFCCardReader() = delete;
 
     static bool init();
-    static uint32_t readTag();
+    static bool readTag(uint32_t &uid);
 };

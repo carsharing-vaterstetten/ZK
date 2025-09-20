@@ -24,25 +24,26 @@ unsigned long targetMillis;
 
 void checkNFCTag()
 {
-    const uint32_t readValue = NFCCardReader::readTag();
+    uint32_t rfidUid;
+    const bool readSuccess = NFCCardReader::readTag(rfidUid);
 
-    if (readValue == 0) return; // No card present
+    if (!readSuccess) return; // No card present
 
-    if (RFIDs::isRegisteredRFID(readValue))
+    if (RFIDs::isRegisteredRFID(rfidUid))
     {
-        fileLog.infoln("Scanned known RFID card: '" + String(readValue, 16) + "'");
+        fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
         if (isLoggedIn)
         {
             AccessControl::logout();
         }
         else
         {
-            AccessControl::login(readValue);
+            AccessControl::login(rfidUid);
         }
     }
     else
     {
-        fileLog.infoln("Scanned unknown RFID card: '" + String(readValue, 16) + "'");
+        fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
         statusLed.setColor(Color::Red);
     }
 
