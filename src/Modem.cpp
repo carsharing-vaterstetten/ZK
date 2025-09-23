@@ -578,7 +578,7 @@ void Modem::performConnectionSpeedTest()
 
     unsigned long uploadStart, uploadEnd;
     const UploadWithSizeCheckResultAndRetries uploadResult = uploadFileWithSizeCheckAndDelete(
-        "/v1/upload-speed-test", SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, "",
+        UPLOAD_SPEED_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, "",
         512, &uploadStart, &uploadEnd);
 
     if (uploadResult == UploadWithSizeCheckResultAndRetries::SUCCESS || uploadResult ==

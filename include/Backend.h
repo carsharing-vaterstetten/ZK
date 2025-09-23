@@ -1,11 +1,16 @@
 #pragma once
 
+// Version route
 #define SERVER_VERSION_ROUTE "/v1"
 
+// Vehicle route
+#define SERVER_VEHICLE_ROUTE SERVER_VERSION_ROUTE "/vehicle"
+
 // Server router paths
-#define LOG_ROUTE SERVER_VERSION_ROUTE "/log"
-#define FIRMWARE_ROUTE SERVER_VERSION_ROUTE "/firmware"
-#define RFIDS_ROUTE SERVER_VERSION_ROUTE "/rfids"
+#define LOG_ROUTE SERVER_VEHICLE_ROUTE "/log"
+#define FIRMWARE_ROUTE SERVER_VEHICLE_ROUTE "/firmware"
+#define RFIDS_ROUTE SERVER_VEHICLE_ROUTE "/rfids"
+#define OTHER_ROUTE SERVER_VEHICLE_ROUTE "/other"
 #define STATIC_ROUTE SERVER_VERSION_ROUTE "/static"
 
 // Log route
@@ -20,6 +25,9 @@
 // RFIDs route
 #define REMOTE_RFID_MD5_CHECKSUM_PATH RFIDS_ROUTE "/md5-checksum"
 #define REMOTE_RFID_PATH RFIDS_ROUTE "/download"
+
+// Other route
+#define UPLOAD_SPEED_TEST_ENDPOINT OTHER_ROUTE "/upload-speed-test"
 
 // Static route
 #define REMOTE_STATIC_SPEED_TEST_DIR STATIC_ROUTE "/test-files"
