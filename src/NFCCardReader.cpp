@@ -4,8 +4,7 @@
 #include "Globals.h"
 #include "HardwareManager.h"
 
-PN532* NFCCardReader::nfc = nullptr;
-PN532_SPI* NFCCardReader::pn532spi = nullptr;
+Adafruit_PN532* NFCCardReader::nfc = nullptr;
 
 bool NFCCardReader::init()
 {
@@ -13,8 +12,7 @@ bool NFCCardReader::init()
 
     HardwareManager::ensureNFCSPIInitialized();
 
-    pn532spi = new PN532_SPI(*HardwareManager::nfcSpi, NFC_SS);
-    nfc = new PN532(*pn532spi);
+    nfc = new Adafruit_PN532(NFC_SS, HardwareManager::nfcSpi);
     nfc->begin();
 
     const uint32_t versionData = nfc->getFirmwareVersion();
@@ -37,7 +35,7 @@ bool NFCCardReader::init()
     return true;
 }
 
-bool NFCCardReader::readTag(uint32_t &uid)
+bool NFCCardReader::readTag(uint32_t& uid)
 {
     uint8_t uidArr[7] = {};
     uint8_t uidLength;
