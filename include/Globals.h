@@ -13,7 +13,14 @@ extern bool isLoggedIn;
 extern uint32_t loggedInRFID;
 
 #if OVERRIDE_CONFIG
-extern const Config config;
+constexpr Config config {
+    CONFIG_VERSION,
+    OVERRIDE_CONFIG_APN,
+     OVERRIDE_CONFIG_SERVER,
+     OVERRIDE_CONFIG_PORT,
+     OVERRIDE_CONFIG_PASSWORD,
+     OVERRIDE_CONFIG_PREFER_SD_CARD,
+};
 #else
 extern Config config;
 #endif
