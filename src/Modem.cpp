@@ -21,6 +21,50 @@ bool Modem::isInit = false;
 uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
+// DownloadStream constructor implementation
+DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+                               const String& username, const String& password)
+    : HttpClient(gsmClient, server, port), isValid(false)
+{
+    fileLog.infoln("Opening stream to " + remotePath);
+
+    beginRequest();
+    const int err = get(remotePath);
+
+    if (err != 0)
+    {
+        fileLog.errorln("Error " + String(err) + ". Stream open canceled");
+        return;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        sendBasicAuth(username, password);
+
+    endRequest();
+
+    const int status = responseStatusCode();
+    skipResponseHeaders();
+
+    fileLog.infoln("Response status: " + String(status));
+
+    if (status != 200)
+    {
+        fileLog.errorln("Unexpected status (see above). Stream open canceled");
+        return;
+    }
+
+    const size_t totalLen = contentLength();
+    fileLog.infoln("Content length: " + String(totalLen) + " B");
+
+    if (Modem::increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
+    {
+        fileLog.errorln("Failed to increase TWDT timeout. Stream open canceled");
+        return;
+    }
+
+    isValid = true;
+}
+
 void Modem::powerOn()
 {
     pinMode(PWR_PIN, OUTPUT);

@@ -2,6 +2,7 @@
 
 #include <FS.h>
 #include "mbedtls/md5.h"
+#include <ArduinoJson.h>
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
@@ -76,8 +77,18 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
 bool RFIDs::downloadRfids()
 {
-    fileLog.infoln("Downloading remote RFIDs file");
+    fileLog.infoln("Downloading remote RFIDs JSON");
 
+    // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
+    DownloadStream http{REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.port, efuseMacHex, config.password};
+
+    if (!http)
+    {
+        fileLog.errorln("Failed to open stream for RFIDs download");
+        return false;
+    }
+
+    // Open temp file for writing
     File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
 
     if (!file)
@@ -86,21 +97,39 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file, efuseMacHex, config.password);
+    // Parse JSON from stream
+    fileLog.infoln("Parsing JSON stream");
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc, http);
 
-    switch (downloadResult)
+    if (error)
     {
-    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-    case DownloadResult::HTTP_REQUEST_ERROR:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
-        fileLog.errorln("RFIDs file download failed");
+        fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
+        file.close();
         StorageManager::removeTmpRFIDs();
         return false;
-    case DownloadResult::SUCCESS:
-        break;
     }
 
-    fileLog.infoln("Successfully downloaded RFIDs file");
+    // Extract RFID array and write to file
+    JsonArray rfids = doc["rfids"];
+    if (rfids.isNull())
+    {
+        fileLog.errorln("JSON does not contain 'rfids' array");
+        file.close();
+        StorageManager::removeTmpRFIDs();
+        return false;
+    }
+
+    fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
+    for (const JsonVariant rfidVariant : rfids)
+    {
+        const uint32_t rfid = rfidVariant.as<uint32_t>();
+        file.write(reinterpret_cast<const uint8_t*>(&rfid), 4);
+    }
+
+    file.close();
+
+    fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
     const bool removeOldSuccess = StorageManager::removeRFIDs();
     fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",

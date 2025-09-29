@@ -8,6 +8,7 @@
 #include <TinyGsmClientSIM7000.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
+#include "WatchdogHandler.h"
 
 #define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
 #define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
@@ -28,6 +29,32 @@ enum class UploadAndRetryResult
 enum class DownloadResult
 {
     BASE_DOWNLOAD_RESULTS,
+};
+
+// HTTP download stream that automatically manages connection and watchdog timeout
+class DownloadStream : public HttpClient
+{
+public:
+    // Open HTTP GET stream with automatic setup and watchdog management
+    DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+                   const String& username = "", const String& password = "");
+
+    // Constructor for invalid/null stream
+    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false) {}
+
+    ~DownloadStream()
+    {
+        if (isValid)
+        {
+            stop();
+            WatchdogHandler::revertTemporaryIncrease();
+        }
+    }
+
+    explicit operator bool() const { return isValid; }
+
+private:
+    bool isValid;
 };
 
 class Modem
