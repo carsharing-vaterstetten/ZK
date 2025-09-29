@@ -45,8 +45,11 @@ RfidsChecksumResult RFIDs::compareChecksums()
         return RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST;
     }
 
-    String response;
-    const int statusCode = Modem::simpleGet(REMOTE_RFID_MD5_CHECKSUM_PATH, &response, efuseMacHex, config.password);
+    constexpr uint8_t hashLen = 16;
+
+    uint8_t remoteMd5Hash[hashLen];
+    const int statusCode = Modem::simpleGetBin(
+        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, efuseMacHex, config.password);
 
     if (statusCode != 200)
     {
@@ -54,15 +57,13 @@ RfidsChecksumResult RFIDs::compareChecksums()
         return RfidsChecksumResult::ERROR;
     }
 
-    uint8_t md5Hash[16];
+    uint8_t fileMd5Hash[hashLen];
 
     File f = StorageManager::openRFIDs(FILE_READ);
-    HelperUtils::md5File(f, md5Hash);
+    HelperUtils::md5File(f, fileMd5Hash);
     f.close();
 
-    const String md5Hex = HelperUtils::md5ToHex(md5Hash);
-
-    if (response == "\"" + md5Hex + "\"")
+    if (memcmp(fileMd5Hash, remoteMd5Hash, hashLen) == 0)
     {
         fileLog.infoln("Files are equal");
         return RfidsChecksumResult::FILES_ARE_EQUAL;

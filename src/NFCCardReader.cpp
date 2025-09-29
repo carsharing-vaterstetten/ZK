@@ -4,8 +4,7 @@
 #include "Globals.h"
 #include "HardwareManager.h"
 
-PN532* NFCCardReader::nfc = nullptr;
-PN532_SPI* NFCCardReader::pn532spi = nullptr;
+Adafruit_PN532* NFCCardReader::nfc = nullptr;
 
 bool NFCCardReader::init()
 {
@@ -13,8 +12,7 @@ bool NFCCardReader::init()
 
     HardwareManager::ensureNFCSPIInitialized();
 
-    pn532spi = new PN532_SPI(*HardwareManager::nfcSpi, NFC_SS);
-    nfc = new PN532(*pn532spi);
+    nfc = new Adafruit_PN532(NFC_SS, HardwareManager::nfcSpi);
     nfc->begin();
 
     const uint32_t versionData = nfc->getFirmwareVersion();
@@ -37,17 +35,19 @@ bool NFCCardReader::init()
     return true;
 }
 
-uint32_t NFCCardReader::readTag()
+bool NFCCardReader::readTag(uint32_t& uid)
 {
-    uint8_t uid[7] = {};
+    uint8_t uidArr[7] = {};
     uint8_t uidLength;
 
-    const bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
+    const bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLength, 200);
 
-    if (!success || uidLength < 4) return 0;
+    if (!success || uidLength != 4) return false;
 
-    return static_cast<uint32_t>(uid[0]) << 24 |
-        static_cast<uint32_t>(uid[1]) << 16 |
-        static_cast<uint32_t>(uid[2]) << 8 |
-        static_cast<uint32_t>(uid[3]);
+    uid = static_cast<uint32_t>(uidArr[0]) << 24 |
+        static_cast<uint32_t>(uidArr[1]) << 16 |
+        static_cast<uint32_t>(uidArr[2]) << 8 |
+        static_cast<uint32_t>(uidArr[3]);
+
+    return true;
 }

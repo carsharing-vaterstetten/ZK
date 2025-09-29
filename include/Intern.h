@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "Config.h"
 
-#define FIRMWARE_VERSION "0.6.0"
+#define FIRMWARE_VERSION "1.0.0"
 
 // Local paths
 #define RFID_FILE_PATH "/rfids.bin"

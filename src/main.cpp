@@ -26,21 +26,22 @@ unsigned long targetMillis;
 
 void checkNFCTag()
 {
-    const uint32_t readValue = NFCCardReader::readTag();
+    uint32_t rfidUid;
+    const bool readSuccess = NFCCardReader::readTag(rfidUid);
 
-    if (readValue == 0) return; // No card present
+    if (!readSuccess) return; // No card present
 
-    if (RFIDs::isRegisteredRFID(readValue))
+    if (RFIDs::isRegisteredRFID(rfidUid))
     {
-        fileLog.infoln("Scanned known RFID card: '" + String(readValue, 16) + "'");
+        fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
         if (isLoggedIn)
         {
             AccessControl::logout();
         }
         else
         {
-            AccessControl::login(readValue);
-            currentRFIDConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(readValue);
+            AccessControl::login(rfidUid);
+            currentRFIDConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfidUid);
             fileLog.infoln(currentRFIDConsentsToGPSTracking
                                ? "Logged in RFID consents to GPS tracking"
                                : "Logged in RFID does not consent to GPS tracking");
@@ -48,7 +49,7 @@ void checkNFCTag()
     }
     else
     {
-        fileLog.infoln("Scanned unknown RFID card: '" + String(readValue, 16) + "'");
+        fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
         statusLed.setColor(Color::Red);
     }
 
@@ -105,21 +106,21 @@ void initializeStorage()
     {
         if (StorageManager::isSDCardConnected())
         {
-            serialOnlyLog.infoln("Using SD-card as preferred storage");
+            serialOnlyLog.infoln("Using SD-Card as preferred storage");
 
             // Should already be mounted after isSDCardConnected()
             const bool sdInitSuccess = StorageManager::mountSDCard();
 
             if (!sdInitSuccess)
             {
-                serialOnlyLog.warningln("Failed to initialize SD-card");
+                serialOnlyLog.warningln("Failed to initialize SD-Card");
             }
 
             enableFileLogging(!sdInitSuccess);
         }
         else
         {
-            serialOnlyLog.warningln("SD-card is not inserted");
+            serialOnlyLog.warningln("SD-Card is not inserted");
             enableFileLogging(true);
         }
     }
@@ -135,7 +136,7 @@ int espLogHandler(const char* fmt, const va_list args)
     char buf[256];
     vsnprintf(buf, sizeof(buf), fmt, args);
     fileLog.errorln(buf);
-    // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-card
+    // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-Card
     return 0;
 }
 

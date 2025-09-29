@@ -1,18 +1,15 @@
 #pragma once
 
 #include <Arduino.h>
-
-#include "../lib/PN532/PN532.h"
-#include "../lib/PN532/PN532_SPI.h"
+#include <Adafruit_PN532.h>
 
 class NFCCardReader
 {
-    static PN532* nfc;
-    static PN532_SPI* pn532spi;
+    static Adafruit_PN532 * nfc;
 
 public:
     NFCCardReader() = delete;
 
     static bool init();
-    static uint32_t readTag();
+    static bool readTag(uint32_t &uid);
 };

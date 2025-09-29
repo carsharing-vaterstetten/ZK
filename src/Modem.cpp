@@ -285,49 +285,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     return UploadResult::SUCCESS;
 }
 
-UploadWithSizeCheckResult Modem::uploadFileWithSizeCheck(const String& endpoint, File& f, const String& urlParams,
-                                                         const int bufferSize, unsigned long* uploadStartMs,
-                                                         unsigned long* uploadEndMs)
-{
-    const size_t fileSize = f.size();
-
-    String resp;
-    int responseStatusCode;
-
-    const UploadResult uploadResult = uploadFile(endpoint, f, &responseStatusCode, &resp, urlParams, bufferSize,
-                                                 uploadStartMs, uploadEndMs);
-
-    switch (uploadResult)
-    {
-    case UploadResult::FILE_IS_EMPTY:
-        return UploadWithSizeCheckResult::FILE_IS_EMPTY;
-    case UploadResult::HTTP_REQUEST_ERROR:
-        return UploadWithSizeCheckResult::HTTP_REQUEST_ERROR;
-    case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-        return UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
-    case UploadResult::SUCCESS:
-        break;
-    }
-
-    if (responseStatusCode != 200)
-    {
-        fileLog.errorln("Unexpected status code " + String(responseStatusCode));
-        return UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE;
-    }
-
-    const long responseSize = resp.toInt();
-
-    if (responseSize != fileSize)
-    {
-        fileLog.errorln(
-            "File size check failed: local: " + String(fileSize) + " B != uploaded: " + String(responseSize) + " B");
-        return UploadWithSizeCheckResult::SIZE_CHECK_FAILED;
-    }
-
-    return UploadWithSizeCheckResult::SUCCESS;
-}
-
-UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
+UploadAndRetryResult Modem::uploadFileAndDelete(
     const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
     const bool deleteAfterRetrying, const uint32_t retries, const String& urlParams, const int bufferSize,
     unsigned long* uploadStartMs, unsigned long* uploadEndMs)
@@ -335,10 +293,10 @@ UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
     if (!fileFs.exists(filePath))
     {
         fileLog.errorln(filePath + " does not exist");
-        return UploadWithSizeCheckResultAndRetries::FILE_DOES_NOT_EXIST;
+        return UploadAndRetryResult::FILE_DOES_NOT_EXIST;
     }
 
-    UploadWithSizeCheckResult uploadResult;
+    UploadResult uploadResult;
     uint32_t attemptNo = 0;
 
     do
@@ -348,20 +306,18 @@ UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
         if (!f)
         {
             fileLog.errorln("Failed to open " + filePath);
-            return UploadWithSizeCheckResultAndRetries::FAILED_TO_OPEN_FILE;
+            return UploadAndRetryResult::FAILED_TO_OPEN_FILE;
         }
 
-        uploadResult = uploadFileWithSizeCheck(endpoint, f, urlParams, bufferSize, uploadStartMs, uploadEndMs);
+        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, urlParams, bufferSize, uploadStartMs, uploadEndMs);
 
         switch (uploadResult)
         {
-        case UploadWithSizeCheckResult::FILE_IS_EMPTY:
-        case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
-        case UploadWithSizeCheckResult::SUCCESS:
+        case UploadResult::FILE_IS_EMPTY:
+        case UploadResult::SUCCESS:
             goto endLoop;
-        case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
-        case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
-        case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        case UploadResult::HTTP_REQUEST_ERROR:
+        case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
             break;
         }
 
@@ -375,7 +331,7 @@ UploadWithSizeCheckResultAndRetries Modem::uploadFileWithSizeCheckAndDelete(
 
 endLoop:;
 
-    if (deleteAfterRetrying || (uploadResult == UploadWithSizeCheckResult::SUCCESS && deleteIfSuccess))
+    if (deleteAfterRetrying || (uploadResult == UploadResult::SUCCESS && deleteIfSuccess))
     {
         const bool removeSuccess = StorageManager::remove(fileFs, filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
@@ -384,19 +340,15 @@ endLoop:;
 
     switch (uploadResult)
     {
-    case UploadWithSizeCheckResult::FILE_IS_EMPTY:
-        return UploadWithSizeCheckResultAndRetries::FILE_IS_EMPTY;
-    case UploadWithSizeCheckResult::HTTP_REQUEST_ERROR:
-        return UploadWithSizeCheckResultAndRetries::HTTP_REQUEST_ERROR;
-    case UploadWithSizeCheckResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-        return UploadWithSizeCheckResultAndRetries::FAILED_TO_INCREASE_TWDT_TIMEOUT;
-    case UploadWithSizeCheckResult::SUCCESS:
-        if (attemptNo == 0) return UploadWithSizeCheckResultAndRetries::SUCCESS;
-        return UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING;
-    case UploadWithSizeCheckResult::UNEXPECTED_STATUS_CODE:
-        return UploadWithSizeCheckResultAndRetries::UNEXPECTED_STATUS_CODE;
-    case UploadWithSizeCheckResult::SIZE_CHECK_FAILED:
-        return UploadWithSizeCheckResultAndRetries::SIZE_CHECK_FAILED;
+    case UploadResult::FILE_IS_EMPTY:
+        return UploadAndRetryResult::FILE_IS_EMPTY;
+    case UploadResult::HTTP_REQUEST_ERROR:
+        return UploadAndRetryResult::HTTP_REQUEST_ERROR;
+    case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadAndRetryResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    case UploadResult::SUCCESS:
+        if (attemptNo == 0) return UploadAndRetryResult::SUCCESS;
+        return UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
     }
 
     // ReSharper disable once CppDFAUnreachableCode
@@ -428,6 +380,38 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
     if (responseBody)
     {
         *responseBody = http.responseBody();
+    }
+
+    http.stop();
+
+    return responseStatus;
+}
+
+
+/// returns response status
+int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const size_t size, const String& username,
+                        const String& password)
+{
+    HttpClient http{*gsmClient, config.server, config.port};
+    http.beginRequest();
+    const int err = http.get(aUrlPath);
+
+    if (err != HTTP_SUCCESS)
+    {
+        http.stop();
+        return err;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        http.sendBasicAuth(username, password);
+    http.endRequest();
+
+    const int responseStatus = http.responseStatusCode();
+    http.skipResponseHeaders();
+
+    if (responseBody)
+    {
+        http.read(responseBody, size);
     }
 
     http.stop();
@@ -528,8 +512,8 @@ void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& en
     {
         fileLog.infoln("Uploading " + filePath + " from SPIFFS");
         uploadedSomething = true;
-        uploadFileWithSizeCheckAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
-                                         deleteAfterRetrying, retries, "filesystem=SPIFFS");
+        uploadFileAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
+                            deleteAfterRetrying, retries, "filesystem=SPIFFS");
     }
 
     if (StorageManager::isSDCardConnected())
@@ -538,8 +522,8 @@ void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& en
         {
             fileLog.infoln("Uploading " + filePath + " from SD-Card");
             uploadedSomething = true;
-            uploadFileWithSizeCheckAndDelete(endpoint, SD, filePath, deleteIfSuccess,
-                                             deleteAfterRetrying, retries, "filesystem=SD-card");
+            uploadFileAndDelete(endpoint, SD, filePath, deleteIfSuccess,
+                                deleteAfterRetrying, retries, "filesystem=SD-Card");
         }
     }
     else if (config.preferSDCard)
@@ -592,7 +576,8 @@ void Modem::performConnectionSpeedTest()
 
     unsigned long downloadStart, downloadEnd;
     const DownloadResult downloadResult = downloadFile(
-        REMOTE_SPEED_TEST_FILE, df, "", "", 512, &downloadStart, &downloadEnd);
+        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, efuseMacHex,
+        config.password, 512, &downloadStart, &downloadEnd);
     df.close();
 
     df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
@@ -616,12 +601,11 @@ void Modem::performConnectionSpeedTest()
     }
 
     unsigned long uploadStart, uploadEnd;
-    const UploadWithSizeCheckResultAndRetries uploadResult = uploadFileWithSizeCheckAndDelete(
-        "/v1/upload-speed-test", SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, "",
-        512, &uploadStart, &uploadEnd);
+    const UploadAndRetryResult uploadResult = uploadFileAndDelete(
+        UPLOAD_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3,
+        "", 512, &uploadStart, &uploadEnd);
 
-    if (uploadResult == UploadWithSizeCheckResultAndRetries::SUCCESS || uploadResult ==
-        UploadWithSizeCheckResultAndRetries::SUCCESS_AFTER_RETRYING)
+    if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {
         const float uploadSeconds = static_cast<float>(uploadEnd - downloadStart) / 1000.0f;
         estimatedUploadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / uploadSeconds);

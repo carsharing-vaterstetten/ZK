@@ -22,7 +22,8 @@ bool FirmwareUpdater::downloadAndPerformUpdate()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(LATEST_FIRMWARE_DOWNLOAD_PATH, downloadFile);
+    const DownloadResult downloadResult = Modem::downloadFile(
+        LATEST_FIRMWARE_DOWNLOAD_PATH, downloadFile, efuseMacHex, config.password);
     downloadFile.close(); // Just to make sure
 
     switch (downloadResult)
@@ -78,7 +79,7 @@ long FirmwareUpdater::getLatestFirmwareSize()
     fileLog.infoln("Checking update size...");
 
     String respSize;
-    Modem::simpleGet(LATEST_FIRMWARE_SIZE_ENDPOINT, &respSize);
+    Modem::simpleGet(LATEST_FIRMWARE_SIZE_ENDPOINT, &respSize, efuseMacHex, config.password);
     const long latestFirmwareSize = respSize.toInt();
 
     fileLog.infoln("Update size: " + String(latestFirmwareSize) + " B");
@@ -98,7 +99,7 @@ FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
     String updateAvailability;
 
     const int respStatus = Modem::simpleGet(LATEST_FIRMWARE_IS_NEWER_ENDPOINT "?fm_version=" FIRMWARE_VERSION,
-                                            &updateAvailability);
+                                            &updateAvailability, efuseMacHex, config.password);
 
     if (respStatus != 200)
     {
