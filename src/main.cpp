@@ -100,21 +100,21 @@ void initializeStorage()
     {
         if (StorageManager::isSDCardConnected())
         {
-            serialOnlyLog.infoln("Using SD-card as preferred storage");
+            serialOnlyLog.infoln("Using SD-Card as preferred storage");
 
             // Should already be mounted after isSDCardConnected()
             const bool sdInitSuccess = StorageManager::mountSDCard();
 
             if (!sdInitSuccess)
             {
-                serialOnlyLog.warningln("Failed to initialize SD-card");
+                serialOnlyLog.warningln("Failed to initialize SD-Card");
             }
 
             enableFileLogging(!sdInitSuccess);
         }
         else
         {
-            serialOnlyLog.warningln("SD-card is not inserted");
+            serialOnlyLog.warningln("SD-Card is not inserted");
             enableFileLogging(true);
         }
     }
@@ -130,7 +130,7 @@ int espLogHandler(const char* fmt, const va_list args)
     char buf[256];
     vsnprintf(buf, sizeof(buf), fmt, args);
     fileLog.errorln(buf);
-    // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-card
+    // TODO: Not logging to file, because it could cause an endless loop, when the error message occures from e.g. SD-Card
     return 0;
 }
 

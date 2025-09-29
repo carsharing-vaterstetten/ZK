@@ -54,7 +54,7 @@
 // Connection speed test
 #define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
 #define SKIP_ALL_CONNECTION_SPEED_TESTS false
-#define REMOTE_SPEED_TEST_FILE REMOTE_STATIC_SPEED_TEST_16KIB_FILE // Smaller files result in less accurate connection speed estimates
+#define CONNECTION_SPEED_TEST_FILE_SIZE (16U * 1024U) // Smaller files result in less accurate connection speed estimates
 
 // Config override
 #define OVERRIDE_CONFIG false // Useful for development or mass deployment
