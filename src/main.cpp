@@ -219,8 +219,9 @@ void setup()
     StorageManager::logFSConfiguration();
     StorageManager::logFilesystemsInformation();
 
-    // Cleanup of leftover firmware update
+    // Cleanup
     StorageManager::removeFirmwareFile();
+    StorageManager::removeGpsLog();
 
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status

@@ -74,6 +74,11 @@ public:
         return remove(*rfidsFs, RFID_FILE_PATH, notExistingOk);
     }
 
+    static bool removeGpsLog(const bool notExistingOk = true)
+    {
+        return remove(*gpsFs, GPS_FILE_PATH, notExistingOk);
+    }
+
     static bool exists(FS& fs, const String& path)
     {
         return fs.exists(path);
