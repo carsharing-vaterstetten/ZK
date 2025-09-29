@@ -11,7 +11,7 @@
 #define RFIDS_ROUTE SERVER_VEHICLE_ROUTE "/rfids"
 #define OTHER_ROUTE SERVER_VEHICLE_ROUTE "/other"
 #define FIRMWARE_ROUTE SERVER_VEHICLE_ROUTE "/firmware"
-#define GPS_TRACKING_ROUTE SERVER_VERSION_ROUTE "/gps-tracking"
+#define GPS_TRACKING_ROUTE SERVER_VEHICLE_ROUTE "/gps-tracking"
 
 // Vehicle/Log router
 #define LOG_FILE_UPLOAD_ENDPOINT LOG_ROUTE "/upload"
