@@ -122,9 +122,8 @@ bool Modem::init(const uint8_t retries)
     return false;
 }
 
-UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                               const String& urlParams, const int bufferSize, unsigned long* uploadStartMs,
-                               unsigned long* uploadEndMs)
+UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response, const int bufferSize,
+                               unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
     const String filePath = f.path();
     const bool isFileLogFile = filePath == LOG_FILE_PATH;
@@ -150,22 +149,15 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FILE_IS_EMPTY;
     }
 
-    // Append URL parameters if provided
-    String fullEndpoint = endpoint;
-    if (!urlParams.isEmpty())
-    {
-        fullEndpoint += "?" + urlParams;
-    }
-
     HttpClient uploadHttp{*gsmClient, config.server, config.port};
 
     uploadHttp.beginRequest();
-    const int err = uploadHttp.post(fullEndpoint);
+
+    const int err = uploadHttp.post(endpoint);
 
     if (err != 0)
     {
         f.close();
-        uploadHttp.stop();
         fileLog.errorln("Failed to upload file. Error " + String(err));
         return UploadResult::HTTP_REQUEST_ERROR;
     }
@@ -173,7 +165,6 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     if (increaseWatchdogTimeoutForFileUpload(fileSize) != ESP_OK)
     {
         f.close();
-        uploadHttp.stop();
         fileLog.errorln("Failed to increase TWDT timeout. Upload aborted");
         return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
@@ -189,23 +180,30 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
     if (uploadStartMs) *uploadStartMs = millis();
 
-    while (f.available() && totalBytesUploaded < fileSize)
+    while (f.available())
     {
-        size_t readLength = bufferSize;
-        if (totalBytesUploaded + readLength > fileSize)
-        {
-            readLength = fileSize - totalBytesUploaded;
-        }
-
-        if (readLength <= 0) break;
-
-        const size_t bytesRead = f.read(buffer, readLength);
+        const size_t bytesRead = f.read(buffer, bufferSize);
 
         if (bytesRead <= 0) break;
 
-        const size_t bytesSent = uploadHttp.write(buffer, bytesRead);
+        size_t bytesSent = uploadHttp.write(buffer, bytesRead);
 
-        if (bytesSent <= 0) break; // This happens, when the server does not allow the request size.
+        uint8_t sendRetry = 0;
+        constexpr uint8_t maxSendRetries = 10;
+
+        while (bytesSent == 0 && sendRetry < maxSendRetries)
+        {
+            bytesSent = uploadHttp.write(buffer, bytesRead);
+            ++sendRetry;
+        }
+
+        if (sendRetry >= maxSendRetries)
+        {
+            f.close();
+            WatchdogHandler::revertTemporaryIncrease();
+            fileLog.errorln("Failed to write data to http client");
+            return UploadResult::FAILED_TO_SEND_DATA;
+        }
 
         totalBytesUploaded += bytesSent;
 
@@ -226,29 +224,32 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         }
     }
 
-    uploadHttp.endRequest();
-
     if (uploadEndMs) *uploadEndMs = millis();
 
-    if (statusCode) *statusCode = uploadHttp.responseStatusCode();
-    const String responseBody = uploadHttp.responseBody();
+    uploadHttp.endRequest();
+
+    const int respCode = uploadHttp.responseStatusCode();
+
+    if (statusCode) *statusCode = respCode;
+    if (response) *response = uploadHttp.responseBody();
 
     f.close();
-    uploadHttp.stop();
 
     WatchdogHandler::revertTemporaryIncrease();
 
-    if (statusCode)
-        fileLog.infoln("Response status code: " + String(*statusCode));
+    fileLog.infoln("Response status code: " + String(respCode));
 
-    if (response) *response = responseBody;
+    if (HelperUtils::isSuccessfulResponse(respCode))
+    {
+        return UploadResult::SUCCESS;
+    }
 
-    return UploadResult::SUCCESS;
+    return UploadResult::UNEXPECTED_STATUS_CODE;
 }
 
 UploadAndRetryResult Modem::uploadFileAndDelete(
     const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
-    const bool deleteAfterRetrying, const uint32_t retries, const String& urlParams, const int bufferSize,
+    const bool deleteAfterRetrying, const uint32_t retries, const int bufferSize,
     unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
     if (!fileFs.exists(filePath))
@@ -270,7 +271,7 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
             return UploadAndRetryResult::FAILED_TO_OPEN_FILE;
         }
 
-        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, urlParams, bufferSize, uploadStartMs, uploadEndMs);
+        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, bufferSize, uploadStartMs, uploadEndMs);
 
         switch (uploadResult)
         {
@@ -278,6 +279,8 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
         case UploadResult::SUCCESS:
             goto endLoop;
         case UploadResult::HTTP_REQUEST_ERROR:
+        case UploadResult::UNEXPECTED_STATUS_CODE:
+        case UploadResult::FAILED_TO_SEND_DATA:
         case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
             break;
         }
@@ -310,6 +313,10 @@ endLoop:;
     case UploadResult::SUCCESS:
         if (attemptNo == 0) return UploadAndRetryResult::SUCCESS;
         return UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
+    case UploadResult::UNEXPECTED_STATUS_CODE:
+        return UploadAndRetryResult::UNEXPECTED_STATUS_CODE;
+    case UploadResult::FAILED_TO_SEND_DATA:
+        return UploadAndRetryResult::FAILED_TO_SEND_DATA;
     }
 
     // ReSharper disable once CppDFAUnreachableCode
@@ -327,7 +334,6 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 
     if (err != HTTP_SUCCESS)
     {
-        http.stop();
         return err;
     }
 
@@ -343,8 +349,6 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
         *responseBody = http.responseBody();
     }
 
-    http.stop();
-
     return responseStatus;
 }
 
@@ -359,7 +363,6 @@ int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const siz
 
     if (err != HTTP_SUCCESS)
     {
-        http.stop();
         return err;
     }
 
@@ -374,8 +377,6 @@ int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const siz
     {
         http.read(responseBody, size);
     }
-
-    http.stop();
 
     return responseStatus;
 }
@@ -394,7 +395,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     if (err != 0)
     {
         fileLog.errorln("Error " + String(err) + ". Download canceled");
-        downloadHttp.stop();
         f.close();
         return DownloadResult::HTTP_REQUEST_ERROR;
     }
@@ -412,7 +412,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     if (status != 200)
     {
         fileLog.errorln("Unexpected status (see above). Download canceled");
-        downloadHttp.stop();
         f.close();
         return DownloadResult::UNEXPECTED_STATUS_CODE;
     }
@@ -427,7 +426,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 
     if (increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
     {
-        downloadHttp.stop();
         f.close();
         fileLog.errorln("Failed to increase TWDT timeout. Download aborted");
         return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
@@ -451,8 +449,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
         }
     }
 
-    downloadHttp.stop();
-
     if (downloadEndMs) *downloadEndMs = millis();
 
     f.close();
@@ -473,8 +469,8 @@ void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& en
     {
         fileLog.infoln("Uploading " + filePath + " from SPIFFS");
         uploadedSomething = true;
-        uploadFileAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
-                            deleteAfterRetrying, retries, "filesystem=SPIFFS");
+        uploadFileAndDelete(endpoint + "?filesystem=SPIFFS", SPIFFS, filePath, deleteIfSuccess,
+                            deleteAfterRetrying, retries);
     }
 
     if (StorageManager::isSDCardConnected())
@@ -483,8 +479,8 @@ void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& en
         {
             fileLog.infoln("Uploading " + filePath + " from SD-Card");
             uploadedSomething = true;
-            uploadFileAndDelete(endpoint, SD, filePath, deleteIfSuccess,
-                                deleteAfterRetrying, retries, "filesystem=SD-Card");
+            uploadFileAndDelete(endpoint + "?filesystem=SD-Card", SD, filePath, deleteIfSuccess,
+                                deleteAfterRetrying, retries);
         }
     }
     else if (config.preferSDCard)
@@ -563,8 +559,7 @@ void Modem::performConnectionSpeedTest()
 
     unsigned long uploadStart, uploadEnd;
     const UploadAndRetryResult uploadResult = uploadFileAndDelete(
-        UPLOAD_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3,
-        "", 512, &uploadStart, &uploadEnd);
+        UPLOAD_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, 512, &uploadStart, &uploadEnd);
 
     if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {

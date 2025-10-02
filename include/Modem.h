@@ -9,7 +9,7 @@
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 
-#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
+#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
 #define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
 
 enum class UploadResult
@@ -45,14 +45,12 @@ public:
 
     static bool init(uint8_t retries = 2);
     static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                                   const String& urlParams = "", int bufferSize = 512,
-                                   unsigned long* uploadStartMs = nullptr, unsigned long* uploadEndMs = nullptr);
-    static UploadAndRetryResult uploadFileAndDelete(
-        const String& endpoint, FS& fileFs, const String& filePath,
-        bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
-        const String& urlParams = "", int bufferSize = 512,
-        unsigned long* uploadStartMs = nullptr,
-        unsigned long* uploadEndMs = nullptr);
+                                   int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
+                                   unsigned long* uploadEndMs = nullptr);
+    static UploadAndRetryResult uploadFileAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
+                                                    bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
+                                                    int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
+                                                    unsigned long* uploadEndMs = nullptr);
     static int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
                          const String& password = "");
     static int simpleGetBin(const String& aUrlPath, uint8_t* responseBody, size_t size, const String& username = "",

@@ -23,4 +23,5 @@ public:
     static bool updateSystemTimeWithModem();
     static uint64_t systemTimeMillisecondsSinceEpoche();
     static const char* sdCardTypeName(sdcard_type_t type);
+    static bool isSuccessfulResponse(int statusCode);
 };

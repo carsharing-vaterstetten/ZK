@@ -270,3 +270,8 @@ const char* HelperUtils::sdCardTypeName(const sdcard_type_t type)
     }
     return "UNKNOWN";
 }
+
+bool HelperUtils::isSuccessfulResponse(const int statusCode)
+{
+    return statusCode < 300 && statusCode >= 200;
+}
