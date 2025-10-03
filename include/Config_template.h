@@ -10,7 +10,6 @@
 #define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
 #endif
 #define FLASH_LOGGING_LEVEL LOGGING_LEVEL_INFO
-#define SD_CARD_LOGGING_LEVEL LOGGING_LEVEL_INFO
 
 #define UART_BAUD 115200U
 
@@ -28,13 +27,6 @@
 // Car key pins
 #define OPEN_KEY 21
 #define CLOSE_KEY 22
-
-// SD-Card pins
-#define SD_MISO 2
-#define SD_MOSI 15
-#define SD_SCLK 14
-#define SD_CS 13
-#define SD_SPI VSPI
 
 // NFC modul Pins
 #define NFC_MOSI 23
@@ -64,5 +56,4 @@
 #define OVERRIDE_CONFIG_SERVER ""
 #define OVERRIDE_CONFIG_PORT 80
 #define OVERRIDE_CONFIG_PASSWORD ""
-#define OVERRIDE_CONFIG_PREFER_SD_CARD true
 #endif

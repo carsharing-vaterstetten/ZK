@@ -5,7 +5,6 @@
 #include <LED.h>
 #include <esp32-hal.h>
 #include <esp_system.h>
-#include <SD.h>
 #include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
@@ -75,54 +74,13 @@ void calculateNextRestartTime()
     fileLog.infoln("Next restart planed in " + String(targetMillis / 1000) + " seconds");
 }
 
-void enableFileLogging(const bool forceFlash)
+void enableFileLogging()
 {
-    if (forceFlash)
-    {
-        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
+    StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
 
-        fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
-
-        fileLog.infoln("Forced to use flash. Now logging to file(s)");
-        return;
-    }
-
-    StorageManager::setFS(SD, SPIFFS, SD);
-
-    fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
+    fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
 
     fileLog.infoln("Now logging to file(s)");
-}
-
-void initializeStorage()
-{
-    if (config.preferSDCard)
-    {
-        if (StorageManager::isSDCardConnected())
-        {
-            serialOnlyLog.infoln("Using SD-Card as preferred storage");
-
-            // Should already be mounted after isSDCardConnected()
-            const bool sdInitSuccess = StorageManager::mountSDCard();
-
-            if (!sdInitSuccess)
-            {
-                serialOnlyLog.warningln("Failed to initialize SD-Card");
-            }
-
-            enableFileLogging(!sdInitSuccess);
-        }
-        else
-        {
-            serialOnlyLog.warningln("SD-Card is not inserted");
-            enableFileLogging(true);
-        }
-    }
-    else
-    {
-        serialOnlyLog.infoln("Using flash as preferred storage");
-        enableFileLogging(true);
-    }
 }
 
 int espLogHandler(const char* fmt, const va_list args)
@@ -177,14 +135,13 @@ void setup()
                                            "EEPROM initialization failed");
     loadConfig(); // Config is now needed because it contains information whether the SD-Card should be used
     serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
-    initializeStorage();
+    enableFileLogging();
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
     fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
-    StorageManager::logFSConfiguration();
     StorageManager::logFilesystemsInformation();
 
     // Cleanup of leftover firmware update
@@ -226,7 +183,7 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    Modem::uploadLogsFromAllFileSystems(false, true, 1);
+    Modem::uploadLog(false, true, 1);
     statusLed.clear();
 
     // Set the watchdog to a shorter timeout for the main loop
@@ -248,7 +205,7 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
-        Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyway
+        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         ESP.restart();
     }

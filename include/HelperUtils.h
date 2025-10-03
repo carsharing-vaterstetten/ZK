@@ -3,7 +3,6 @@
 
 #include <Intern.h>
 #include <FS.h>
-#include <sd_defines.h>
 
 class HelperUtils
 {
@@ -22,6 +21,5 @@ public:
     static void dateTimeToString(char* buf, int year, int month, int day, int hour, int minute, int second);
     static bool updateSystemTimeWithModem();
     static uint64_t systemTimeMillisecondsSinceEpoche();
-    static const char* sdCardTypeName(sdcard_type_t type);
     static bool isSuccessfulResponse(int statusCode);
 };

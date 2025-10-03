@@ -1,8 +1,6 @@
 #pragma once
 
 #include <FS.h>
-#include <SD.h>
-#include <SPIFFS.h>
 
 #include "Intern.h"
 
@@ -10,7 +8,6 @@ class StorageManager
 {
     static bool eepromIsMounted;
     static bool sspiffsIsMounted;
-    static bool sdCardIsMounted;
 
 public:
     static FS* logFileFs;
@@ -22,9 +19,6 @@ public:
     static void setFS(FS& logFile, FS& rfids, FS& firmware);
     static bool mountEEPROM();
     static bool mountSSPIFFS();
-    static bool mountSDCard();
-
-    static bool isSDCardConnected();
 
     static void saveConfigToEEPROM(Config& c);
     static bool loadConfigFromEEPROM(Config& c);
@@ -88,12 +82,6 @@ public:
         logDirTree(fs, dirname, maxDepth, 0);
     }
     static void logFilesystemTree(FS* fs, uint8_t maxDepth);
-
-    static void logFilesystemTrees(const uint8_t maxDepth = 10)
-    {
-        logFilesystemTree(&SPIFFS, maxDepth);
-        logFilesystemTree(&SD, maxDepth);
-    }
 
     static void logFilesystemsInformation();
 

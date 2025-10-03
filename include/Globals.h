@@ -19,7 +19,6 @@ constexpr Config config {
      OVERRIDE_CONFIG_SERVER,
      OVERRIDE_CONFIG_PORT,
      OVERRIDE_CONFIG_PASSWORD,
-     OVERRIDE_CONFIG_PREFER_SD_CARD,
 };
 #else
 extern Config config;

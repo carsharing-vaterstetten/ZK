@@ -27,5 +27,4 @@ struct Config
   char server[64];
   uint16_t port;
   char password[64];
-  bool preferSDCard;
 };

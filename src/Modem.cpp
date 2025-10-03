@@ -5,7 +5,6 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
-#include <SD.h>
 #include <SPIFFS.h>
 
 #include "Backend.h"
@@ -460,45 +459,11 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     return DownloadResult::SUCCESS;
 }
 
-void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
-                                        const bool deleteAfterRetrying, const uint32_t retries)
+void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
-    bool uploadedSomething = false;
-
-    if (SPIFFS.exists(filePath))
-    {
-        fileLog.infoln("Uploading " + filePath + " from SPIFFS");
-        uploadedSomething = true;
-        uploadFileAndDelete(endpoint + "?filesystem=SPIFFS", SPIFFS, filePath, deleteIfSuccess,
-                            deleteAfterRetrying, retries);
-    }
-
-    if (StorageManager::isSDCardConnected())
-    {
-        if (SD.exists(filePath))
-        {
-            fileLog.infoln("Uploading " + filePath + " from SD-Card");
-            uploadedSomething = true;
-            uploadFileAndDelete(endpoint + "?filesystem=SD-Card", SD, filePath, deleteIfSuccess,
-                                deleteAfterRetrying, retries);
-        }
-    }
-    else if (config.preferSDCard)
-    {
-        fileLog.warningln("SD-Card not inserted -> Cannot upload " + filePath + " from there");
-    }
-
-    if (!uploadedSomething)
-    {
-        fileLog.warningln("Could not find " + filePath + " on any FS for uploading");
-    }
-}
-
-void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                         const uint32_t retries)
-{
-    fileLog.infoln("Uploading log file(s)");
-    uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
+    fileLog.infoln("Uploading log file");
+    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH, deleteIfSuccess,
+                        deleteAfterRetrying, retries);
 }
 
 time_t Modem::getUnixTimestamp()

@@ -1,16 +1,15 @@
 #include "StorageManager.h"
 
 #include <EEPROM.h>
+#include <SPIFFS.h>
 
 #include "Config.h"
 #include "Globals.h"
 #include "HardwareManager.h"
-#include "HelperUtils.h"
 #include "Intern.h"
 
 bool StorageManager::eepromIsMounted = false;
 bool StorageManager::sspiffsIsMounted = false;
-bool StorageManager::sdCardIsMounted = false;
 
 FS* StorageManager::logFileFs = nullptr;
 FS* StorageManager::rfidsFs = nullptr;
@@ -35,25 +34,6 @@ bool StorageManager::mountSSPIFFS()
     if (sspiffsIsMounted) return true;
     sspiffsIsMounted = SPIFFS.begin(true);
     return sspiffsIsMounted;
-}
-
-bool StorageManager::mountSDCard()
-{
-    if (sdCardIsMounted) return true;
-    HardwareManager::ensureSDSPIInitialized();
-    sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);
-    return sdCardIsMounted;
-}
-
-bool StorageManager::isSDCardConnected()
-{
-    // Don't worry about these errors:
-    // [ 28611][E][sd_diskio.cpp:806] sdcard_mount(): f_mount failed: (3) The physical drive cannot work
-    // [ 29120][E][sd_diskio.cpp:126] sdSelectCard(): Select Failed
-    HardwareManager::ensureSDSPIInitialized();
-    SD.end();
-    sdCardIsMounted = SD.begin(SD_CS, *HardwareManager::sdSpi);
-    return sdCardIsMounted && SD.cardType() != CARD_NONE;
 }
 
 void StorageManager::saveConfigToEEPROM(Config& c)
@@ -92,7 +72,6 @@ bool StorageManager::remove(FS& fs, const String& path, const bool notExistingOk
 String fsName(const FS* fs)
 {
     if (fs == &SPIFFS) return "SPIFFS";
-    if (fs == &SD) return "SD";
     return "UNKNOWN";
 }
 
@@ -146,14 +125,5 @@ void StorageManager::logFilesystemsInformation()
         const size_t flashUtilized = SPIFFS.usedBytes();
         const size_t flashTotal = SPIFFS.totalBytes();
         fileLog.infoln("SPIFFS: usage: " + String(flashUtilized) + " B / " + String(flashTotal) + " B");
-    }
-
-    if (sdCardIsMounted && isSDCardConnected())
-    {
-        const uint64_t sdUtilized = SD.usedBytes();
-        const uint64_t sdTotal = SD.totalBytes();
-        const String sdCardType = HelperUtils::sdCardTypeName(SD.cardType());
-        fileLog.infoln(
-            "SD-Card: type: " + sdCardType + ", usage: " + String(sdUtilized) + " B / " + String(sdTotal) + " B");
     }
 }

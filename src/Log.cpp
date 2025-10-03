@@ -1,7 +1,6 @@
 #include "Log.h"
 
 #include <SPIFFS.h>
-#include <SD.h>
 
 #include "Config.h"
 #include "HelperUtils.h"
@@ -20,25 +19,6 @@ void Log::enableSerialLogging(const uint8_t loggingLevel, const String& serialNa
     logToSerial = true;
     serialLoggingLevel = loggingLevel;
     serialLoggingName = serialName;
-}
-
-/// Make sure the pins of the sd card aren't used by something else!
-bool Log::enableSDCardLogging(const String& SDCardLogFileName, const uint8_t loggingLevel)
-{
-    if (!SD.exists(SDCardLogFileName))
-    {
-        // Let's ignore directories for now
-        File file = SD.open(SDCardLogFileName, FILE_WRITE, true);
-        if (!file)
-            return false;
-
-        file.close();
-    }
-
-    SDCardLogPath = SDCardLogFileName;
-    logToSDCard = true;
-    sdCardLoggingLevel = loggingLevel;
-    return true;
 }
 
 bool Log::enableFlashLogging(const String& flashLogFileName, const uint8_t loggingLevel)
@@ -60,11 +40,6 @@ bool Log::enableFlashLogging(const String& flashLogFileName, const uint8_t loggi
 void Log::stopSerialLogging()
 {
     logToSerial = false;
-}
-
-void Log::stopSDCardLogging()
-{
-    logToSDCard = false;
 }
 
 void Log::stopFlashLogging()
@@ -134,8 +109,6 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
 
     if (logToFlash && level >= flashLoggingLevel)
         appendRawMsgToFileOnFlash(timestampMs, level, msg);
-    if (logToSDCard && level >= sdCardLoggingLevel)
-        appendRawMsgToFileOnSDCard(timestampMs, level, msg);
 }
 
 
@@ -152,13 +125,6 @@ void Log::write(const uint8_t* buffer, const size_t size) const
     if (logToFlash)
     {
         File file = SPIFFS.open(flashLogPath, FILE_APPEND);
-        file.write(buffer, size);
-        file.close();
-    }
-
-    if (logToSDCard)
-    {
-        File file = SD.open(SDCardLogPath, FILE_APPEND);
         file.write(buffer, size);
         file.close();
     }
@@ -182,11 +148,6 @@ void Log::appendRawMsgToFile(FS& fs, const String& path, const uint64_t timestam
     file.write(reinterpret_cast<const uint8_t*>(text.c_str()), len);
 
     file.close();
-}
-
-void Log::appendRawMsgToFileOnSDCard(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
-{
-    appendRawMsgToFile(SD, SDCardLogPath, timestamp, loggingLevel, text);
 }
 
 void Log::appendRawMsgToFileOnFlash(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
