@@ -110,21 +110,13 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    // Extract RFID array and write to file
-    JsonArray rfids = doc["rfids"];
-    if (rfids.isNull())
-    {
-        fileLog.errorln("JSON does not contain 'rfids' array");
-        file.close();
-        StorageManager::removeTmpRFIDs();
-        return false;
-    }
+    const JsonArray rfids = doc.as<JsonArray>();
 
     fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
     for (const JsonVariant rfidVariant : rfids)
     {
-        const uint32_t rfid = rfidVariant.as<uint32_t>();
-        file.write(reinterpret_cast<const uint8_t*>(&rfid), 4);
+        const auto rfid = rfidVariant.as<uint32_t>();
+        file.write(reinterpret_cast<const uint8_t*>(&rfid), sizeof(rfid));
     }
 
     file.close();
