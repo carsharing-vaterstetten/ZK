@@ -40,13 +40,15 @@ public:
                    const String& username = "", const String& password = "");
 
     // Constructor for invalid/null stream
-    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false) {}
+    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false)
+    {
+    }
 
-    ~DownloadStream()
+    ~DownloadStream() override
     {
         if (isValid)
         {
-            stop();
+            HttpClient::stop();
             WatchdogHandler::revertTemporaryIncrease();
         }
     }
