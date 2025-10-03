@@ -20,6 +20,50 @@ bool Modem::isInit = false;
 uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
+// DownloadStream constructor implementation
+DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+                               const String& username, const String& password)
+    : HttpClient(gsmClient, server, port), isValid(false)
+{
+    fileLog.infoln("Opening stream to " + remotePath);
+
+    beginRequest();
+    const int err = get(remotePath);
+
+    if (err != 0)
+    {
+        fileLog.errorln("Error " + String(err) + ". Stream open canceled");
+        return;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        sendBasicAuth(username, password);
+
+    endRequest();
+
+    const int status = responseStatusCode();
+    skipResponseHeaders();
+
+    fileLog.infoln("Response status: " + String(status));
+
+    if (status != 200)
+    {
+        fileLog.errorln("Unexpected status (see above). Stream open canceled");
+        return;
+    }
+
+    const size_t totalLen = contentLength();
+    fileLog.infoln("Content length: " + String(totalLen) + " B");
+
+    if (Modem::increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
+    {
+        fileLog.errorln("Failed to increase TWDT timeout. Stream open canceled");
+        return;
+    }
+
+    isValid = true;
+}
+
 void Modem::powerOn()
 {
     pinMode(PWR_PIN, OUTPUT);
@@ -386,57 +430,30 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
                                    unsigned long* downloadEndMs)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
-    HttpClient downloadHttp{*gsmClient, config.server, config.port};
+    DownloadStream downloadStream{remotePath, *gsmClient, config.server, config.port, username, password};
 
-    downloadHttp.beginRequest();
-    const int err = downloadHttp.get(remotePath);
-
-    if (err != 0)
+    if (!downloadStream)
     {
-        fileLog.errorln("Error " + String(err) + ". Download canceled");
+        fileLog.errorln("Failed to open stream for download");
         f.close();
-        return DownloadResult::HTTP_REQUEST_ERROR;
-    }
-
-    if (!username.isEmpty() && !password.isEmpty())
-        downloadHttp.sendBasicAuth(username, password);
-
-    downloadHttp.endRequest();
-
-    const int status = downloadHttp.responseStatusCode();
-    downloadHttp.skipResponseHeaders();
-
-    fileLog.infoln("Response status: " + String(status));
-
-    if (status != 200)
-    {
-        fileLog.errorln("Unexpected status (see above). Download canceled");
-        f.close();
-        return DownloadResult::UNEXPECTED_STATUS_CODE;
+        return DownloadResult::FAILED_TO_OPEN_STREAM;
     }
 
     uint8_t buf[bufferSize];
 
-    const size_t totalLen = downloadHttp.contentLength();
+    const size_t totalLen = downloadStream.contentLength();
     size_t downloaded = 0;
     size_t nextPrint = totalLen / 10;
 
     fileLog.infoln("Downloading " + String(totalLen) + " B");
 
-    if (increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
-    {
-        f.close();
-        fileLog.errorln("Failed to increase TWDT timeout. Download aborted");
-        return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
-    }
-
     if (downloadStartMs) *downloadStartMs = millis();
 
-    while (downloadHttp.connected() || downloadHttp.available())
+    while (downloadStream.connected() || downloadStream.available())
     {
-        while (downloadHttp.available())
+        while (downloadStream.available())
         {
-            const size_t len = downloadHttp.readBytes(buf, bufferSize);
+            const size_t len = downloadStream.readBytes(buf, bufferSize);
             f.write(buf, len);
             downloaded += len;
 
@@ -451,8 +468,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
     if (downloadEndMs) *downloadEndMs = millis();
 
     f.close();
-
-    WatchdogHandler::revertTemporaryIncrease();
 
     fileLog.infoln("Download complete");
 

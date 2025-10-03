@@ -28,9 +28,7 @@ bool FirmwareUpdater::downloadAndPerformUpdate()
 
     switch (downloadResult)
     {
-    case DownloadResult::HTTP_REQUEST_ERROR:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
-    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+    case DownloadResult::FAILED_TO_OPEN_STREAM:
         return false;
     case DownloadResult::SUCCESS:
         break;
