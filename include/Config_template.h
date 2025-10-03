@@ -25,8 +25,8 @@
 #define PWR_PIN 4
 
 // Car key pins
-#define OPEN_KEY 21
-#define CLOSE_KEY 22
+#define OPEN_KEY 15
+#define CLOSE_KEY 14
 
 // NFC modul Pins
 #define NFC_MOSI 23
