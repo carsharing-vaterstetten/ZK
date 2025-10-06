@@ -3,9 +3,10 @@
 #include <Arduino.h>
 
 #define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
-#include <TinyGsmClientSIM7000.h>
+#include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 #include "WatchdogHandler.h"
