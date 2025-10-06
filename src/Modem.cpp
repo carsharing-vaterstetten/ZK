@@ -23,6 +23,10 @@ uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 void Modem::powerOn()
 {
     pinMode(PWR_PIN, OUTPUT);
+    pinMode(POWER_PIN, OUTPUT);
+
+    digitalWrite(POWER_PIN, HIGH);
+
     digitalWrite(PWR_PIN, LOW);
     delay(1000);
     digitalWrite(PWR_PIN, HIGH);
