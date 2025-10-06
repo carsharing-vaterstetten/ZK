@@ -6,7 +6,6 @@
 
 class StorageManager
 {
-    static bool eepromIsMounted;
     static bool sspiffsIsMounted;
 
 public:
@@ -17,12 +16,7 @@ public:
     StorageManager() = delete; // Prevent instantiation
 
     static void setFS(FS& logFile, FS& rfids, FS& firmware);
-    static bool mountEEPROM();
     static bool mountSSPIFFS();
-
-    static void saveConfigToEEPROM(Config& c);
-    static bool loadConfigFromEEPROM(Config& c);
-    static void resetEEPROM();
 
     static File openLog(const char* mode, const bool create = false)
     {

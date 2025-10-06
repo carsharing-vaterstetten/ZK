@@ -1,15 +1,10 @@
 #include "StorageManager.h"
 
-#include <EEPROM.h>
 #include <SPIFFS.h>
 
-#include "Config.h"
 #include "Globals.h"
 #include "HardwareManager.h"
 #include "Intern.h"
-
-bool StorageManager::eepromIsMounted = false;
-bool StorageManager::sspiffsIsMounted = false;
 
 FS* StorageManager::logFileFs = nullptr;
 FS* StorageManager::rfidsFs = nullptr;
@@ -22,44 +17,11 @@ void StorageManager::setFS(FS& logFile, FS& rfids, FS& firmware)
     firmwareFs = &firmware;
 }
 
-bool StorageManager::mountEEPROM()
-{
-    if (eepromIsMounted) return true;
-    eepromIsMounted = EEPROM.begin(sizeof(Config));
-    return eepromIsMounted;
-}
-
 bool StorageManager::mountSSPIFFS()
 {
     if (sspiffsIsMounted) return true;
     sspiffsIsMounted = SPIFFS.begin(true);
     return sspiffsIsMounted;
-}
-
-void StorageManager::saveConfigToEEPROM(Config& c)
-{
-    c.version = CONFIG_VERSION;
-    fileLog.infoln("Saving config to EEPROM");
-    EEPROM.put(CONFIG_START_ADDRESS, c);
-    const bool commitSuccess = EEPROM.commit();
-    fileLog.logInfoOrErrorln(commitSuccess, "Commiting config to EEPROM succeeded",
-                             "Commiting config to EEPROM failed");
-}
-
-bool StorageManager::loadConfigFromEEPROM(Config& c)
-{
-    EEPROM.get(CONFIG_START_ADDRESS, c);
-    return c.version == CONFIG_VERSION;
-}
-
-// Funktion zum Zurücksetzen des EEPROM
-void StorageManager::resetEEPROM()
-{
-    Config emptyConfig{};
-    emptyConfig.version = 0xFF;
-    EEPROM.put(CONFIG_START_ADDRESS, emptyConfig);
-    EEPROM.commit();
-    fileLog.infoln("EEPROM has been reset");
 }
 
 bool StorageManager::remove(FS& fs, const String& path, const bool notExistingOk)

@@ -94,17 +94,17 @@ int espLogHandler(const char* fmt, const va_list args)
 
 void loadConfig()
 {
-#if OVERRIDE_CONFIG
-    serialOnlyLog.infoln("Using compiled config");
+#if USE_DEFAULT_CONFIG
+    serialOnlyLog.infoln("Using default config");
 #else
-    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
 
-    if (!configLoadedSuccess)
+    if (const auto loadedConfig = LocalConfig::fromStorage(); !loadedConfig)
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        HelperUtils::requestConfig(config);
+        config = HelperUtils::requestConfig();
+        const bool configSaveSuccess = config.save();
+        fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
         WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
-        StorageManager::saveConfigToEEPROM(config);
     }
 #endif
 }
@@ -130,16 +130,13 @@ void setup()
     const bool flashInitSuccess = StorageManager::mountSSPIFFS();
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
-    const bool eepromInitSuccess = StorageManager::mountEEPROM();
-    serialOnlyLog.logInfoOrCriticalErrorln(eepromInitSuccess, "EEPROM initialized successfully",
-                                           "EEPROM initialization failed");
+
     loadConfig(); // Config is now needed because it contains information whether the SD-Card should be used
-    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
     enableFileLogging();
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
-    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
+    fileLog.infoln("Loaded config: " + config.toString());
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
     StorageManager::logFilesystemsInformation();

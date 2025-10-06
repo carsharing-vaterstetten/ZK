@@ -1,7 +1,6 @@
 #include "Globals.h"
 
 #include "Config.h"
-#include "Intern.h"
 
 Log serialOnlyLog{};
 Log fileLog{};
@@ -10,6 +9,9 @@ String efuseMacHex = "";
 LED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
 bool isLoggedIn = false;
 uint32_t loggedInRFID = 0;
-#if !OVERRIDE_CONFIG
-Config config;
-#endif
+LocalConfig config{
+    DEFAULT_CONFIG_APN,
+    DEFAULT_CONFIG_SERVER,
+    DEFAULT_CONFIG_PORT,
+    DEFAULT_CONFIG_PASSWORD
+};

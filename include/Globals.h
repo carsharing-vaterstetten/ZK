@@ -2,6 +2,7 @@
 
 #include "Intern.h"
 #include "LED.h"
+#include "LocalConfig.h"
 #include "Log.h"
 
 extern Log serialOnlyLog;
@@ -11,15 +12,4 @@ extern String efuseMacHex;
 extern LED statusLed;
 extern bool isLoggedIn;
 extern uint32_t loggedInRFID;
-
-#if OVERRIDE_CONFIG
-constexpr Config config {
-    CONFIG_VERSION,
-    OVERRIDE_CONFIG_APN,
-     OVERRIDE_CONFIG_SERVER,
-     OVERRIDE_CONFIG_PORT,
-     OVERRIDE_CONFIG_PASSWORD,
-};
-#else
-extern Config config;
-#endif
+extern LocalConfig config;

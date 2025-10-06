@@ -107,7 +107,7 @@ bool Modem::init(const uint8_t retries)
 
 
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn.c_str());
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
         if (!gsmModem->isGprsConnected())

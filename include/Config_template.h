@@ -49,11 +49,9 @@
 #define CONNECTION_SPEED_TEST_FILE_SIZE (16U * 1024U) // Smaller files result in less accurate connection speed estimates
 
 // Config override
-#define OVERRIDE_CONFIG false // Useful for development or mass deployment
-#if OVERRIDE_CONFIG
-#define OVERRIDE_CONFIG_VERSION 2
-#define OVERRIDE_CONFIG_APN ""
-#define OVERRIDE_CONFIG_SERVER ""
-#define OVERRIDE_CONFIG_PORT 80
-#define OVERRIDE_CONFIG_PASSWORD ""
-#endif
+#define USE_DEFAULT_CONFIG false // Useful for development or mass deployment
+// Default config values are used when no config was previously set and before the user entered a config. Or when USE_DEFAULT_CONFIG is true
+#define DEFAULT_CONFIG_APN ""
+#define DEFAULT_CONFIG_SERVER ""
+#define DEFAULT_CONFIG_PORT 80
+#define DEFAULT_CONFIG_PASSWORD ""
