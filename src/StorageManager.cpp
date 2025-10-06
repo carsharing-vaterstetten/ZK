@@ -6,6 +6,8 @@
 #include "HardwareManager.h"
 #include "Intern.h"
 
+bool StorageManager::sspiffsIsMounted = false;
+
 FS* StorageManager::logFileFs = nullptr;
 FS* StorageManager::rfidsFs = nullptr;
 FS* StorageManager::firmwareFs = nullptr;
