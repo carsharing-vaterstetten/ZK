@@ -554,7 +554,7 @@ void Modem::performConnectionSpeedTest()
     }
     else
     {
-        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed));
+        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed) + " B/s");
     }
 #endif
 }
