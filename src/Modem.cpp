@@ -103,15 +103,47 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem connected to serial");
 
-        const bool modemInitSuccess = gsmModem->init();
+        const bool modemInitSuccess = gsmModem->init(config.simPin.c_str());
         fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
                                    "There was an error while initializing the modem");
 
         fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
+        const SimStatus simStatus = gsmModem->getSimStatus();
+        const String msg = "Sim status: " + HelperUtils::simStatusToString(simStatus);
+        fileLog.logInfoOrWarningln(simStatus == SIM_READY, msg, msg);
+
+        switch (simStatus)
+        {
+        case SIM_READY: break;
+        case SIM_LOCKED:
+            {
+                const bool unlockSuccess = gsmModem->simUnlock(config.simPin.c_str());
+                fileLog.logInfoOrWarningln(unlockSuccess,
+                                           "Sim unlocked successfully", "Attempt no. " + String(attempt + 1) + " of " +
+                                           String(retries + 1) + " failed because the SIM is not ready. Retrying...");
+                if (unlockSuccess) break;
+
+                powerOff();
+                continue;
+            }
+        case SIM_ERROR:
+            fileLog.errorln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the SIM card has an unknown status. Retrying...");
+            powerOff();
+            continue;
+        case SIM_ANTITHEFT_LOCKED:
+            {
+                fileLog.errorln("The SIM card is antitheft locked");
+                powerOff();
+                return false;
+            }
+        }
 
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem->gprsConnect(config.apn.c_str());
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
+                                                       config.gprsPassword.c_str());
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
         if (!gsmModem->isGprsConnected())
@@ -196,7 +228,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FILE_IS_EMPTY;
     }
 
-    HttpClient uploadHttp{*gsmClient, config.server, config.port};
+    HttpClient uploadHttp{*gsmClient, config.server, config.serverPort};
 
     uploadHttp.beginRequest();
 
@@ -216,7 +248,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
 
-    uploadHttp.sendBasicAuth(efuseMacHex, config.password);
+    uploadHttp.sendBasicAuth(efuseMacHex, config.serverPassword);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
     uploadHttp.sendHeader("Content-Length", String(fileSize));
     uploadHttp.beginBody();
@@ -375,7 +407,7 @@ endLoop:;
 int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String& username,
                      const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.port};
+    HttpClient http{*gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
@@ -404,7 +436,7 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const size_t size, const String& username,
                         const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.port};
+    HttpClient http{*gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
@@ -434,7 +466,7 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
                                    unsigned long* downloadEndMs)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
-    DownloadStream downloadStream{remotePath, *gsmClient, config.server, config.port, username, password};
+    DownloadStream downloadStream{remotePath, *gsmClient, config.server, config.serverPort, username, password};
 
     if (!downloadStream)
     {
@@ -518,7 +550,7 @@ void Modem::performConnectionSpeedTest()
     unsigned long downloadStart, downloadEnd;
     const DownloadResult downloadResult = downloadFile(
         DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, efuseMacHex,
-        config.password, 512, &downloadStart, &downloadEnd);
+        config.serverPassword, 512, &downloadStart, &downloadEnd);
     df.close();
 
     df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);

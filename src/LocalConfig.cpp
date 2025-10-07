@@ -8,9 +8,12 @@ bool LocalConfig::save() const
     if (!prefs.begin(prefsName, false)) return false;
 
     prefs.putString(apnKey, apn);
+    prefs.putString(gprsUserKey, gprsUser);
+    prefs.putString(gprsPasswordKey, gprsPassword);
     prefs.putString(serverKey, server);
-    prefs.putUShort(portKey, port);
-    prefs.putString(passwordKey, password);
+    prefs.putUShort(serverPortKey, serverPort);
+    prefs.putString(serverPasswordKey, serverPassword);
+    prefs.putString(simPinKey, simPin);
 
     prefs.end();
 
@@ -23,13 +26,16 @@ String LocalConfig::toString(const bool withVersion) const
 
     if (withVersion)
     {
-        str += "Version: " + String(CONFIG_VERSION) + " ";
+        str += "Version: " CONFIG_VERSION " ";
     }
 
     str += String(apnKey) + "=" + apn + ";";
+    str += String(gprsUserKey) + "=" + gprsUser + ";";
+    str += String(gprsPasswordKey) + "=" + gprsPassword + ";";
     str += String(serverKey) + "=" + server + ";";
-    str += String(portKey) + "=" + port + ";";
-    str += String(passwordKey) + "=" + password + ";";
+    str += String(serverPortKey) + "=" + serverPort + ";";
+    str += String(serverPasswordKey) + "=" + serverPassword + ";";
+    str += String(simPinKey) + "=" + simPin + ";";
 
     return str;
 }
@@ -46,9 +52,12 @@ std::optional<LocalConfig> LocalConfig::fromStorage()
 
     LocalConfig c{
         prefs.getString(apnKey).c_str(),
+        prefs.getString(gprsUserKey).c_str(),
+        prefs.getString(gprsPasswordKey).c_str(),
         prefs.getString(serverKey).c_str(),
-        prefs.getUShort(portKey),
-        prefs.getString(passwordKey).c_str()
+        prefs.getUShort(serverPortKey),
+        prefs.getString(serverPasswordKey).c_str(),
+        prefs.getString(simPinKey).c_str()
     };
 
     prefs.end();

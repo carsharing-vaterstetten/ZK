@@ -1,6 +1,7 @@
 #pragma once
 
 #include <FS.h>
+#include "Modem.h"
 
 #define STR_HELPER(s) #s
 #define STR(s) STR_HELPER(s)
@@ -22,4 +23,5 @@ public:
     static bool updateSystemTimeWithModem();
     static uint64_t systemTimeMillisecondsSinceEpoche();
     static bool isSuccessfulResponse(int statusCode);
+    static String simStatusToString(SimStatus status);
 };

@@ -131,7 +131,6 @@ void setup()
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
-    loadConfig(); // Config is now needed because it contains information whether the SD-Card should be used
     enableFileLogging();
 
     // Logging to files is now possible
@@ -155,6 +154,7 @@ void setup()
 
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
+    loadConfig(); // We need the config for the Modem
     Modem::init();
     HelperUtils::updateSystemTimeWithModem();
     fileLog.infoln(

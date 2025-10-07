@@ -49,7 +49,7 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
     uint8_t remoteMd5Hash[hashLen];
     const int statusCode = Modem::simpleGetBin(
-        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, efuseMacHex, config.password);
+        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, efuseMacHex, config.serverPassword);
 
     if (statusCode != 200)
     {
@@ -86,7 +86,7 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file, efuseMacHex, config.password);
+    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file, efuseMacHex, config.serverPassword);
 
     switch (downloadResult)
     {

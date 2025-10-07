@@ -13,8 +13,8 @@ std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputStr
 {
     int start = 0;
 
-    std::optional<String> apn = std::nullopt, server = std::nullopt, password = std::nullopt;
-    std::optional<uint16_t> port = std::nullopt;
+    std::optional<String> apn, gprsUser, gprsPassword, server, serverPassword, simPin;
+    std::optional<uint16_t> serverPort;
 
     while (start < inputString.length())
     {
@@ -51,30 +51,42 @@ std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputStr
 
         if (key == LocalConfig::apnKey)
             apn = value;
+        else if (key == LocalConfig::gprsUserKey)
+            gprsUser = value;
+        else if (key == LocalConfig::gprsPasswordKey)
+            gprsPassword = value;
         else if (key == LocalConfig::serverKey)
             server = value;
-        else if (key == LocalConfig::portKey)
-            port = value.toInt();
-        else if (key == LocalConfig::passwordKey)
-            password = value;
+        else if (key == LocalConfig::serverPortKey)
+            serverPort = value.toInt();
+        else if (key == LocalConfig::serverPasswordKey)
+            serverPassword = value;
+        else if (key == LocalConfig::simPinKey)
+            simPin = value;
         else
             fileLog.warningln("Unknown config key: '" + key + "'");
 
         start = end + 1;
     }
 
-    if (!apn || !server || !port || !password) return std::nullopt;
+    if (!apn || !server || !serverPort || !serverPassword || !gprsUser || !gprsPassword || !simPin) return std::nullopt;
 
-    return LocalConfig{apn.value(), server.value(), port.value(), password.value()};
+    return LocalConfig{
+        apn.value(), gprsUser.value(), gprsPassword.value(), server.value(), serverPort.value(), serverPassword.value(),
+        simPin.value()
+    };
 }
 
 LocalConfig HelperUtils::requestConfig()
 {
     const LocalConfig exampleConfig{
         "iot.1nce.net",
+        "hans",
+        "PWD",
         "example.com",
         80,
-        "XXX"
+        "XXX",
+        "1234"
     };
     const String exampleConfigFormat = exampleConfig.toString(false);
 
@@ -197,4 +209,21 @@ uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
 bool HelperUtils::isSuccessfulResponse(const int statusCode)
 {
     return statusCode < 300 && statusCode >= 200;
+}
+
+String HelperUtils::simStatusToString(const SimStatus status)
+{
+    switch (status)
+    {
+    case SIM_ERROR:
+        return "ERROR";
+    case SIM_READY:
+        return "READY";
+    case SIM_LOCKED:
+        return "LOCKED";
+    case SIM_ANTITHEFT_LOCKED:
+        return "ANTITHEFT LOCKED";
+    }
+
+    return "UNKNOWN";
 }
