@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-
 #define FIRMWARE_VERSION "1.0.0"
 
 // Local paths
