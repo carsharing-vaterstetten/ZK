@@ -120,4 +120,9 @@ public:
     {
         return timeSynced;
     }
+
+    static String getIMEI()
+    {
+        return gsmModem->getIMEI();
+    }
 };

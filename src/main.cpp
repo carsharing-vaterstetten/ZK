@@ -147,11 +147,6 @@ void setup()
     // First we start the LED to communicate the system status
     statusLed.init();
 
-    // We need the efuseMac for communicating with the server therefore it is needed before we do anything with the modem
-    efuseMac = ESP.getEfuseMac();
-    efuseMacHex = String(efuseMac, 16);
-    fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
-
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     loadConfig(); // We need the config for the Modem
@@ -161,6 +156,10 @@ void setup()
         ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
             HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
     calculateNextRestartTime();
+
+    // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
+    modemIMEI = Modem::getIMEI();
+    fileLog.infoln("Modem IMEI: " + modemIMEI);
 
     // Do the connection speed test before any up-/downloads
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST

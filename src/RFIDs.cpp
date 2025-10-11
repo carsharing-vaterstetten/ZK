@@ -50,7 +50,7 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
     uint8_t remoteMd5Hash[hashLen];
     const int statusCode = Modem::simpleGetBin(
-        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, efuseMacHex, config.serverPassword);
+        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, modemIMEI, config.serverPassword);
 
     if (statusCode != 200)
     {
@@ -80,7 +80,7 @@ bool RFIDs::downloadRfids()
     fileLog.infoln("Downloading remote RFIDs JSON");
 
     // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
-    DownloadStream http{REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, efuseMacHex, config.serverPassword};
+    DownloadStream http{REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword};
 
     if (!http)
     {

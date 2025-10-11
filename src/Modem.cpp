@@ -88,8 +88,14 @@ bool Modem::init(const uint8_t retries)
 {
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
+        if (gsmClient != nullptr)
+        {
+            gsmClient->stop();
+            powerOff();
+            delete gsmClient;
+        }
+
         delete gsmModem;
-        delete gsmClient;
 
         gsmModem = new TinyGsmSim7000{SERIAL_AT};
         gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
@@ -124,19 +130,16 @@ bool Modem::init(const uint8_t retries)
                                            String(retries + 1) + " failed because the SIM is not ready. Retrying...");
                 if (unlockSuccess) break;
 
-                powerOff();
                 continue;
             }
         case SIM_ERROR:
             fileLog.errorln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the SIM card has an unknown status. Retrying...");
-            powerOff();
             continue;
         case SIM_ANTITHEFT_LOCKED:
             {
                 fileLog.errorln("The SIM card is antitheft locked");
-                powerOff();
                 return false;
             }
         }
@@ -151,7 +154,6 @@ bool Modem::init(const uint8_t retries)
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the GPRS failed to connect. Retrying...");
-            powerOff();
             continue;
         }
 
@@ -165,7 +167,6 @@ bool Modem::init(const uint8_t retries)
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the network is not connected. Retrying...");
-            powerOff();
             continue;
         }
 
@@ -177,7 +178,7 @@ bool Modem::init(const uint8_t retries)
             int year;
             gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
             if (year < 2070 && year >= 2025) break;
-            fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+            serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
         }
         timeSynced = syncAttempt < maxNetTimeSyncAttempts;
         HelperUtils::updateSystemTimeWithModem();
@@ -188,7 +189,6 @@ bool Modem::init(const uint8_t retries)
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the the modem could not synchronise time. Retrying...");
-            powerOff();
             continue;
         }
 
@@ -249,7 +249,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
 
-    uploadHttp.sendBasicAuth(efuseMacHex, config.serverPassword);
+    uploadHttp.sendBasicAuth(modemIMEI, config.serverPassword);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
     uploadHttp.sendHeader("Content-Length", String(fileSize));
     uploadHttp.beginBody();
@@ -550,7 +550,7 @@ void Modem::performConnectionSpeedTest()
 
     unsigned long downloadStart, downloadEnd;
     const DownloadResult downloadResult = downloadFile(
-        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, efuseMacHex,
+        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, modemIMEI,
         config.serverPassword, 512, &downloadStart, &downloadEnd);
     df.close();
 
