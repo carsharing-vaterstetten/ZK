@@ -2,6 +2,7 @@
 
 #include <FS.h>
 #include "mbedtls/md5.h"
+#include <ArduinoJson.h>
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
@@ -76,8 +77,18 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
 bool RFIDs::downloadRfids()
 {
-    fileLog.infoln("Downloading remote RFIDs file");
+    fileLog.infoln("Downloading remote RFIDs JSON");
 
+    // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
+    DownloadStream http{REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, efuseMacHex, config.serverPassword};
+
+    if (!http)
+    {
+        fileLog.errorln("Failed to open stream for RFIDs download");
+        return false;
+    }
+
+    // Open temp file for writing
     File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
 
     if (!file)
@@ -86,19 +97,31 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file, efuseMacHex, config.serverPassword);
+    // Parse JSON from stream
+    fileLog.infoln("Parsing JSON stream");
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc, http);
 
-    switch (downloadResult)
+    if (error)
     {
-    case DownloadResult::FAILED_TO_OPEN_STREAM:
-        fileLog.errorln("RFIDs file download failed");
+        fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
+        file.close();
         StorageManager::removeTmpRFIDs();
         return false;
-    case DownloadResult::SUCCESS:
-        break;
     }
 
-    fileLog.infoln("Successfully downloaded RFIDs file");
+    const JsonArray rfids = doc.as<JsonArray>();
+
+    fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
+    for (const JsonVariant rfidVariant : rfids)
+    {
+        const auto rfid = rfidVariant.as<uint32_t>();
+        file.write(reinterpret_cast<const uint8_t*>(&rfid), sizeof(rfid));
+    }
+
+    file.close();
+
+    fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
     const bool removeOldSuccess = StorageManager::removeRFIDs();
     fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
