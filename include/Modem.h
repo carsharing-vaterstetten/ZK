@@ -68,6 +68,9 @@ class Modem
     static uint32_t estimatedDownloadSpeed;
     static uint32_t estimatedUploadSpeed;
 
+    static bool isInit, timeSynced;
+    static TinyGsmSim7000* gsmModem;
+
 public:
     static TinyGsmSim7000::GsmClientSim7000* gsmClient;
 
@@ -113,7 +116,8 @@ public:
         return isInit;
     }
 
-private:
-    static bool isInit;
-    static TinyGsmSim7000* gsmModem;
+    static bool timeIsAvailable()
+    {
+        return timeSynced;
+    }
 };

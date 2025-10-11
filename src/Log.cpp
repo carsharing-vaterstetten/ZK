@@ -66,93 +66,66 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
     // = millis() if modem is not initialized
     const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
 
-    char timeStr[HelperUtils::dateTimeStrLength]; // For human-readable time
+    if (logToSerial && level >= serialLoggingLevel)
+        appendMsgToSerial(timestampMs, level, msg);
 
-    if (Modem::isInitialized())
+    if (logToFlash && level >= flashLoggingLevel)
+        appendMsgToFile(timestampMs, level, msg);
+}
+
+void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
+{
+    Serial.print("[");
+    Serial.print(HelperUtils::millisToIsoString(timestamp));
+    Serial.print("][");
+#if COLORIZE_SERIAL_LOGGING
+    Serial.print(getLoggingLevelColor(loggingLevel));
+#endif
+    Serial.print(getLoggingLevelChar(loggingLevel));
+#if COLORIZE_SERIAL_LOGGING
+    Serial.print(COLOR_RESET);
+#endif
+    Serial.print("]");
+
+    if (serialLoggingName.isEmpty())
     {
-        int year, month, day, hour, minute, second;
-        float timezone;
-        Modem::getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
-        HelperUtils::dateTimeToString(timeStr, year, month, day, hour, minute, second);
+        Serial.print(" ");
     }
     else
     {
-        sniprintf(timeStr, sizeof(timeStr), "%lu", millis());
+        Serial.print("[");
+        Serial.print(serialLoggingName);
+        Serial.print("] ");
     }
 
+#if COLORIZE_SERIAL_LOGGING
+    if (loggingLevel >= LOGGING_LEVEL_ERROR)
+        Serial.print(BACKGROUND_COLOR_RED);
+#endif
 
-    if (logToSerial && level >= serialLoggingLevel)
-    {
-        Serial.printf("[%s][%s%s%s]%s%s\n",
-                      timeStr,
-#if COLORIZE_SERIAL_LOGGING
-                      getLoggingLevelColor(level).c_str(),
-#else
-                      "",
-#endif
-                      getLoggingLevelChar(level).c_str(),
-#if COLORIZE_SERIAL_LOGGING
-                      COLOR_RESET,
-#else
-                      "",
-#endif
-                      serialLoggingName.isEmpty() ? " " : ("[" + serialLoggingName + "] ").c_str(),
-#if COLORIZE_SERIAL_LOGGING
-                      (level >= LOGGING_LEVEL_ERROR)
-                          ? (BACKGROUND_COLOR_RED + msg + COLOR_RESET).c_str()
-                          : msg.c_str()
-#else
-                      msg.c_str()
-#endif
-        );
-    }
+    Serial.print(text);
 
-    if (logToFlash && level >= flashLoggingLevel)
-        appendRawMsgToFileOnFlash(timestampMs, level, msg);
+#if COLORIZE_SERIAL_LOGGING
+    if (loggingLevel >= LOGGING_LEVEL_ERROR)
+        Serial.print(COLOR_RESET);
+#endif
+
+    Serial.println();
 }
 
-
-/// Does not add any time and level information
-void Log::write(const uint8_t* buffer, const size_t size) const
+void Log::appendMsgToFile(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
 {
-    if (!buffer || size == 0) return;
-
-    if (logToSerial)
-    {
-        Serial.write(buffer, size);
-    }
-
-    if (logToFlash)
-    {
-        File file = SPIFFS.open(flashLogPath, FILE_APPEND);
-        file.write(buffer, size);
-        file.close();
-    }
-}
-
-void Log::appendRawMsgToFile(FS& fs, const String& path, const uint64_t timestamp, const uint8_t loggingLevel,
-                             const String& text)
-{
-    File file = fs.open(path, FILE_APPEND);
+    File file = SPIFFS.open(flashLogPath, FILE_APPEND);
     if (!file) return;
 
-    // Write 8-byte timestamp
-    file.write(reinterpret_cast<const uint8_t*>(&timestamp), sizeof(timestamp));
-
-    // Write 1-byte logging level
-    file.write(&loggingLevel, sizeof(loggingLevel));
-
-    // Write string length + data
-    const uint16_t len = text.length();
-    file.write(reinterpret_cast<const uint8_t*>(&len), sizeof(len));
-    file.write(reinterpret_cast<const uint8_t*>(text.c_str()), len);
+    file.print("[");
+    file.print(HelperUtils::millisToIsoString(timestamp));
+    file.print("][");
+    file.print(getLoggingLevelChar(loggingLevel));
+    file.print("] ");
+    file.println(text);
 
     file.close();
-}
-
-void Log::appendRawMsgToFileOnFlash(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
-{
-    appendRawMsgToFile(SPIFFS, flashLogPath, timestamp, loggingLevel, text);
 }
 
 String Log::getLoggingLevelChar(const uint8_t level)

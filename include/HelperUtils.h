@@ -24,4 +24,5 @@ public:
     static uint64_t systemTimeMillisecondsSinceEpoche();
     static bool isSuccessfulResponse(int statusCode);
     static String simStatusToString(SimStatus status);
+    static String millisToIsoString(uint64_t ms);
 };

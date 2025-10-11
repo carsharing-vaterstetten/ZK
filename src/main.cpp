@@ -156,9 +156,8 @@ void setup()
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     loadConfig(); // We need the config for the Modem
     Modem::init();
-    HelperUtils::updateSystemTimeWithModem();
     fileLog.infoln(
-        "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
+        "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
         ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
             HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
     calculateNextRestartTime();

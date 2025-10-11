@@ -4,6 +4,7 @@
 #include "Globals.h"
 #include "mbedtls/md5.h"
 #include <FS.h>
+#include <iomanip>
 
 #include "Modem.h"
 #include "LocalConfig.h"
@@ -188,7 +189,7 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
 
 bool HelperUtils::updateSystemTimeWithModem()
 {
-    if (!Modem::isInitialized())
+    if (!Modem::timeIsAvailable())
         return false;
 
     const time_t seconds = Modem::getUnixTimestamp();
@@ -226,4 +227,18 @@ String HelperUtils::simStatusToString(const SimStatus status)
     }
 
     return "UNKNOWN";
+}
+
+String HelperUtils::millisToIsoString(const uint64_t ms) {
+    const auto seconds = static_cast<time_t>(ms / 1000ULL); // convert to seconds
+    tm timeinfo{};
+    gmtime_r(&seconds, &timeinfo); // use UTC time
+
+    char buf[30];
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+
+    // Add milliseconds
+    char result[40];
+    snprintf(result, sizeof(result), "%s.%03uZ", buf, static_cast<unsigned>(ms % 1000));
+    return {result};
 }

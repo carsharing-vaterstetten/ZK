@@ -19,7 +19,7 @@ public:
     void stopFlashLogging();
 
     void logMsgln(const String& msg, uint8_t level) const;
-    void write(const uint8_t* buffer, size_t size) const;
+    void appendMsgToSerial(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
 
     void debugln(const String& msg) const
     {
@@ -72,9 +72,7 @@ private:
     uint8_t serialLoggingLevel = LOGGING_LEVEL_DEBUG;
     uint8_t flashLoggingLevel = LOGGING_LEVEL_DEBUG;
 
-    void appendRawMsgToFileOnFlash(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
-    static void appendRawMsgToFile(FS& fs, const String& path, uint64_t timestamp, uint8_t loggingLevel,
-                                   const String& text);
+    void appendMsgToFile(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
 
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);

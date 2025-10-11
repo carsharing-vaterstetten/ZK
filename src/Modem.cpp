@@ -16,7 +16,7 @@
 
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
-bool Modem::isInit = false;
+bool Modem::isInit = false, Modem::timeSynced = false;
 uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
@@ -170,7 +170,7 @@ bool Modem::init(const uint8_t retries)
         }
 
         fileLog.infoln("Syncing time");
-        constexpr uint8_t maxNetTimeSyncAttempts = 10;
+        constexpr uint8_t maxNetTimeSyncAttempts = 20;
         uint8_t syncAttempt = 0;
         for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
         {
@@ -179,10 +179,11 @@ bool Modem::init(const uint8_t retries)
             if (year < 2070 && year >= 2025) break;
             fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
         }
-        const bool timeSyncSuccess = syncAttempt < maxNetTimeSyncAttempts;
-        fileLog.logInfoOrWarningln(timeSyncSuccess, "Time synced successfully", "Failed to sync time");
+        timeSynced = syncAttempt < maxNetTimeSyncAttempts;
+        HelperUtils::updateSystemTimeWithModem();
+        fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
 
-        if (!timeSyncSuccess)
+        if (!timeSynced)
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
