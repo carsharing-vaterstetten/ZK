@@ -55,7 +55,7 @@ RfidsChecksumResult RFIDs::compareChecksums()
     if (statusCode != 200)
     {
         fileLog.warningln("Unexpected status code " + String(statusCode));
-        return RfidsChecksumResult::ERROR;
+        return RfidsChecksumResult::UNEXPECTED_STATUS_CODE;
     }
 
     uint8_t fileMd5Hash[hashLen];
@@ -110,7 +110,7 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const JsonArray rfids = doc.as<JsonArray>();
+    const auto rfids = doc.as<JsonArray>();
 
     fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
     for (const JsonVariant rfidVariant : rfids)
@@ -141,10 +141,10 @@ void RFIDs::downloadRfidsIfChanged()
 {
     switch (compareChecksums())
     {
-    case RfidsChecksumResult::ERROR:
     case RfidsChecksumResult::FILES_ARE_EQUAL:
         break;
     case RfidsChecksumResult::FILES_DIFFER:
+    case RfidsChecksumResult::UNEXPECTED_STATUS_CODE:
     case RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST:
         downloadRfids();
         break;

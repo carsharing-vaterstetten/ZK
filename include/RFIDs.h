@@ -6,7 +6,7 @@ enum class RfidsChecksumResult
     FILES_ARE_EQUAL,
     FILES_DIFFER,
     LOCAL_FILE_DOES_NOT_EXIST,
-    ERROR,
+    UNEXPECTED_STATUS_CODE,
 };
 
 class RFIDs
