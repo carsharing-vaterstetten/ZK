@@ -95,7 +95,7 @@ int espLogHandler(const char* fmt, const va_list args)
 void loadConfig()
 {
 #if USE_DEFAULT_CONFIG
-    serialOnlyLog.infoln("Using default config");
+    fileLog.infoln("Using default config");
 #else
 
     if (const auto loadedConfig = LocalConfig::fromStorage(); !loadedConfig)
