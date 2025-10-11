@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Log.h"
-#include "Backend.h"
 
 // Serial debugging
 #define ENABLE_SERIAL_LOGGING false // Enable for serial printing
