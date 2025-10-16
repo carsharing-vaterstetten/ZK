@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <FS.h>
 
 #define LOGGING_LEVEL_DEBUG 0
 #define LOGGING_LEVEL_INFO 1

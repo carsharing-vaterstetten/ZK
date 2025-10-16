@@ -1,6 +1,6 @@
 #include "Log.h"
 
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 #include "Config.h"
 #include "HelperUtils.h"
@@ -23,10 +23,10 @@ void Log::enableSerialLogging(const uint8_t loggingLevel, const String& serialNa
 
 bool Log::enableFlashLogging(const String& flashLogFileName, const uint8_t loggingLevel)
 {
-    if (!SPIFFS.exists(flashLogFileName))
+    if (!LittleFS.exists(flashLogFileName))
     {
         // Let's ignore directories for now
-        File file = SPIFFS.open(flashLogFileName, FILE_WRITE, true);
+        File file = LittleFS.open(flashLogFileName, FILE_WRITE, true);
         if (!file) return false;
         file.close();
     }
@@ -115,7 +115,7 @@ void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel
 
 void Log::appendMsgToFile(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
 {
-    File file = SPIFFS.open(flashLogPath, FILE_APPEND);
+    File file = LittleFS.open(flashLogPath, FILE_APPEND);
     if (!file) return;
 
     file.print("[");

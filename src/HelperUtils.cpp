@@ -3,7 +3,6 @@
 #include "HelperUtils.h"
 #include "Globals.h"
 #include "mbedtls/md5.h"
-#include <FS.h>
 #include <iomanip>
 
 #include "Modem.h"

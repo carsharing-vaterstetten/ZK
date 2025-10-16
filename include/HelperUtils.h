@@ -1,6 +1,5 @@
 #pragma once
 
-#include <FS.h>
 #include "Modem.h"
 
 #define STR_HELPER(s) #s

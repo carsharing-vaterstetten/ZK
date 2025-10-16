@@ -1,6 +1,5 @@
 #include "RFIDs.h"
 
-#include <FS.h>
 #include "mbedtls/md5.h"
 #include <ArduinoJson.h>
 #include "Backend.h"
@@ -129,7 +128,7 @@ bool RFIDs::downloadRfids()
     fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
                                "Failed to remove old RFIDs file");
 
-    const bool renameSuccess = StorageManager::rfidsFs->rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
+    const bool renameSuccess = LittleFS.rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
 
     fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed RFIDs file",
                                "Failed to rename RFIDs file. RFIDs not updated");

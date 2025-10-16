@@ -5,7 +5,6 @@
 #include <LED.h>
 #include <esp32-hal.h>
 #include <esp_system.h>
-#include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Config.h"
@@ -74,15 +73,6 @@ void calculateNextRestartTime()
     fileLog.infoln("Next restart planed in " + String(targetMillis / 1000) + " seconds");
 }
 
-void enableFileLogging()
-{
-    StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS);
-
-    fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
-
-    fileLog.infoln("Now logging to file(s)");
-}
-
 int espLogHandler(const char* fmt, const va_list args)
 {
     char buf[256];
@@ -127,11 +117,12 @@ void setup()
     WatchdogHandler::subscribeTask();
 
     // Mount filesystems
-    const bool flashInitSuccess = StorageManager::mountSSPIFFS();
+    const bool flashInitSuccess = StorageManager::mountLittleFS();
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
-    enableFileLogging();
+    const bool enableFileLoggingSuccess = fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
+    fileLog.logInfoOrErrorln(enableFileLoggingSuccess, "Now logging to file(s)", "Failed to enable file logging");
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file

@@ -1,63 +1,34 @@
 #include "StorageManager.h"
 
-#include <SPIFFS.h>
-
 #include "Globals.h"
-#include "HardwareManager.h"
-#include "Intern.h"
 
-bool StorageManager::sspiffsIsMounted = false;
+bool StorageManager::flashIsMounted = false;
 
-FS* StorageManager::logFileFs = nullptr;
-FS* StorageManager::rfidsFs = nullptr;
-FS* StorageManager::firmwareFs = nullptr;
-
-void StorageManager::setFS(FS& logFile, FS& rfids, FS& firmware)
+bool StorageManager::mountLittleFS()
 {
-    logFileFs = &logFile;
-    rfidsFs = &rfids;
-    firmwareFs = &firmware;
+    if (flashIsMounted) return true;
+    flashIsMounted = LittleFS.begin(true);
+    return flashIsMounted;
 }
 
-bool StorageManager::mountSSPIFFS()
+bool StorageManager::remove(const String& path, const bool notExistingOk)
 {
-    if (sspiffsIsMounted) return true;
-    sspiffsIsMounted = SPIFFS.begin(true);
-    return sspiffsIsMounted;
-}
-
-bool StorageManager::remove(FS& fs, const String& path, const bool notExistingOk)
-{
-    if (notExistingOk && !fs.exists(path)) return true;
-    const bool removeSuccess = fs.remove(path);
+    if (notExistingOk && !LittleFS.exists(path)) return true;
+    const bool removeSuccess = LittleFS.remove(path);
     return removeSuccess;
 }
 
-String fsName(const FS* fs)
+void StorageManager::logFilesystemTree(const uint8_t maxDepth)
 {
-    if (fs == &SPIFFS) return "SPIFFS";
-    return "UNKNOWN";
+    Serial.println("/");
+    logDirTree("/", maxDepth, 1);
 }
 
-void StorageManager::logFSConfiguration()
-{
-    String msg = "Filesystem configuration: " LOG_FILE_PATH ": " + fsName(logFileFs);
-    msg += ", " RFID_FILE_PATH ": " + fsName(rfidsFs);
-    msg += ", " FIRMWARE_FILE_PATH ": " + fsName(firmwareFs);
-    fileLog.infoln(msg);
-}
-
-void StorageManager::logFilesystemTree(FS* fs, const uint8_t maxDepth)
-{
-    Serial.println(fsName(fs) + "/");
-    logDirTree(*fs, "/", maxDepth, 1);
-}
-
-void StorageManager::logDirTree(FS& fs, const char* dirname, const uint8_t maxDepth, const uint8_t indent)
+void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth, const uint8_t indent)
 {
     if (maxDepth <= 0) return;
 
-    File f = fs.open(dirname);
+    File f = LittleFS.open(dirname);
     File nextFile = f.openNextFile();
 
 
@@ -68,7 +39,7 @@ void StorageManager::logDirTree(FS& fs, const char* dirname, const uint8_t maxDe
         if (nextFile.isDirectory())
         {
             Serial.println(String(nextFile.name()) + "/");
-            logDirTree(fs, nextFile.path(), maxDepth - 1, indent + 1);
+            logDirTree(nextFile.path(), maxDepth - 1, indent + 1);
         }
         else
         {
@@ -84,10 +55,10 @@ void StorageManager::logDirTree(FS& fs, const char* dirname, const uint8_t maxDe
 
 void StorageManager::logFilesystemsInformation()
 {
-    if (sspiffsIsMounted)
+    if (flashIsMounted)
     {
-        const size_t flashUtilized = SPIFFS.usedBytes();
-        const size_t flashTotal = SPIFFS.totalBytes();
-        fileLog.infoln("SPIFFS: usage: " + String(flashUtilized) + " B / " + String(flashTotal) + " B");
+        const size_t flashUtilized = LittleFS.usedBytes();
+        const size_t flashTotal = LittleFS.totalBytes();
+        fileLog.infoln("Flash usage: " + String(flashUtilized) + " B / " + String(flashTotal) + " B");
     }
 }

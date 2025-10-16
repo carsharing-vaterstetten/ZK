@@ -5,7 +5,6 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
-#include <SPIFFS.h>
 
 #include "Backend.h"
 #include "StorageManager.h"
@@ -328,11 +327,11 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 }
 
 UploadAndRetryResult Modem::uploadFileAndDelete(
-    const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
+    const String& endpoint, const String& filePath, const bool deleteIfSuccess,
     const bool deleteAfterRetrying, const uint32_t retries, const int bufferSize,
     unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
-    if (!fileFs.exists(filePath))
+    if (!LittleFS.exists(filePath))
     {
         fileLog.errorln(filePath + " does not exist");
         return UploadAndRetryResult::FILE_DOES_NOT_EXIST;
@@ -343,7 +342,7 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
 
     do
     {
-        File f = fileFs.open(filePath, FILE_READ);
+        File f = LittleFS.open(filePath, FILE_READ);
 
         if (!f)
         {
@@ -377,7 +376,7 @@ endLoop:;
 
     if (deleteAfterRetrying || (uploadResult == UploadResult::SUCCESS && deleteIfSuccess))
     {
-        const bool removeSuccess = StorageManager::remove(fileFs, filePath);
+        const bool removeSuccess = StorageManager::remove(filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }
@@ -514,8 +513,8 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
     fileLog.infoln("Uploading log file");
-    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, *StorageManager::logFileFs, LOG_FILE_PATH, deleteIfSuccess,
-                        deleteAfterRetrying, retries);
+    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying,
+                        retries);
 }
 
 time_t Modem::getUnixTimestamp()
@@ -545,8 +544,8 @@ void Modem::performConnectionSpeedTest()
 #if !SKIP_ALL_CONNECTION_SPEED_TESTS
     fileLog.infoln("Performing connection speed test");
 
-    // Use SPIFFS for simplicity and reliability
-    File df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
+    // Use LittleFS for simplicity and reliability
+    File df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
 
     unsigned long downloadStart, downloadEnd;
     const DownloadResult downloadResult = downloadFile(
@@ -554,7 +553,7 @@ void Modem::performConnectionSpeedTest()
         config.serverPassword, 512, &downloadStart, &downloadEnd);
     df.close();
 
-    df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
+    df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
     const size_t fileSize = df.size();
     df.close();
 
@@ -570,13 +569,13 @@ void Modem::performConnectionSpeedTest()
         fileLog.errorln(
             "Download test failed. Aborting further tests. Defaulting to " + String(estimatedUploadSpeed) + " B/s UP, "
             + String(estimatedDownloadSpeed) + " B/s DOWN");
-        SPIFFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
+        LittleFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
         return;
     }
 
     unsigned long uploadStart, uploadEnd;
     const UploadAndRetryResult uploadResult = uploadFileAndDelete(
-        UPLOAD_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, 512, &uploadStart, &uploadEnd);
+        UPLOAD_TEST_ENDPOINT, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, 512, &uploadStart, &uploadEnd);
 
     if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {

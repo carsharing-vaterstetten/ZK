@@ -80,7 +80,7 @@ public:
     static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
                                    int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
                                    unsigned long* uploadEndMs = nullptr);
-    static UploadAndRetryResult uploadFileAndDelete(const String& endpoint, FS& fileFs, const String& filePath,
+    static UploadAndRetryResult uploadFileAndDelete(const String& endpoint, const String& filePath,
                                                     bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
                                                     int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
                                                     unsigned long* uploadEndMs = nullptr);
