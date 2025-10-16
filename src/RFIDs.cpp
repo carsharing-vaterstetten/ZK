@@ -97,6 +97,8 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
+    http.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
+
     // Parse JSON from stream
     fileLog.infoln("Parsing JSON stream");
     JsonDocument doc;
