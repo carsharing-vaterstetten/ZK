@@ -166,7 +166,7 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    Modem::uploadLog(false, true, 1);
+    Modem::uploadLog(true, true, 1);
     statusLed.clear();
 
     // Set the watchdog to a shorter timeout for the main loop
