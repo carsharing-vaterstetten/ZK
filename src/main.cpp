@@ -10,6 +10,7 @@
 #include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
+#include "GPS.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
 #include "WatchdogHandler.h"
@@ -17,6 +18,7 @@
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
 unsigned long nextWatchdogResetMs;
+unsigned long nextGPSUpdate;
 unsigned long targetMillis;
 
 
@@ -36,6 +38,10 @@ void checkNFCTag()
         else
         {
             AccessControl::login(rfidUid);
+            currentRFIDConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfidUid);
+            fileLog.infoln(currentRFIDConsentsToGPSTracking
+                               ? "Logged in RFID consents to GPS tracking"
+                               : "Logged in RFID does not consent to GPS tracking");
         }
     }
     else
@@ -98,6 +104,32 @@ void loadConfig()
 #endif
 }
 
+void checkGPS()
+{
+    if (isLoggedIn && !currentRFIDConsentsToGPSTracking) return;
+
+    if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
+    {
+        // GPS is logging to flash and storage is low
+        serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
+        nextGPSUpdate = millis() + 5 * 60 * 1000;
+        return;
+    }
+
+    GPS_DATA_t gpsData;
+    const bool gpsSuccess = Modem::getGPS(gpsData);
+
+    if (!gpsSuccess)
+    {
+        serialOnlyLog.debugln("No GPS data received");
+        return;
+    }
+
+    serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
+
+    GPS::logDataBuffered(gpsData);
+}
+
 void setup()
 {
     // Start serial communication
@@ -129,6 +161,9 @@ void setup()
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
     StorageManager::logFilesystemsInformation();
+
+    // Cleanup
+    StorageManager::removeGpsLog();
 
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
@@ -166,6 +201,7 @@ void setup()
     AccessControl::init();
     NFCCardReader::init();
     RFIDs::downloadRfidsIfChanged();
+    RFIDs::downloadGPSTrackingConsentedRFIDs();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
@@ -191,10 +227,18 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
+        GPS::uploadFileAndDelete(true, true, 2);
         Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         ESP.restart();
     }
 
     checkNFCTag();
+
+    if (millis() >= nextGPSUpdate)
+    {
+        nextGPSUpdate = millis() + (
+            isLoggedIn ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
+        checkGPS();
+    }
 }

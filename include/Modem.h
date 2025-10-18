@@ -10,6 +10,7 @@
 #include <ArduinoHttpClient.h>
 #include <FS.h>
 #include "WatchdogHandler.h"
+#include "GPS.h"
 
 #define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
 #define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS
@@ -64,6 +65,8 @@ class Modem
 {
     static void powerOn();
     static void powerOff();
+    static bool enableGPS();
+    static bool disableGPS();
 
     static uint32_t estimatedDownloadSpeed;
     static uint32_t estimatedUploadSpeed;
@@ -110,6 +113,7 @@ public:
     static esp_err_t increaseWatchdogTimeoutForFileUpload(size_t fileSize);
     static esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize);
     static void performConnectionSpeedTest();
+    static bool getGPS(GPS_DATA_t& out);
 
     static bool isInitialized()
     {

@@ -33,7 +33,19 @@ public:
         return LittleFS.open(TMP_RFID_FILE_PATH, mode, create);
     }
 
+    static File openGpsRFIDs(const char* mode, const bool create = false)
+    {
+        return LittleFS.open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, mode, create);
+    }
+
+    static File openGPS(const char* mode, const bool create = false)
+    {
+        return LittleFS.open(GPS_FILE_PATH, mode, create);
+    }
+
     static bool replaceRFIDsFileWithTmpRFIDs();
+    static bool replaceGpsUIDsFileWithTmpUIDs();
+    static bool move(const String& oldPath, const String& newPath, bool deleteIfNewExists);
 
     static bool remove(const String& path, bool notExistingOk = true);
 
@@ -45,6 +57,11 @@ public:
     static bool removeRFIDs(const bool notExistingOk = true)
     {
         return remove(RFID_FILE_PATH, notExistingOk);
+    }
+
+    static bool removeGpsLog(const bool notExistingOk = true)
+    {
+        return remove(GPS_FILE_PATH, notExistingOk);
     }
 
     static bool exists(const String& path)
@@ -61,6 +78,7 @@ public:
     {
         logDirTree(dirname, maxDepth, 0);
     }
+
     static void logFilesystemTree(uint8_t maxDepth);
 
     static void logFilesystemsInformation();

@@ -7,6 +7,7 @@ Log fileLog{};
 String modemIMEI = "";
 LED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
 bool isLoggedIn = false;
+bool currentRFIDConsentsToGPSTracking = false;
 uint32_t loggedInRFID = 0;
 LocalConfig config{
     DEFAULT_CONFIG_APN,

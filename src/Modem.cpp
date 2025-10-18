@@ -87,6 +87,43 @@ void Modem::powerOff()
     digitalWrite(PWR_PIN, HIGH);
 }
 
+bool Modem::enableGPS()
+{
+    gsmModem->sendAT("+CGPIO=0,48,1,1");
+
+    if (gsmModem->waitResponse(10000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power HIGH Failed");
+    }
+
+    fileLog.infoln("Enabling GPS... ");
+
+    const bool success = gsmModem->enableGPS();
+
+    fileLog.logInfoOrErrorln(success, "Enabled GPS", "Failed to enable GPS");
+
+    return success;
+}
+
+
+bool Modem::disableGPS()
+{
+    gsmModem->sendAT("+CGPIO=0,48,1,0");
+
+    if (gsmModem->waitResponse(10000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power LOW Failed");
+    }
+
+    fileLog.infoln("Disabling GPS...");
+
+    const bool success = gsmModem->disableGPS();
+
+    fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
+
+    return success;
+}
+
 bool Modem::init(const uint8_t retries)
 {
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
@@ -194,6 +231,8 @@ bool Modem::init(const uint8_t retries)
                 " failed because the the modem could not synchronise time. Retrying...");
             continue;
         }
+
+        enableGPS();
 
         isInit = true;
         fileLog.infoln("Modem startup completed successfully");
@@ -593,4 +632,18 @@ void Modem::performConnectionSpeedTest()
         fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed) + " B/s");
     }
 #endif
+}
+
+bool Modem::getGPS(GPS_DATA_t& out)
+{
+    uint8_t status;
+    int year, month, day, hour, minute, second;
+    const bool success = gsmModem->getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
+                                          reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
+                                          &out.accuracy, &year, &month, &day, &hour, &minute, &second);
+    if (!success) return false;
+
+    out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
+
+    return true;
 }

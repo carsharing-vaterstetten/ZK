@@ -13,15 +13,54 @@ bool StorageManager::mountLittleFS()
 
 bool StorageManager::replaceRFIDsFileWithTmpRFIDs()
 {
-    fileLog.logInfoOrWarningln(removeRFIDs(), "Removed old RFIDs file successfully",
-                               "Failed to remove old RFIDs file");
+    const bool moveSuccess = move(TMP_RFID_FILE_PATH, RFID_FILE_PATH, true);
+    fileLog.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
+    return moveSuccess;
+}
 
-    const bool renameSuccess = LittleFS.rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
+bool StorageManager::replaceGpsUIDsFileWithTmpUIDs()
+{
+    const bool moveSuccess = move(TMP_RFID_FILE_PATH, GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, true);
+    fileLog.logInfoOrErrorln(moveSuccess, "GPS RFID UIDs updated successfully", "GPS RFID UIDs not updated");
+    return moveSuccess;
+}
 
-    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed RFIDs file", "Failed to rename RFIDs file.");
+bool StorageManager::move(const String& oldPath, const String& newPath, const bool deleteIfNewExists = false)
+{
+    fileLog.infoln("Moving " + oldPath + " to " + newPath);
 
-    removeTmpRFIDs();
-    return renameSuccess;
+    if (LittleFS.exists(newPath))
+    {
+        if (deleteIfNewExists)
+        {
+            fileLog.infoln(newPath + " exists. Removing...");
+
+            if (!LittleFS.remove(newPath))
+            {
+                fileLog.errorln("Failed to remove file. Move failed");
+                return false;
+            }
+
+            fileLog.infoln("Removed file");
+        }
+        else
+        {
+            fileLog.errorln(newPath + " exists. Move failed");
+            return false;
+        }
+    }
+
+    if (!LittleFS.rename(oldPath, newPath))
+    {
+        fileLog.errorln("Move (rename) failed.");
+        return false;
+    }
+
+    const bool removeSuccess = remove(oldPath);
+
+    fileLog.logInfoOrErrorln(removeSuccess, "Move successful", "Move (remove old file) failed");
+
+    return removeSuccess;
 }
 
 bool StorageManager::remove(const String& path, const bool notExistingOk)

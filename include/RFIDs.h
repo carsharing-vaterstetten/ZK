@@ -16,4 +16,6 @@ public:
     static RfidsChecksumResult compareChecksums();
     static bool downloadRfids();
     static void downloadRfidsIfChanged();
+    static bool downloadGPSTrackingConsentedRFIDs();
+    static bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
 };

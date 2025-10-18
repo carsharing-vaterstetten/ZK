@@ -79,7 +79,9 @@ bool RFIDs::downloadRfids()
     fileLog.infoln("Downloading remote RFIDs JSON");
 
     // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
-    DownloadStream http{REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword};
+    DownloadStream http{
+        REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword
+    };
 
     if (!http)
     {
@@ -139,4 +141,62 @@ void RFIDs::downloadRfidsIfChanged()
         downloadRfids();
         break;
     }
+}
+
+bool RFIDs::downloadGPSTrackingConsentedRFIDs()
+{
+    fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
+
+    File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
+
+    if (!file)
+    {
+        fileLog.warningln("Failed to open temp RFIDs file. Download canceled");
+        return false;
+    }
+
+    const DownloadResult downloadResult = Modem::downloadFile(
+        REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, modemIMEI, config.serverPassword);
+
+    switch (downloadResult)
+    {
+    case DownloadResult::FAILED_TO_OPEN_STREAM:
+        fileLog.errorln("Download failed");
+        StorageManager::removeTmpRFIDs();
+        return false;
+    case DownloadResult::SUCCESS:
+        break;
+    }
+
+    fileLog.infoln("Successfully downloaded file");
+
+    return StorageManager::replaceGpsUIDsFileWithTmpUIDs();
+}
+
+
+bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid)
+{
+    File file = StorageManager::openGpsRFIDs(FILE_READ);
+
+    if (!file)
+    {
+        fileLog.errorln("Failed to open GPS consent RFIDs file for reading");
+        return false;
+    }
+
+    const size_t rfidsCount = file.size() / 4;
+    uint32_t buffer;
+
+    for (int i = 0; i < rfidsCount; i++)
+    {
+        file.read(reinterpret_cast<uint8_t*>(&buffer), 4);
+        if (buffer == rfid)
+        {
+            file.close();
+            return true;
+        }
+    }
+
+    file.close();
+    return false;
 }
