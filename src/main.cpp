@@ -227,6 +227,7 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
+        GPS::uploadFileAndDelete(true, true, 2);
         Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         ESP.restart();
