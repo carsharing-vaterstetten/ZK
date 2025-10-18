@@ -24,4 +24,5 @@ public:
     static bool isSuccessfulResponse(int statusCode);
     static String simStatusToString(SimStatus status);
     static String millisToIsoString(uint64_t ms);
+    static String getResetReasonHumanReadable(int reset_reason);
 };

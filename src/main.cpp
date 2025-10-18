@@ -4,7 +4,6 @@
 #include <HelperUtils.h>
 #include <LED.h>
 #include <esp32-hal.h>
-#include <esp_system.h>
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Config.h"
@@ -14,6 +13,7 @@
 #include "RFIDs.h"
 #include "StorageManager.h"
 #include "WatchdogHandler.h"
+#include "esp32/rom/rtc.h"
 
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
@@ -159,7 +159,9 @@ void setup()
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
     fileLog.infoln("Loaded config: " + config.toString());
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
-    fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
+    fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(0)));
+    fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
+
     StorageManager::logFilesystemsInformation();
 
     // Cleanup
