@@ -2,25 +2,24 @@
 
 #include "HelperUtils.h"
 #include "Globals.h"
-#include <EEPROM.h>
 #include "mbedtls/md5.h"
-#include <FS.h>
-#include <sd_defines.h>
+#include <iomanip>
 
 #include "Modem.h"
+#include "LocalConfig.h"
 
 
-bool HelperUtils::parseConfigString(const String& inputString, Config& c)
+std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)
 {
     int start = 0;
-    bool success = true;
 
-    bool hasApn = false, hasServer = false, hasPort = false, hasPassword = false, hasPreferSDCard = false;
+    std::optional<String> apn, gprsUser, gprsPassword, server, serverPassword, simPin;
+    std::optional<uint16_t> serverPort;
 
     while (start < inputString.length())
     {
         int end = inputString.indexOf(';', start);
-        if (end == -1) end = inputString.length();
+        if (end == -1) end = static_cast<int>(inputString.length());
 
         String token = inputString.substring(start, end);
         token.trim();
@@ -31,11 +30,10 @@ bool HelperUtils::parseConfigString(const String& inputString, Config& c)
             continue;
         }
 
-        int eqIndex = token.indexOf('=');
+        const int eqIndex = token.indexOf('=');
         if (eqIndex == -1)
         {
             fileLog.warningln("Invalid config token (missing '='): '" + token + "'");
-            success = false;
             start = end + 1;
             continue;
         }
@@ -51,88 +49,46 @@ bool HelperUtils::parseConfigString(const String& inputString, Config& c)
             value = value.substring(1, value.length() - 1);
         }
 
-        if (key == "apn")
-        {
-            value.toCharArray(c.apn, sizeof(c.apn));
-            hasApn = true;
-        }
-        else if (key == "server")
-        {
-            value.toCharArray(c.server, sizeof(c.server));
-            hasServer = true;
-        }
-        else if (key == "port")
-        {
-            if (value.length() == 0)
-            {
-                fileLog.warningln("Invalid port value, using default");
-                success = false;
-            }
-            else
-            {
-                c.port = value.toInt();
-                hasPort = true;
-            }
-        }
-        else if (key == "password")
-        {
-            value.toCharArray(c.password, sizeof(c.password));
-            hasPassword = true;
-        }
-        else if (key == "preferSDCard")
-        {
-            c.preferSDCard = (value.toInt() != 0);
-            hasPreferSDCard = true;
-        }
+        if (key == LocalConfig::apnKey)
+            apn = value;
+        else if (key == LocalConfig::gprsUserKey)
+            gprsUser = value;
+        else if (key == LocalConfig::gprsPasswordKey)
+            gprsPassword = value;
+        else if (key == LocalConfig::serverKey)
+            server = value;
+        else if (key == LocalConfig::serverPortKey)
+            serverPort = value.toInt();
+        else if (key == LocalConfig::serverPasswordKey)
+            serverPassword = value;
+        else if (key == LocalConfig::simPinKey)
+            simPin = value;
         else
-        {
             fileLog.warningln("Unknown config key: '" + key + "'");
-            success = false;
-        }
 
         start = end + 1;
     }
 
-    // Make sure all required keys were present
-    if (!hasApn || !hasServer || !hasPort || !hasPassword || !hasPreferSDCard)
-    {
-        fileLog.warningln("Missing required config keys!");
-        success = false;
-    }
+    if (!apn || !server || !serverPort || !serverPassword || !gprsUser || !gprsPassword || !simPin) return std::nullopt;
 
-    return success;
+    return LocalConfig{
+        apn.value(), gprsUser.value(), gprsPassword.value(), server.value(), serverPort.value(), serverPassword.value(),
+        simPin.value()
+    };
 }
 
-
-String HelperUtils::getConfigHumanReadable(const Config& c)
+LocalConfig HelperUtils::requestConfig()
 {
-    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
-        + " password=" + c.password + " preferSDCard=" + String(c.preferSDCard);
-}
-
-String HelperUtils::getConfigHumanReadableHideSecrets(const Config& c)
-{
-    return "Config version: " + String(c.version) + " apn=" + c.apn + " server=" + c.server + " port=" + String(c.port)
-        + " preferSDCard=" + String(c.preferSDCard);
-}
-
-String HelperUtils::getConfigFormat(const Config& c)
-{
-    return "apn=\"" + String(c.apn) + "\";server=\"" + c.server + "\";port=\"" + String(c.port) +
-        +"\";password=\"" + c.password + "\";preferSDCard=\"" + String(c.preferSDCard) + "\";";
-}
-
-void HelperUtils::requestConfig(Config& c)
-{
-    constexpr Config exampleConfig = {
-        CONFIG_VERSION,
+    const LocalConfig exampleConfig{
         "iot.1nce.net",
+        "hans",
+        "PWD",
         "example.com",
         80,
         "XXX",
-        true,
+        "1234"
     };
-    const String exampleConfigFormat = getConfigFormat(exampleConfig);
+    const String exampleConfigFormat = exampleConfig.toString(false);
 
     String inputString = "";
 
@@ -159,18 +115,15 @@ void HelperUtils::requestConfig(Config& c)
 
         Serial.println("Entered config string: " + inputString);
 
-        const bool parseSuccess = parseConfigString(inputString, c);
-
-        if (!parseSuccess)
+        if (const auto pc = parseConfigString(inputString))
         {
-            Serial.println("Failed to parse config. Try again");
-            continue;
+            Serial.println("Successfully parsed config: " + pc.value().toString());
+            Serial.setTimeout(oldTimeout);
+            return pc.value();
         }
 
-        break;
+        Serial.println("Failed to parse config. Try again");
     }
-
-    Serial.setTimeout(oldTimeout);
 }
 
 bool HelperUtils::md5File(File file, uint8_t out[16])
@@ -235,7 +188,7 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
 
 bool HelperUtils::updateSystemTimeWithModem()
 {
-    if (!Modem::isInitialized())
+    if (!Modem::timeIsAvailable())
         return false;
 
     const time_t seconds = Modem::getUnixTimestamp();
@@ -253,20 +206,38 @@ uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
     return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
 }
 
-const char* HelperUtils::sdCardTypeName(const sdcard_type_t type)
+bool HelperUtils::isSuccessfulResponse(const int statusCode)
 {
-    switch (type)
+    return statusCode < 300 && statusCode >= 200;
+}
+
+String HelperUtils::simStatusToString(const SimStatus status)
+{
+    switch (status)
     {
-    case CARD_NONE:
-        return "None";
-    case CARD_MMC:
-        return "MMC";
-    case CARD_SD:
-        return "SD";
-    case CARD_SDHC:
-        return "SDHC";
-    case CARD_UNKNOWN:
-        return "UNKNOWN";
+    case SIM_ERROR:
+        return "ERROR";
+    case SIM_READY:
+        return "READY";
+    case SIM_LOCKED:
+        return "LOCKED";
+    case SIM_ANTITHEFT_LOCKED:
+        return "ANTITHEFT LOCKED";
     }
+
     return "UNKNOWN";
+}
+
+String HelperUtils::millisToIsoString(const uint64_t ms) {
+    const auto seconds = static_cast<time_t>(ms / 1000ULL); // convert to seconds
+    tm timeinfo{};
+    gmtime_r(&seconds, &timeinfo); // use UTC time
+
+    char buf[30];
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+
+    // Add milliseconds
+    char result[40];
+    snprintf(result, sizeof(result), "%s.%03uZ", buf, static_cast<unsigned>(ms % 1000));
+    return {result};
 }

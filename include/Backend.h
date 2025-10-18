@@ -18,7 +18,7 @@
 
 // Vehicle/RFIDs router
 #define REMOTE_RFID_MD5_CHECKSUM_PATH RFIDS_ROUTE "/md5-checksum"
-#define REMOTE_RFID_PATH RFIDS_ROUTE "/download"
+#define REMOTE_RFID_PATH RFIDS_ROUTE "/"
 
 // Vehicle/Other router
 #define UPLOAD_TEST_ENDPOINT OTHER_ROUTE "/upload-test"

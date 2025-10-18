@@ -4,55 +4,55 @@
 
 #include "Backend.h"
 #include "Globals.h"
-#include "HelperUtils.h"
 #include "Modem.h"
 #include "StorageManager.h"
 
 #define UPDATE_COMMAND U_FLASH
 
-bool FirmwareUpdater::downloadAndPerformUpdate()
+size_t nextDownloadProgressPrint = 0;
+
+void onDownloadProgress(const size_t progress, const size_t total)
+{
+    if (progress >= nextDownloadProgressPrint)
+    {
+        fileLog.debugln("Downloaded " + String(progress) + " B of the Update");
+
+        nextDownloadProgressPrint = progress + total / 10;
+    }
+}
+
+bool FirmwareUpdater::performUpdate()
 {
     fileLog.infoln("Performing OTA update");
 
-    File downloadFile = StorageManager::openFirmware(FILE_WRITE, true);
+    DownloadStream downloadStream{
+        LATEST_FIRMWARE_DOWNLOAD_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI,
+        config.serverPassword
+    };
 
-    if (!downloadFile)
+    if (!downloadStream)
     {
-        fileLog.errorln("Failed to open firmware file");
+        fileLog.errorln("Failed to open stream for download");
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(
-        LATEST_FIRMWARE_DOWNLOAD_PATH, downloadFile, efuseMacHex, config.password);
-    downloadFile.close(); // Just to make sure
+    const size_t updateSize = downloadStream.contentLength();
+    fileLog.infoln("Update size: " + String(updateSize) + " B");
 
-    switch (downloadResult)
-    {
-    case DownloadResult::HTTP_REQUEST_ERROR:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
-    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-        return false;
-    case DownloadResult::SUCCESS:
-        break;
-    }
-
-    File updateFile = StorageManager::openFirmware(FILE_READ);
-
-    const size_t fileSize = updateFile.size();
-
-    fileLog.infoln("Update size: " + String(fileSize) + " B");
-
-    if (!Update.begin(fileSize, UPDATE_COMMAND))
+    if (!Update.begin(updateSize))
     {
         fileLog.errorln("Not enough space for OTA");
         return false;
     }
 
-    const size_t written = Update.writeStream(updateFile);
+    nextDownloadProgressPrint = 0;
+    Update.onProgress(onDownloadProgress);
 
-    if (written != fileSize)
+    const size_t written = Update.writeStream(downloadStream);
+
+    if (written != updateSize)
     {
-        fileLog.errorln("Write failed. Written " + String(written) + " B / " + String(fileSize) + " B");
+        fileLog.errorln("Write failed. Written " + String(written) + " B / " + String(updateSize) + " B");
         return false;
     }
 
@@ -62,25 +62,27 @@ bool FirmwareUpdater::downloadAndPerformUpdate()
         return false;
     }
 
-    if (Update.isFinished())
+    if (!Update.isFinished())
     {
-        fileLog.infoln("Update complete. Rebooting in 5 seconds...");
-        delay(5000);
-        ESP.restart();
-        return true;
+        fileLog.errorln("Update not finished?");
+        return false;
     }
 
-    fileLog.errorln("Update not finished?");
-    return false;
+    fileLog.infoln("Update complete. Rebooting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+
+    // Never reaches here
+    return true;
 }
 
-long FirmwareUpdater::getLatestFirmwareSize()
+uint32_t FirmwareUpdater::getLatestFirmwareSize()
 {
     fileLog.infoln("Checking update size...");
 
     String respSize;
-    Modem::simpleGet(LATEST_FIRMWARE_SIZE_ENDPOINT, &respSize, efuseMacHex, config.password);
-    const long latestFirmwareSize = respSize.toInt();
+    Modem::simpleGet(LATEST_FIRMWARE_SIZE_ENDPOINT, &respSize, modemIMEI, config.serverPassword);
+    const uint32_t latestFirmwareSize = respSize.toInt();
 
     fileLog.infoln("Update size: " + String(latestFirmwareSize) + " B");
 
@@ -99,7 +101,7 @@ FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
     String updateAvailability;
 
     const int respStatus = Modem::simpleGet(LATEST_FIRMWARE_IS_NEWER_ENDPOINT "?fm_version=" FIRMWARE_VERSION,
-                                            &updateAvailability, efuseMacHex, config.password);
+                                            &updateAvailability, modemIMEI, config.serverPassword);
 
     if (respStatus != 200)
     {
@@ -127,7 +129,7 @@ bool FirmwareUpdater::doUpdateIfAvailable()
 {
     if (checkForFirmwareUpdate() == FirmwareUpdateCheckResult::UPDATE_AVAILABLE)
     {
-        return downloadAndPerformUpdate();
+        return performUpdate();
     }
     return false;
 }

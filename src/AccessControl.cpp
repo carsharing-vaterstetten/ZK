@@ -17,7 +17,7 @@ void AccessControl::lockCar()
     delay(200);
     digitalWrite(CLOSE_KEY, LOW);
 
-    statusLed.setColor(Color::Red);
+    statusLed.setStatusColor(StatusColor::CarLocked);
     fileLog.infoln("Car locked");
 }
 
@@ -27,7 +27,7 @@ void AccessControl::unlockCar()
     digitalWrite(OPEN_KEY, HIGH);
     delay(200);
     digitalWrite(OPEN_KEY, LOW);
-    statusLed.setColor(Color::Green);
+    statusLed.setStatusColor(StatusColor::CarUnlocked);
     fileLog.infoln("Car unlocked");
 }
 

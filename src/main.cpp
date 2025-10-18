@@ -5,8 +5,6 @@
 #include <LED.h>
 #include <esp32-hal.h>
 #include <esp_system.h>
-#include <SD.h>
-#include <SPIFFS.h>
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Config.h"
@@ -27,9 +25,8 @@ unsigned long targetMillis;
 void checkNFCTag()
 {
     uint32_t rfidUid;
-    const bool readSuccess = NFCCardReader::readTag(rfidUid);
 
-    if (!readSuccess) return; // No card present
+    if (!NFCCardReader::readTag(rfidUid)) return; // No card present
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
@@ -50,7 +47,7 @@ void checkNFCTag()
     else
     {
         fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
-        statusLed.setColor(Color::Red);
+        statusLed.setStatusColor(StatusColor::NFCUnknownUIDScanned);
     }
 
     delay(2000);
@@ -81,56 +78,6 @@ void calculateNextRestartTime()
     fileLog.infoln("Next restart planed in " + String(targetMillis / 1000) + " seconds");
 }
 
-void enableFileLogging(const bool forceFlash)
-{
-    if (forceFlash)
-    {
-        StorageManager::setFS(SPIFFS, SPIFFS, SPIFFS, SPIFFS, SPIFFS);
-
-        fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
-
-        fileLog.infoln("Forced to use flash. Now logging to file(s)");
-        return;
-    }
-
-    StorageManager::setFS(SD, SPIFFS, SD, SD, SPIFFS);
-
-    fileLog.enableSDCardLogging(LOG_FILE_PATH, SD_CARD_LOGGING_LEVEL);
-
-    fileLog.infoln("Now logging to file(s)");
-}
-
-void initializeStorage()
-{
-    if (config.preferSDCard)
-    {
-        if (StorageManager::isSDCardConnected())
-        {
-            serialOnlyLog.infoln("Using SD-Card as preferred storage");
-
-            // Should already be mounted after isSDCardConnected()
-            const bool sdInitSuccess = StorageManager::mountSDCard();
-
-            if (!sdInitSuccess)
-            {
-                serialOnlyLog.warningln("Failed to initialize SD-Card");
-            }
-
-            enableFileLogging(!sdInitSuccess);
-        }
-        else
-        {
-            serialOnlyLog.warningln("SD-Card is not inserted");
-            enableFileLogging(true);
-        }
-    }
-    else
-    {
-        serialOnlyLog.infoln("Using flash as preferred storage");
-        enableFileLogging(true);
-    }
-}
-
 int espLogHandler(const char* fmt, const va_list args)
 {
     char buf[256];
@@ -142,17 +89,17 @@ int espLogHandler(const char* fmt, const va_list args)
 
 void loadConfig()
 {
-#if OVERRIDE_CONFIG
-    serialOnlyLog.infoln("Using compiled config");
+#if USE_DEFAULT_CONFIG
+    fileLog.infoln("Using default config");
 #else
-    const bool configLoadedSuccess = StorageManager::loadConfigFromEEPROM(config);
 
-    if (!configLoadedSuccess)
+    if (const auto loadedConfig = LocalConfig::fromStorage(); !loadedConfig)
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        HelperUtils::requestConfig(config);
+        config = HelperUtils::requestConfig();
+        const bool configSaveSuccess = config.save();
+        fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
         WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
-        StorageManager::saveConfigToEEPROM(config);
     }
 #endif
 }
@@ -161,7 +108,7 @@ void checkGPS()
 {
     if (isLoggedIn && !currentRFIDConsentsToGPSTracking) return;
 
-    if (StorageManager::gpsFs == &SPIFFS && SPIFFS.totalBytes() - SPIFFS.usedBytes() < 128 * 1024)
+    if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
     {
         // GPS is logging to flash and storage is low
         serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
@@ -201,46 +148,40 @@ void setup()
     WatchdogHandler::subscribeTask();
 
     // Mount filesystems
-    const bool flashInitSuccess = StorageManager::mountSSPIFFS();
+    const bool flashInitSuccess = StorageManager::mountLittleFS();
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
-    const bool eepromInitSuccess = StorageManager::mountEEPROM();
-    serialOnlyLog.logInfoOrCriticalErrorln(eepromInitSuccess, "EEPROM initialized successfully",
-                                           "EEPROM initialization failed");
-    loadConfig(); // Config is now needed because it contains information whether the SD-Card should be used
-    serialOnlyLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadable(config));
-    initializeStorage();
+
+    const bool enableFileLoggingSuccess = fileLog.enableFlashLogging(LOG_FILE_PATH, FLASH_LOGGING_LEVEL);
+    fileLog.logInfoOrErrorln(enableFileLoggingSuccess, "Now logging to file(s)", "Failed to enable file logging");
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
-    fileLog.infoln("Loaded config: " + HelperUtils::getConfigHumanReadableHideSecrets(config));
+    fileLog.infoln("Loaded config: " + config.toString());
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
-    StorageManager::logFSConfiguration();
     StorageManager::logFilesystemsInformation();
 
     // Cleanup
-    StorageManager::removeFirmwareFile();
     StorageManager::removeGpsLog();
 
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
     statusLed.init();
 
-    // We need the efuseMac for communicating with the server therefore it is needed before we do anything with the modem
-    efuseMac = ESP.getEfuseMac();
-    efuseMacHex = String(efuseMac, 16);
-    fileLog.infoln("Efuse chip ID: 0x" + efuseMacHex);
-
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
+    loadConfig(); // We need the config for the Modem
     Modem::init();
-    HelperUtils::updateSystemTimeWithModem();
     fileLog.infoln(
-        "Time: millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
+        "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
         ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
             HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
     calculateNextRestartTime();
+
+    // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
+    modemIMEI = Modem::getIMEI();
+    fileLog.infoln("Modem IMEI: " + modemIMEI);
 
     // Do the connection speed test before any up-/downloads
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
@@ -248,8 +189,12 @@ void setup()
 #endif
 
     // Now we are ready to check for a firmware update
+#if CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT
     statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
     FirmwareUpdater::doUpdateIfAvailable();
+#else
+    fileLog.infoln("Skipped firmware update check");
+#endif
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
@@ -260,7 +205,7 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    Modem::uploadLogsFromAllFileSystems(false, true, 1);
+    Modem::uploadLog(true, true, 1);
     statusLed.clear();
 
     // Set the watchdog to a shorter timeout for the main loop
@@ -282,7 +227,7 @@ void loop()
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         Modem::performConnectionSpeedTest();
-        Modem::uploadLogsFromAllFileSystems(true, false, 10); // Log will be deleted at next startup anyway
+        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         ESP.restart();
     }

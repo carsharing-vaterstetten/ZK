@@ -11,12 +11,6 @@ bool LED::init()
     return true;
 }
 
-void LED::setColor(const Color color)
-{
-    neo.fill(getColorValue(color));
-    neo.show();
-}
-
 void LED::setStatusColor(const StatusColor color)
 {
     neo.fill(getStatusColorValue(color));
@@ -28,31 +22,6 @@ void LED::clear()
     neo.clear();
     neo.show();
 }
-
-
-uint32_t LED::getColorValue(const Color color)
-{
-    switch (color)
-    {
-    case Color::Red:
-        return 0xFF0000;
-    case Color::Orange:
-        return 0xFFA500;
-    case Color::Yellow:
-        return 0xFFFF00;
-    case Color::Purple:
-        return 0x800080;
-    case Color::Blue:
-        return 0x0000FF;
-    case Color::Green:
-        return 0x00FF00;
-    case Color::White:
-        return 0xFFFFFF;
-    default:
-        return 0;
-    }
-}
-
 
 uint32_t LED::getStatusColorValue(const StatusColor color)
 {
@@ -68,6 +37,12 @@ uint32_t LED::getStatusColorValue(const StatusColor color)
         return 0xFFA500;
     case StatusColor::UploadingLogs:
         return 0x0000FF;
+    case StatusColor::CarLocked:
+        return 0xFF0000;
+    case StatusColor::CarUnlocked:
+        return 0x00FF00;
+    case StatusColor::NFCUnknownUIDScanned:
+        return 0xFF0000;
     default:
         return 0;
     }

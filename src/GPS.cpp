@@ -9,12 +9,10 @@
 uint16_t GPS::logBufferIndex = 0;
 GPS_DATA_t GPS::logBuffer[GPS_LOG_BUFFER_SIZE];
 
-void GPS::uploadFileFromAllFilesystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                       const uint32_t retries)
+void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
     fileLog.infoln("Uploading GPS log(s)");
-    Modem::uploadFileFromAllFileSystem(GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying,
-                                       retries);
+    Modem::uploadFileAndDelete(GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 bool GPS::writeLogBufferToFile()

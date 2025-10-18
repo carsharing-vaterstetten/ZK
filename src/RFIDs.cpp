@@ -1,7 +1,7 @@
 #include "RFIDs.h"
 
-#include <FS.h>
 #include "mbedtls/md5.h"
+#include <ArduinoJson.h>
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
@@ -49,12 +49,12 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
     uint8_t remoteMd5Hash[hashLen];
     const int statusCode = Modem::simpleGetBin(
-        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, efuseMacHex, config.password);
+        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, modemIMEI, config.serverPassword);
 
     if (statusCode != 200)
     {
         fileLog.warningln("Unexpected status code " + String(statusCode));
-        return RfidsChecksumResult::ERROR;
+        return RfidsChecksumResult::UNEXPECTED_STATUS_CODE;
     }
 
     uint8_t fileMd5Hash[hashLen];
@@ -76,8 +76,20 @@ RfidsChecksumResult RFIDs::compareChecksums()
 
 bool RFIDs::downloadRfids()
 {
-    fileLog.infoln("Downloading remote RFIDs file");
+    fileLog.infoln("Downloading remote RFIDs JSON");
 
+    // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
+    DownloadStream http{
+        REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword
+    };
+
+    if (!http)
+    {
+        fileLog.errorln("Failed to open stream for RFIDs download");
+        return false;
+    }
+
+    // Open temp file for writing
     File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
 
     if (!file)
@@ -86,44 +98,45 @@ bool RFIDs::downloadRfids()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(REMOTE_RFID_PATH, file, efuseMacHex, config.password);
+    http.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
 
-    switch (downloadResult)
+    // Parse JSON from stream
+    fileLog.infoln("Parsing JSON stream");
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc, http);
+
+    if (error)
     {
-    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-    case DownloadResult::HTTP_REQUEST_ERROR:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
-        fileLog.errorln("RFIDs file download failed");
+        fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
+        file.close();
         StorageManager::removeTmpRFIDs();
         return false;
-    case DownloadResult::SUCCESS:
-        break;
     }
 
-    fileLog.infoln("Successfully downloaded RFIDs file");
+    const auto rfids = doc.as<JsonArray>();
 
-    const bool removeOldSuccess = StorageManager::removeRFIDs();
-    fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
-                               "Failed to remove old RFIDs file");
+    fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
+    for (const JsonVariant rfidVariant : rfids)
+    {
+        const auto rfid = rfidVariant.as<uint32_t>();
+        file.write(reinterpret_cast<const uint8_t*>(&rfid), sizeof(rfid));
+    }
 
-    const bool renameSuccess = StorageManager::rfidsFs->rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
+    file.close();
 
-    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed RFIDs file",
-                               "Failed to rename RFIDs file. RFIDs not updated");
+    fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
-    StorageManager::removeTmpRFIDs();
-
-    return renameSuccess;
+    return StorageManager::replaceRFIDsFileWithTmpRFIDs();
 }
 
 void RFIDs::downloadRfidsIfChanged()
 {
     switch (compareChecksums())
     {
-    case RfidsChecksumResult::ERROR:
     case RfidsChecksumResult::FILES_ARE_EQUAL:
         break;
     case RfidsChecksumResult::FILES_DIFFER:
+    case RfidsChecksumResult::UNEXPECTED_STATUS_CODE:
     case RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST:
         downloadRfids();
         break;
@@ -143,13 +156,11 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
     }
 
     const DownloadResult downloadResult = Modem::downloadFile(
-        REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, efuseMacHex, config.password);
+        REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, modemIMEI, config.serverPassword);
 
     switch (downloadResult)
     {
-    case DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
-    case DownloadResult::HTTP_REQUEST_ERROR:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
+    case DownloadResult::FAILED_TO_OPEN_STREAM:
         fileLog.errorln("Download failed");
         StorageManager::removeTmpRFIDs();
         return false;
@@ -159,27 +170,13 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
 
     fileLog.infoln("Successfully downloaded file");
 
-    const bool removeOldSuccess = StorageManager::remove(*StorageManager::consentToGPSTrackingRfidsFs,
-                                                         GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH);
-
-    fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
-                               "Failed to remove old RFIDs file");
-
-    const bool renameSuccess = StorageManager::rfidsFs->rename(
-        TMP_RFID_FILE_PATH, GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH);
-
-    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed file",
-                               "Failed to rename file. RFIDs not updated");
-
-    StorageManager::removeTmpRFIDs();
-
-    return renameSuccess;
+    return StorageManager::replaceGpsUIDsFileWithTmpUIDs();
 }
 
 
 bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid)
 {
-    File file = StorageManager::consentToGPSTrackingRfidsFs->open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, FILE_READ);
+    File file = StorageManager::openGpsRFIDs(FILE_READ);
 
     if (!file)
     {

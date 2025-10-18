@@ -1,114 +1,88 @@
 #pragma once
 
-#include <FS.h>
-#include <SD.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 #include "Intern.h"
 
 class StorageManager
 {
-    static bool eepromIsMounted;
-    static bool sspiffsIsMounted;
-    static bool sdCardIsMounted;
+    static bool flashIsMounted;
 
 public:
-    static FS* logFileFs;
-    static FS* rfidsFs;
-    static FS* firmwareFs;
-    static FS* gpsFs;
-    static FS* consentToGPSTrackingRfidsFs;
-
     StorageManager() = delete; // Prevent instantiation
 
-    static void setFS(FS& logFile, FS& rfids, FS& firmware, FS& gps, FS& consentToGPSTrackingRfids);
-    static bool mountEEPROM();
-    static bool mountSSPIFFS();
-    static bool mountSDCard();
-
-    static bool isSDCardConnected();
-
-    static void saveConfigToEEPROM(Config& c);
-    static bool loadConfigFromEEPROM(Config& c);
-    static void resetEEPROM();
+    static bool mountLittleFS();
 
     static File openLog(const char* mode, const bool create = false)
     {
-        return logFileFs->open(LOG_FILE_PATH, mode, create);
+        return LittleFS.open(LOG_FILE_PATH, mode, create);
     }
 
     static bool removeLog()
     {
-        return logFileFs->remove(LOG_FILE_PATH);
+        return LittleFS.remove(LOG_FILE_PATH);
     }
 
     static File openRFIDs(const char* mode, const bool create = false)
     {
-        return rfidsFs->open(RFID_FILE_PATH, mode, create);
+        return LittleFS.open(RFID_FILE_PATH, mode, create);
     }
 
     static File openTmpRFIDs(const char* mode, const bool create = false)
     {
-        return rfidsFs->open(TMP_RFID_FILE_PATH, mode, create);
+        return LittleFS.open(TMP_RFID_FILE_PATH, mode, create);
     }
 
-    static File openFirmware(const char* mode, const bool create = false)
+    static File openGpsRFIDs(const char* mode, const bool create = false)
     {
-        return firmwareFs->open(FIRMWARE_FILE_PATH, mode, create);
+        return LittleFS.open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, mode, create);
     }
 
     static File openGPS(const char* mode, const bool create = false)
     {
-        return gpsFs->open(GPS_FILE_PATH, mode, create);
+        return LittleFS.open(GPS_FILE_PATH, mode, create);
     }
 
-    static bool remove(FS& fs, const String& path, bool notExistingOk = true);
+    static bool replaceRFIDsFileWithTmpRFIDs();
+    static bool replaceGpsUIDsFileWithTmpUIDs();
+    static bool move(const String& oldPath, const String& newPath, bool deleteIfNewExists);
+
+    static bool remove(const String& path, bool notExistingOk = true);
 
     static bool removeTmpRFIDs(const bool notExistingOk = true)
     {
-        return remove(*rfidsFs, TMP_RFID_FILE_PATH, notExistingOk);
+        return remove(TMP_RFID_FILE_PATH, notExistingOk);
     }
 
     static bool removeRFIDs(const bool notExistingOk = true)
     {
-        return remove(*rfidsFs, RFID_FILE_PATH, notExistingOk);
+        return remove(RFID_FILE_PATH, notExistingOk);
     }
 
     static bool removeGpsLog(const bool notExistingOk = true)
     {
-        return remove(*gpsFs, GPS_FILE_PATH, notExistingOk);
+        return remove(GPS_FILE_PATH, notExistingOk);
     }
 
-    static bool exists(FS& fs, const String& path)
+    static bool exists(const String& path)
     {
-        return fs.exists(path);
+        return LittleFS.exists(path);
     }
 
     static bool rfidsFileExists()
     {
-        return exists(*rfidsFs, RFID_FILE_PATH);
+        return exists(RFID_FILE_PATH);
     }
 
-    static bool removeFirmwareFile(const bool notExistingOk = true)
+    static void logDirTree(const char* dirname, const uint8_t maxDepth)
     {
-        return remove(*firmwareFs, FIRMWARE_FILE_PATH, notExistingOk);
+        logDirTree(dirname, maxDepth, 0);
     }
 
-    static void logFSConfiguration();
-    static void logDirTree(FS& fs, const char* dirname, const uint8_t maxDepth)
-    {
-        logDirTree(fs, dirname, maxDepth, 0);
-    }
-    static void logFilesystemTree(FS* fs, uint8_t maxDepth);
-
-    static void logFilesystemTrees(const uint8_t maxDepth = 10)
-    {
-        logFilesystemTree(&SPIFFS, maxDepth);
-        logFilesystemTree(&SD, maxDepth);
-    }
+    static void logFilesystemTree(uint8_t maxDepth);
 
     static void logFilesystemsInformation();
 
 private:
-    static void logDirTree(FS& fs, const char* dirname, uint8_t maxDepth, uint8_t indent);
+    static void logDirTree(const char* dirname, uint8_t maxDepth, uint8_t indent);
 };

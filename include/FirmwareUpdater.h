@@ -1,4 +1,5 @@
 #pragma once
+#include <sys/_stdint.h>
 
 
 enum class FirmwareUpdateCheckResult
@@ -11,8 +12,8 @@ enum class FirmwareUpdateCheckResult
 
 class FirmwareUpdater
 {
-    static bool downloadAndPerformUpdate();
-    static long getLatestFirmwareSize();
+    static bool performUpdate();
+    static uint32_t getLatestFirmwareSize();
 public:
     static FirmwareUpdateCheckResult checkForFirmwareUpdate();
     static bool doUpdateIfAvailable();

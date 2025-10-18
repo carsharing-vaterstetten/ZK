@@ -27,7 +27,7 @@ class GPS
     static bool writeLogBufferToFile();
 
 public:
-    static void uploadFileFromAllFilesystems(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    static void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
     static void logDataBuffered(const GPS_DATA_t& data);
     static bool flush();
 };

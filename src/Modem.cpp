@@ -5,8 +5,6 @@
 #include "Globals.h"
 #include <HelperUtils.h>
 #include <ctime>
-#include <SD.h>
-#include <SPIFFS.h>
 
 #include "Backend.h"
 #include "StorageManager.h"
@@ -17,13 +15,65 @@
 
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
-bool Modem::isInit = false;
+bool Modem::isInit = false, Modem::timeSynced = false;
 uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
+
+// DownloadStream constructor implementation
+DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+                               const String& username, const String& password)
+    : HttpClient(gsmClient, server, port), isValid(false)
+{
+    fileLog.infoln("Opening stream to " + remotePath);
+
+    beginRequest();
+    const int err = get(remotePath);
+
+    if (err != 0)
+    {
+        fileLog.errorln("Error " + String(err) + ". Stream open canceled");
+        return;
+    }
+
+    if (!username.isEmpty() && !password.isEmpty())
+        sendBasicAuth(username, password);
+
+    endRequest();
+
+    const int status = responseStatusCode();
+    skipResponseHeaders();
+
+    fileLog.infoln("Response status: " + String(status));
+
+    if (status != 200)
+    {
+        fileLog.errorln("Unexpected status (see above). Stream open canceled");
+        return;
+    }
+
+    const size_t totalLen = contentLength();
+    fileLog.infoln("Content length: " + String(totalLen) + " B");
+
+    const uint32_t downloadTime = totalLen / Modem::getEstimatedDownloadSpeed();
+
+    fileLog.debugln("Download will take approximately " + String(downloadTime) + "s");
+
+    if (Modem::increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
+    {
+        fileLog.errorln("Failed to increase TWDT timeout. Stream open canceled");
+        return;
+    }
+
+    isValid = true;
+}
 
 void Modem::powerOn()
 {
     pinMode(PWR_PIN, OUTPUT);
+    pinMode(POWER_PIN, OUTPUT);
+
+    digitalWrite(POWER_PIN, HIGH);
+
     digitalWrite(PWR_PIN, LOW);
     delay(1000);
     digitalWrite(PWR_PIN, HIGH);
@@ -78,8 +128,14 @@ bool Modem::init(const uint8_t retries)
 {
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
+        if (gsmClient != nullptr)
+        {
+            gsmClient->stop();
+            powerOff();
+            delete gsmClient;
+        }
+
         delete gsmModem;
-        delete gsmClient;
 
         gsmModem = new TinyGsmSim7000{SERIAL_AT};
         gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
@@ -93,15 +149,44 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem connected to serial");
 
-        const bool modemInitSuccess = gsmModem->init();
+        const bool modemInitSuccess = gsmModem->init(config.simPin.c_str());
         fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
                                    "There was an error while initializing the modem");
 
         fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
 
+        const SimStatus simStatus = gsmModem->getSimStatus();
+        const String msg = "Sim status: " + HelperUtils::simStatusToString(simStatus);
+        fileLog.logInfoOrWarningln(simStatus == SIM_READY, msg, msg);
+
+        switch (simStatus)
+        {
+        case SIM_READY: break;
+        case SIM_LOCKED:
+            {
+                const bool unlockSuccess = gsmModem->simUnlock(config.simPin.c_str());
+                fileLog.logInfoOrWarningln(unlockSuccess,
+                                           "Sim unlocked successfully", "Attempt no. " + String(attempt + 1) + " of " +
+                                           String(retries + 1) + " failed because the SIM is not ready. Retrying...");
+                if (unlockSuccess) break;
+
+                continue;
+            }
+        case SIM_ERROR:
+            fileLog.errorln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the SIM card has an unknown status. Retrying...");
+            continue;
+        case SIM_ANTITHEFT_LOCKED:
+            {
+                fileLog.errorln("The SIM card is antitheft locked");
+                return false;
+            }
+        }
 
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem->gprsConnect(config.apn);
+        const bool gprsSuccess = gsmModem->gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
+                                                       config.gprsPassword.c_str());
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
         if (!gsmModem->isGprsConnected())
@@ -109,7 +194,6 @@ bool Modem::init(const uint8_t retries)
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the GPRS failed to connect. Retrying...");
-            powerOff();
             continue;
         }
 
@@ -123,29 +207,28 @@ bool Modem::init(const uint8_t retries)
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the network is not connected. Retrying...");
-            powerOff();
             continue;
         }
 
         fileLog.infoln("Syncing time");
-        constexpr uint8_t maxNetTimeSyncAttempts = 10;
+        constexpr uint8_t maxNetTimeSyncAttempts = 20;
         uint8_t syncAttempt = 0;
         for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
         {
             int year;
             gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
             if (year < 2070 && year >= 2025) break;
-            fileLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+            serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
         }
-        const bool timeSyncSuccess = syncAttempt < maxNetTimeSyncAttempts;
-        fileLog.logInfoOrWarningln(timeSyncSuccess, "Time synced successfully", "Failed to sync time");
+        timeSynced = syncAttempt < maxNetTimeSyncAttempts;
+        HelperUtils::updateSystemTimeWithModem();
+        fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
 
-        if (!timeSyncSuccess)
+        if (!timeSynced)
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
                 " failed because the the modem could not synchronise time. Retrying...");
-            powerOff();
             continue;
         }
 
@@ -161,9 +244,8 @@ bool Modem::init(const uint8_t retries)
     return false;
 }
 
-UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                               const String& urlParams, const int bufferSize, unsigned long* uploadStartMs,
-                               unsigned long* uploadEndMs)
+UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response, const int bufferSize,
+                               unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
     const String filePath = f.path();
     const bool isFileLogFile = filePath == LOG_FILE_PATH;
@@ -189,22 +271,15 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FILE_IS_EMPTY;
     }
 
-    // Append URL parameters if provided
-    String fullEndpoint = endpoint;
-    if (!urlParams.isEmpty())
-    {
-        fullEndpoint += "?" + urlParams;
-    }
-
-    HttpClient uploadHttp{*gsmClient, config.server, config.port};
+    HttpClient uploadHttp{*gsmClient, config.server, config.serverPort};
 
     uploadHttp.beginRequest();
-    const int err = uploadHttp.post(fullEndpoint);
+
+    const int err = uploadHttp.post(endpoint);
 
     if (err != 0)
     {
         f.close();
-        uploadHttp.stop();
         fileLog.errorln("Failed to upload file. Error " + String(err));
         return UploadResult::HTTP_REQUEST_ERROR;
     }
@@ -212,12 +287,11 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     if (increaseWatchdogTimeoutForFileUpload(fileSize) != ESP_OK)
     {
         f.close();
-        uploadHttp.stop();
         fileLog.errorln("Failed to increase TWDT timeout. Upload aborted");
         return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
 
-    uploadHttp.sendBasicAuth(efuseMacHex, config.password);
+    uploadHttp.sendBasicAuth(modemIMEI, config.serverPassword);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
     uploadHttp.sendHeader("Content-Length", String(fileSize));
     uploadHttp.beginBody();
@@ -228,23 +302,30 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
     if (uploadStartMs) *uploadStartMs = millis();
 
-    while (f.available() && totalBytesUploaded < fileSize)
+    while (f.available())
     {
-        size_t readLength = bufferSize;
-        if (totalBytesUploaded + readLength > fileSize)
-        {
-            readLength = fileSize - totalBytesUploaded;
-        }
-
-        if (readLength <= 0) break;
-
-        const size_t bytesRead = f.read(buffer, readLength);
+        const size_t bytesRead = f.read(buffer, bufferSize);
 
         if (bytesRead <= 0) break;
 
-        const size_t bytesSent = uploadHttp.write(buffer, bytesRead);
+        size_t bytesSent = uploadHttp.write(buffer, bytesRead);
 
-        if (bytesSent <= 0) break; // This happens, when the server does not allow the request size.
+        uint8_t sendRetry = 0;
+        constexpr uint8_t maxSendRetries = 10;
+
+        while (bytesSent == 0 && sendRetry < maxSendRetries)
+        {
+            bytesSent = uploadHttp.write(buffer, bytesRead);
+            ++sendRetry;
+        }
+
+        if (sendRetry >= maxSendRetries)
+        {
+            f.close();
+            WatchdogHandler::revertTemporaryIncrease();
+            fileLog.errorln("Failed to write data to http client");
+            return UploadResult::FAILED_TO_SEND_DATA;
+        }
 
         totalBytesUploaded += bytesSent;
 
@@ -265,32 +346,35 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         }
     }
 
-    uploadHttp.endRequest();
-
     if (uploadEndMs) *uploadEndMs = millis();
 
-    if (statusCode) *statusCode = uploadHttp.responseStatusCode();
-    const String responseBody = uploadHttp.responseBody();
+    uploadHttp.endRequest();
+
+    const int respCode = uploadHttp.responseStatusCode();
+
+    if (statusCode) *statusCode = respCode;
+    if (response) *response = uploadHttp.responseBody();
 
     f.close();
-    uploadHttp.stop();
 
     WatchdogHandler::revertTemporaryIncrease();
 
-    if (statusCode)
-        fileLog.infoln("Response status code: " + String(*statusCode));
+    fileLog.infoln("Response status code: " + String(respCode));
 
-    if (response) *response = responseBody;
+    if (HelperUtils::isSuccessfulResponse(respCode))
+    {
+        return UploadResult::SUCCESS;
+    }
 
-    return UploadResult::SUCCESS;
+    return UploadResult::UNEXPECTED_STATUS_CODE;
 }
 
 UploadAndRetryResult Modem::uploadFileAndDelete(
-    const String& endpoint, FS& fileFs, const String& filePath, const bool deleteIfSuccess,
-    const bool deleteAfterRetrying, const uint32_t retries, const String& urlParams, const int bufferSize,
+    const String& endpoint, const String& filePath, const bool deleteIfSuccess,
+    const bool deleteAfterRetrying, const uint32_t retries, const int bufferSize,
     unsigned long* uploadStartMs, unsigned long* uploadEndMs)
 {
-    if (!fileFs.exists(filePath))
+    if (!LittleFS.exists(filePath))
     {
         fileLog.errorln(filePath + " does not exist");
         return UploadAndRetryResult::FILE_DOES_NOT_EXIST;
@@ -301,7 +385,7 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
 
     do
     {
-        File f = fileFs.open(filePath, FILE_READ);
+        File f = LittleFS.open(filePath, FILE_READ);
 
         if (!f)
         {
@@ -309,7 +393,7 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
             return UploadAndRetryResult::FAILED_TO_OPEN_FILE;
         }
 
-        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, urlParams, bufferSize, uploadStartMs, uploadEndMs);
+        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, bufferSize, uploadStartMs, uploadEndMs);
 
         switch (uploadResult)
         {
@@ -317,6 +401,8 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
         case UploadResult::SUCCESS:
             goto endLoop;
         case UploadResult::HTTP_REQUEST_ERROR:
+        case UploadResult::UNEXPECTED_STATUS_CODE:
+        case UploadResult::FAILED_TO_SEND_DATA:
         case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
             break;
         }
@@ -333,7 +419,7 @@ endLoop:;
 
     if (deleteAfterRetrying || (uploadResult == UploadResult::SUCCESS && deleteIfSuccess))
     {
-        const bool removeSuccess = StorageManager::remove(fileFs, filePath);
+        const bool removeSuccess = StorageManager::remove(filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }
@@ -349,6 +435,10 @@ endLoop:;
     case UploadResult::SUCCESS:
         if (attemptNo == 0) return UploadAndRetryResult::SUCCESS;
         return UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
+    case UploadResult::UNEXPECTED_STATUS_CODE:
+        return UploadAndRetryResult::UNEXPECTED_STATUS_CODE;
+    case UploadResult::FAILED_TO_SEND_DATA:
+        return UploadAndRetryResult::FAILED_TO_SEND_DATA;
     }
 
     // ReSharper disable once CppDFAUnreachableCode
@@ -360,13 +450,12 @@ endLoop:;
 int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String& username,
                      const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.port};
+    HttpClient http{*gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
     if (err != HTTP_SUCCESS)
     {
-        http.stop();
         return err;
     }
 
@@ -382,8 +471,6 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
         *responseBody = http.responseBody();
     }
 
-    http.stop();
-
     return responseStatus;
 }
 
@@ -392,13 +479,12 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const size_t size, const String& username,
                         const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.port};
+    HttpClient http{*gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
     if (err != HTTP_SUCCESS)
     {
-        http.stop();
         return err;
     }
 
@@ -414,8 +500,6 @@ int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const siz
         http.read(responseBody, size);
     }
 
-    http.stop();
-
     return responseStatus;
 }
 
@@ -425,60 +509,30 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
                                    unsigned long* downloadEndMs)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
-    HttpClient downloadHttp{*gsmClient, config.server, config.port};
+    DownloadStream downloadStream{remotePath, *gsmClient, config.server, config.serverPort, username, password};
 
-    downloadHttp.beginRequest();
-    const int err = downloadHttp.get(remotePath);
-
-    if (err != 0)
+    if (!downloadStream)
     {
-        fileLog.errorln("Error " + String(err) + ". Download canceled");
-        downloadHttp.stop();
+        fileLog.errorln("Failed to open stream for download");
         f.close();
-        return DownloadResult::HTTP_REQUEST_ERROR;
-    }
-
-    if (!username.isEmpty() && !password.isEmpty())
-        downloadHttp.sendBasicAuth(username, password);
-
-    downloadHttp.endRequest();
-
-    const int status = downloadHttp.responseStatusCode();
-    downloadHttp.skipResponseHeaders();
-
-    fileLog.infoln("Response status: " + String(status));
-
-    if (status != 200)
-    {
-        fileLog.errorln("Unexpected status (see above). Download canceled");
-        downloadHttp.stop();
-        f.close();
-        return DownloadResult::UNEXPECTED_STATUS_CODE;
+        return DownloadResult::FAILED_TO_OPEN_STREAM;
     }
 
     uint8_t buf[bufferSize];
 
-    const size_t totalLen = downloadHttp.contentLength();
+    const size_t totalLen = downloadStream.contentLength();
     size_t downloaded = 0;
     size_t nextPrint = totalLen / 10;
 
     fileLog.infoln("Downloading " + String(totalLen) + " B");
 
-    if (increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
-    {
-        downloadHttp.stop();
-        f.close();
-        fileLog.errorln("Failed to increase TWDT timeout. Download aborted");
-        return DownloadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
-    }
-
     if (downloadStartMs) *downloadStartMs = millis();
 
-    while (downloadHttp.connected() || downloadHttp.available())
+    while (downloadStream.connected() || downloadStream.available())
     {
-        while (downloadHttp.available())
+        while (downloadStream.available())
         {
-            const size_t len = downloadHttp.readBytes(buf, bufferSize);
+            const size_t len = downloadStream.readBytes(buf, bufferSize);
             f.write(buf, len);
             downloaded += len;
 
@@ -490,58 +544,20 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
         }
     }
 
-    downloadHttp.stop();
-
     if (downloadEndMs) *downloadEndMs = millis();
 
     f.close();
-
-    WatchdogHandler::revertTemporaryIncrease();
 
     fileLog.infoln("Download complete");
 
     return DownloadResult::SUCCESS;
 }
 
-void Modem::uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, const bool deleteIfSuccess,
-                                        const bool deleteAfterRetrying, const uint32_t retries)
+void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
-    bool uploadedSomething = false;
-
-    if (SPIFFS.exists(filePath))
-    {
-        fileLog.infoln("Uploading " + filePath + " from SPIFFS");
-        uploadedSomething = true;
-        uploadFileAndDelete(endpoint, SPIFFS, filePath, deleteIfSuccess,
-                            deleteAfterRetrying, retries, "filesystem=SPIFFS");
-    }
-
-    if (StorageManager::isSDCardConnected())
-    {
-        if (SD.exists(filePath))
-        {
-            fileLog.infoln("Uploading " + filePath + " from SD-Card");
-            uploadedSomething = true;
-            uploadFileAndDelete(endpoint, SD, filePath, deleteIfSuccess,
-                                deleteAfterRetrying, retries, "filesystem=SD-Card");
-        }
-    }
-    else if (config.preferSDCard)
-    {
-        fileLog.warningln("SD-Card not inserted -> Cannot upload " + filePath + " from there");
-    }
-
-    if (!uploadedSomething)
-    {
-        fileLog.warningln("Could not find " + filePath + " on any FS for uploading");
-    }
-}
-
-void Modem::uploadLogsFromAllFileSystems(const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                         const uint32_t retries)
-{
-    fileLog.infoln("Uploading log file(s)");
-    uploadFileFromAllFileSystem(LOG_FILE_PATH, LOG_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
+    fileLog.infoln("Uploading log file");
+    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying,
+                        retries);
 }
 
 time_t Modem::getUnixTimestamp()
@@ -571,16 +587,16 @@ void Modem::performConnectionSpeedTest()
 #if !SKIP_ALL_CONNECTION_SPEED_TESTS
     fileLog.infoln("Performing connection speed test");
 
-    // Use SPIFFS for simplicity and reliability
-    File df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
+    // Use LittleFS for simplicity and reliability
+    File df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
 
     unsigned long downloadStart, downloadEnd;
     const DownloadResult downloadResult = downloadFile(
-        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, efuseMacHex,
-        config.password, 512, &downloadStart, &downloadEnd);
+        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, modemIMEI,
+        config.serverPassword, 512, &downloadStart, &downloadEnd);
     df.close();
 
-    df = SPIFFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
+    df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
     const size_t fileSize = df.size();
     df.close();
 
@@ -596,14 +612,13 @@ void Modem::performConnectionSpeedTest()
         fileLog.errorln(
             "Download test failed. Aborting further tests. Defaulting to " + String(estimatedUploadSpeed) + " B/s UP, "
             + String(estimatedDownloadSpeed) + " B/s DOWN");
-        SPIFFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
+        LittleFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
         return;
     }
 
     unsigned long uploadStart, uploadEnd;
     const UploadAndRetryResult uploadResult = uploadFileAndDelete(
-        UPLOAD_TEST_ENDPOINT, SPIFFS, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3,
-        "", 512, &uploadStart, &uploadEnd);
+        UPLOAD_TEST_ENDPOINT, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, 512, &uploadStart, &uploadEnd);
 
     if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {
@@ -614,17 +629,18 @@ void Modem::performConnectionSpeedTest()
     }
     else
     {
-        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed));
+        fileLog.warningln("Upload test failed. Defaulting to " + String(estimatedUploadSpeed) + " B/s");
     }
 #endif
 }
 
 bool Modem::getGPS(GPS_DATA_t& out)
 {
+    uint8_t status;
     int year, month, day, hour, minute, second;
-    const bool success = gsmModem->getGPS(&out.lat, &out.lon, &out.speed, &out.alt, reinterpret_cast<int*>(&out.vsat),
-                                    reinterpret_cast<int*>(&out.usat), &out.accuracy, &year, &month, &day, &hour,
-                                    &minute, &second);
+    const bool success = gsmModem->getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
+                                          reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
+                                          &out.accuracy, &year, &month, &day, &hour, &minute, &second);
     if (!success) return false;
 
     out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);

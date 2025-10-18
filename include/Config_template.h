@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Log.h"
-#include "Backend.h"
 
 // Serial debugging
 #define ENABLE_SERIAL_LOGGING false // Enable for serial printing
@@ -10,7 +9,6 @@
 #define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
 #endif
 #define FLASH_LOGGING_LEVEL LOGGING_LEVEL_INFO
-#define SD_CARD_LOGGING_LEVEL LOGGING_LEVEL_INFO
 
 #define UART_BAUD 115200U
 
@@ -24,17 +22,11 @@
 #define PIN_TX 27
 #define PIN_RX 26
 #define PWR_PIN 4
+#define POWER_PIN 25
 
 // Car key pins
-#define OPEN_KEY 21
-#define CLOSE_KEY 22
-
-// SD-Card pins
-#define SD_MISO 2
-#define SD_MOSI 15
-#define SD_SCLK 14
-#define SD_CS 13
-#define SD_SPI VSPI
+#define OPEN_KEY 15
+#define CLOSE_KEY 14
 
 // NFC modul Pins
 #define NFC_MOSI 23
@@ -45,6 +37,9 @@
 
 // Restart the esp at this time
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
+
+// Check for firmware update on boot. Useful for development
+#define CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT true
 
 // Hardware watchdog
 #define HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT 1200U // [s]
@@ -57,12 +52,12 @@
 #define CONNECTION_SPEED_TEST_FILE_SIZE (16U * 1024U) // Smaller files result in less accurate connection speed estimates
 
 // Config override
-#define OVERRIDE_CONFIG false // Useful for development or mass deployment
-#if OVERRIDE_CONFIG
-#define OVERRIDE_CONFIG_VERSION 2
-#define OVERRIDE_CONFIG_APN ""
-#define OVERRIDE_CONFIG_SERVER ""
-#define OVERRIDE_CONFIG_PORT 80
-#define OVERRIDE_CONFIG_PASSWORD ""
-#define OVERRIDE_CONFIG_PREFER_SD_CARD true
-#endif
+#define USE_DEFAULT_CONFIG false // Useful for development or mass deployment
+// Default config values are used when no config was previously set and before the user entered a config. Or when USE_DEFAULT_CONFIG is true
+#define DEFAULT_CONFIG_APN ""
+#define DEFAULT_CONFIG_GPRS_USER ""
+#define DEFAULT_CONFIG_GPRS_PASSWORD ""
+#define DEFAULT_CONFIG_SERVER ""
+#define DEFAULT_CONFIG_PORT 80
+#define DEFAULT_CONFIG_PASSWORD ""
+#define DEFAULT_SIM_PIN ""

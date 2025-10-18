@@ -3,16 +3,17 @@
 #include <Arduino.h>
 
 #define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
-#include <TinyGsmClientSIM7000.h>
+#include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
-
+#include "WatchdogHandler.h"
 #include "GPS.h"
 
-#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
-#define BASE_DOWNLOAD_RESULTS HTTP_REQUEST_ERROR, UNEXPECTED_STATUS_CODE, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS
+#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
+#define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS
 
 enum class UploadResult
 {
@@ -32,6 +33,34 @@ enum class DownloadResult
     BASE_DOWNLOAD_RESULTS,
 };
 
+// HTTP download stream that automatically manages connection and watchdog timeout
+class DownloadStream : public HttpClient
+{
+public:
+    // Open HTTP GET stream with automatic setup and watchdog management
+    DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+                   const String& username = "", const String& password = "");
+
+    // Constructor for invalid/null stream
+    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false)
+    {
+    }
+
+    ~DownloadStream() override
+    {
+        if (isValid)
+        {
+            HttpClient::stop();
+            WatchdogHandler::revertTemporaryIncrease();
+        }
+    }
+
+    explicit operator bool() const { return isValid; }
+
+private:
+    bool isValid;
+};
+
 class Modem
 {
     static void powerOn();
@@ -42,6 +71,9 @@ class Modem
     static uint32_t estimatedDownloadSpeed;
     static uint32_t estimatedUploadSpeed;
 
+    static bool isInit, timeSynced;
+    static TinyGsmSim7000* gsmModem;
+
 public:
     static TinyGsmSim7000::GsmClientSim7000* gsmClient;
 
@@ -49,14 +81,12 @@ public:
 
     static bool init(uint8_t retries = 2);
     static UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                                   const String& urlParams = "", int bufferSize = 512,
-                                   unsigned long* uploadStartMs = nullptr, unsigned long* uploadEndMs = nullptr);
-    static UploadAndRetryResult uploadFileAndDelete(
-        const String& endpoint, FS& fileFs, const String& filePath,
-        bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
-        const String& urlParams = "", int bufferSize = 512,
-        unsigned long* uploadStartMs = nullptr,
-        unsigned long* uploadEndMs = nullptr);
+                                   int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
+                                   unsigned long* uploadEndMs = nullptr);
+    static UploadAndRetryResult uploadFileAndDelete(const String& endpoint, const String& filePath,
+                                                    bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
+                                                    int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
+                                                    unsigned long* uploadEndMs = nullptr);
     static int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
                          const String& password = "");
     static int simpleGetBin(const String& aUrlPath, uint8_t* responseBody, size_t size, const String& username = "",
@@ -65,9 +95,7 @@ public:
                                        const String& password = "", int bufferSize = 512,
                                        unsigned long* downloadStartMs = nullptr,
                                        unsigned long* downloadEndMs = nullptr);
-    static void uploadFileFromAllFileSystem(const String& filePath, const String& endpoint, bool deleteIfSuccess,
-                                            bool deleteAfterRetrying, uint32_t retries);
-    static void uploadLogsFromAllFileSystems(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
@@ -92,7 +120,23 @@ public:
         return isInit;
     }
 
-private:
-    static bool isInit;
-    static TinyGsmSim7000* gsmModem;
+    static bool timeIsAvailable()
+    {
+        return timeSynced;
+    }
+
+    static String getIMEI()
+    {
+        return gsmModem->getIMEI();
+    }
+
+    static uint32_t getEstimatedDownloadSpeed()
+    {
+        return estimatedDownloadSpeed;
+    }
+
+    static uint32_t getEstimatedUploadSpeed()
+    {
+        return estimatedUploadSpeed;
+    }
 };
