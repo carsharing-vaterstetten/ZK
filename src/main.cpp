@@ -131,9 +131,6 @@ void setup()
     fileLog.infoln("Hardware startup reason: " + WatchdogHandler::getResetReasonHumanReadable(esp_reset_reason()));
     StorageManager::logFilesystemsInformation();
 
-    // Cleanup of leftover firmware update
-    StorageManager::removeFirmwareFile();
-
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
     statusLed.init();

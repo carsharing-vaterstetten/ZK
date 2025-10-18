@@ -33,11 +33,6 @@ public:
         return LittleFS.open(TMP_RFID_FILE_PATH, mode, create);
     }
 
-    static File openFirmware(const char* mode, const bool create = false)
-    {
-        return LittleFS.open(FIRMWARE_FILE_PATH, mode, create);
-    }
-
     static bool replaceRFIDsFileWithTmpRFIDs();
 
     static bool remove(const String& path, bool notExistingOk = true);
@@ -60,11 +55,6 @@ public:
     static bool rfidsFileExists()
     {
         return exists(RFID_FILE_PATH);
-    }
-
-    static bool removeFirmwareFile(const bool notExistingOk = true)
-    {
-        return remove(FIRMWARE_FILE_PATH, notExistingOk);
     }
 
     static void logDirTree(const char* dirname, const uint8_t maxDepth)
