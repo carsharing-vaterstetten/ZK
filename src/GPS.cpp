@@ -12,7 +12,7 @@ GPS_DATA_t GPS::logBuffer[GPS_LOG_BUFFER_SIZE];
 void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
     fileLog.infoln("Uploading GPS log(s)");
-    Modem::uploadFileAndDelete(GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT, deleteIfSuccess, deleteAfterRetrying, retries);
+    Modem::uploadFileAndDelete(GPS_FILE_UPLOAD_ENDPOINT, GPS_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 bool GPS::writeLogBufferToFile()
