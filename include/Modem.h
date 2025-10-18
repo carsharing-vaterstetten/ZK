@@ -125,4 +125,14 @@ public:
     {
         return gsmModem->getIMEI();
     }
+
+    static uint32_t getEstimatedDownloadSpeed()
+    {
+        return estimatedDownloadSpeed;
+    }
+
+    static uint32_t getEstimatedUploadSpeed()
+    {
+        return estimatedUploadSpeed;
+    }
 };

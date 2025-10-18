@@ -54,6 +54,10 @@ DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, cons
     const size_t totalLen = contentLength();
     fileLog.infoln("Content length: " + String(totalLen) + " B");
 
+    const uint32_t downloadTime = totalLen / Modem::getEstimatedDownloadSpeed();
+
+    fileLog.debugln("Download will take approximately " + String(downloadTime) + "s");
+
     if (Modem::increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
     {
         fileLog.errorln("Failed to increase TWDT timeout. Stream open canceled");
