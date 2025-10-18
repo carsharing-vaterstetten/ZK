@@ -124,18 +124,7 @@ bool RFIDs::downloadRfids()
 
     fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
-    const bool removeOldSuccess = StorageManager::removeRFIDs();
-    fileLog.logInfoOrWarningln(removeOldSuccess, "Removed old RFIDs file successfully",
-                               "Failed to remove old RFIDs file");
-
-    const bool renameSuccess = LittleFS.rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
-
-    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed RFIDs file",
-                               "Failed to rename RFIDs file. RFIDs not updated");
-
-    StorageManager::removeTmpRFIDs();
-
-    return renameSuccess;
+    return StorageManager::replaceRFIDsFileWithTmpRFIDs();
 }
 
 void RFIDs::downloadRfidsIfChanged()

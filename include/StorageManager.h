@@ -38,6 +38,8 @@ public:
         return LittleFS.open(FIRMWARE_FILE_PATH, mode, create);
     }
 
+    static bool replaceRFIDsFileWithTmpRFIDs();
+
     static bool remove(const String& path, bool notExistingOk = true);
 
     static bool removeTmpRFIDs(const bool notExistingOk = true)

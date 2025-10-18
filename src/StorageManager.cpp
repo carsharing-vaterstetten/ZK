@@ -11,6 +11,19 @@ bool StorageManager::mountLittleFS()
     return flashIsMounted;
 }
 
+bool StorageManager::replaceRFIDsFileWithTmpRFIDs()
+{
+    fileLog.logInfoOrWarningln(removeRFIDs(), "Removed old RFIDs file successfully",
+                               "Failed to remove old RFIDs file");
+
+    const bool renameSuccess = LittleFS.rename(TMP_RFID_FILE_PATH, RFID_FILE_PATH);
+
+    fileLog.logInfoOrWarningln(renameSuccess, "Successfully renamed RFIDs file", "Failed to rename RFIDs file.");
+
+    removeTmpRFIDs();
+    return renameSuccess;
+}
+
 bool StorageManager::remove(const String& path, const bool notExistingOk)
 {
     if (notExistingOk && !LittleFS.exists(path)) return true;
