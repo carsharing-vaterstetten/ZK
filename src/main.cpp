@@ -154,8 +154,12 @@ void setup()
 #endif
 
     // Now we are ready to check for a firmware update
+#if CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT
     statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
     FirmwareUpdater::doUpdateIfAvailable();
+#else
+    fileLog.infoln("Skipped firmware update check");
+#endif
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
