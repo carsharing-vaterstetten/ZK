@@ -42,7 +42,7 @@ void checkNFCTag()
     else
     {
         fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
-        statusLed.setColor(Color::Red);
+        statusLed.setStatusColor(StatusColor::NFCUnknownUIDScanned);
     }
 
     delay(2000);
