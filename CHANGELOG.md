@@ -1,10 +1,10 @@
 # Changelog
 
-## [0.6.0] (WIP)
+## [1.0.0] (WIP)
 
 > [!CAUTION]
-> Diese Version vernichtet alle Kompatibilität mit vorherigen Versionen vom Backend, alter EEPROM Configs und
-> Pinbelegung. Hardware und Backend muss neu aufgesetzt werden.
+> Diese Version vernichtet alle Kompatibilität mit vorherigen Versionen vom Backend, alter EEPROM Configs und altem
+> Dateisystem. Hardware und Backend muss neu aufgesetzt werden.
 
 Noch stehen nicht alle Änderungen fest. Bis dahin gibt es [hier](https://github.com/Finnomator/ZK/issues/1) eine kleine Übersicht.
 
