@@ -23,9 +23,8 @@ unsigned long targetMillis;
 void checkNFCTag()
 {
     uint32_t rfidUid;
-    const bool readSuccess = NFCCardReader::readTag(rfidUid);
 
-    if (!readSuccess) return; // No card present
+    if (!NFCCardReader::readTag(rfidUid)) return; // No card present
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {

@@ -50,11 +50,7 @@ bool FirmwareUpdater::performUpdate()
 
     const size_t written = Update.writeStream(downloadStream);
 
-    if (written == updateSize)
-    {
-        fileLog.infoln("Written : " + String(written) + " successfully");
-    }
-    else
+    if (written != updateSize)
     {
         fileLog.errorln("Write failed. Written " + String(written) + " B / " + String(updateSize) + " B");
         return false;
