@@ -3,7 +3,7 @@
 #include "Log.h"
 
 // Serial debugging
-#define ENABLE_SERIAL_LOGGING false // Enable for serial printing
+#define ENABLE_SERIAL_LOGGING true // Enable for serial printing
 #define COLORIZE_SERIAL_LOGGING true
 #if ENABLE_SERIAL_LOGGING
 #define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
