@@ -122,11 +122,11 @@ void checkGPS()
 
     if (!gpsSuccess)
     {
-        serialOnlyLog.debugln("No GPS data received");
+        // serialOnlyLog.debugln("No GPS data received");
         return;
     }
 
-    serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
+    // serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
 
     GPS::logDataBuffered(gpsData);
 }
