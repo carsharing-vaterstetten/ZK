@@ -102,6 +102,7 @@ void loadConfig()
         WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
     }
 #endif
+    fileLog.infoln("Loaded config: " + config.toString());
 }
 
 void checkGPS()
@@ -157,7 +158,6 @@ void setup()
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
-    fileLog.infoln("Loaded config: " + config.toString());
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
     fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(0)));
     fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
