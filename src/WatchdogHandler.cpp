@@ -37,11 +37,10 @@ esp_err_t WatchdogHandler::revertTemporaryIncrease()
 /// @param timeout Timeout period of TWDT in seconds
 esp_err_t WatchdogHandler::setTimeout(const uint32_t timeout)
 {
-    fileLog.infoln("Setting TWDT timeout to " + String(timeout) + " seconds");
     esp_task_wdt_reset(); // Reset watchdog to ensure it does not immediately trigger when setting to a lower timeout
     const esp_err_t watchdog_init_err = esp_task_wdt_init(timeout, true);
-    fileLog.logInfoOrErrorln(watchdog_init_err == ESP_OK, "TWDT timeout set successfully",
-                             "Setting TWDT timeout failed. Error " + String(watchdog_init_err));
+    fileLog.logInfoOrErrorln(watchdog_init_err == ESP_OK, "TWDT timeout set successfully to " + String(timeout) + " s",
+                             "Setting TWDT timeout to " + String(timeout) + " s failed. Error " + String(watchdog_init_err));
     if (watchdog_init_err == ESP_OK)
     {
         currentTimeout = timeout;
