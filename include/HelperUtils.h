@@ -25,4 +25,5 @@ public:
     static String simStatusToString(SimStatus status);
     static String millisToIsoString(uint64_t ms);
     static String getResetReasonHumanReadable(int reset_reason);
+    static String toBase64(const uint8_t* data, size_t len);
 };

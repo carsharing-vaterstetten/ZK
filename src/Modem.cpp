@@ -21,7 +21,7 @@ uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
 // DownloadStream constructor implementation
 DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
-                               const String& username, const String& password)
+                               const String& username, const String& password, const String& cacheChecksum)
     : HttpClient(gsmClient, server, port), isValid(false)
 {
     fileLog.infoln("Opening stream to " + remotePath);
@@ -35,19 +35,29 @@ DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, cons
         return;
     }
 
+    if (!cacheChecksum.isEmpty())
+        sendHeader("if-none-match", cacheChecksum);
+
     if (!username.isEmpty() && !password.isEmpty())
         sendBasicAuth(username, password);
 
     endRequest();
 
-    const int status = responseStatusCode();
+    responseCode = HttpClient::responseStatusCode();
     skipResponseHeaders();
 
-    fileLog.infoln("Response status: " + String(status));
+    fileLog.infoln("Response status: " + String(responseCode));
 
-    if (status != 200)
+    if (responseCode <= 0)
     {
         fileLog.errorln("Unexpected status (see above). Stream open canceled");
+        return;
+    }
+
+    if (responseCode == 304)
+    {
+        fileLog.infoln("Not modified. Nothing to download");
+        isValid = true;
         return;
     }
 
@@ -516,6 +526,13 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
         fileLog.errorln("Failed to open stream for download");
         f.close();
         return DownloadResult::FAILED_TO_OPEN_STREAM;
+    }
+
+    if (downloadStream.responseStatusCode() != 200)
+    {
+        fileLog.errorln("Unexpected status code. Download canceled");
+        f.close();
+        return DownloadResult::UNEXPECTED_STATUS_CODE;
     }
 
     uint8_t buf[bufferSize];

@@ -13,7 +13,7 @@
 #include "GPS.h"
 
 #define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
-#define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS
+#define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS, UNEXPECTED_STATUS_CODE
 
 enum class UploadResult
 {
@@ -39,10 +39,10 @@ class DownloadStream : public HttpClient
 public:
     // Open HTTP GET stream with automatic setup and watchdog management
     DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
-                   const String& username = "", const String& password = "");
+                   const String& username = "", const String& password = "", const String& cacheChecksum = "");
 
     // Constructor for invalid/null stream
-    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false)
+    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false), responseCode(0)
     {
     }
 
@@ -51,14 +51,21 @@ public:
         if (isValid)
         {
             HttpClient::stop();
-            WatchdogHandler::revertTemporaryIncrease();
+            if (responseCode != 304)
+                WatchdogHandler::revertTemporaryIncrease();
         }
     }
 
     explicit operator bool() const { return isValid; }
 
+    [[nodiscard]] int responseStatusCode() const
+    {
+        return responseCode;
+    }
+
 private:
     bool isValid;
+    int responseCode;
 };
 
 class Modem

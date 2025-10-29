@@ -13,8 +13,7 @@ class RFIDs
 {
 public:
     static bool isRegisteredRFID(uint32_t rfid);
-    static RfidsChecksumResult compareChecksums();
-    static bool downloadRfids();
+    static void generateChecksum(uint8_t out[16]);
     static void downloadRfidsIfChanged();
     static bool downloadGPSTrackingConsentedRFIDs();
     static bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);

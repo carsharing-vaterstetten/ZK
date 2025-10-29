@@ -36,6 +36,12 @@ bool FirmwareUpdater::performUpdate()
         return false;
     }
 
+    if (downloadStream.responseStatusCode() != 200)
+    {
+        fileLog.errorln("Unexpected status code. Update canceled");
+        return false;
+    }
+
     const size_t updateSize = downloadStream.contentLength();
     fileLog.infoln("Update size: " + String(updateSize) + " B");
 

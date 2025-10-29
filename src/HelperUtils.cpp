@@ -4,6 +4,7 @@
 #include "Globals.h"
 #include "mbedtls/md5.h"
 #include <iomanip>
+#include "mbedtls/base64.h"
 
 #include "Modem.h"
 #include "LocalConfig.h"
@@ -263,4 +264,15 @@ String HelperUtils::getResetReasonHumanReadable(const int reset_reason)
     case 16: return "RTC Watch dog reset digital core and rtc module";
     default: return "NO_MEAN";
     }
+}
+
+String HelperUtils::toBase64(const uint8_t *data, size_t len)
+{
+    unsigned char encoded[64]; // plenty of space for 16-byte MD5
+    size_t out_len = 0;
+
+    mbedtls_base64_encode(encoded, sizeof(encoded), &out_len, data, len);
+    encoded[out_len] = '\0'; // null-terminate
+
+    return {reinterpret_cast<char*>(encoded)};
 }

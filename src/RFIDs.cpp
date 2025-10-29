@@ -35,58 +35,59 @@ bool RFIDs::isRegisteredRFID(const uint32_t rfid)
     return false;
 }
 
-RfidsChecksumResult RFIDs::compareChecksums()
+void RFIDs::generateChecksum(uint8_t out[16])
 {
-    fileLog.infoln("Comparing RFID file checksums");
-
     if (!StorageManager::rfidsFileExists())
     {
         fileLog.infoln("Local RFIDs file does not exist");
-        return RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST;
+        constexpr uint8_t empty_md5[16] = {
+            0xd4, 0x1d, 0x8c, 0xd9,
+            0x8f, 0x00, 0xb2, 0x04,
+            0xe9, 0x80, 0x09, 0x98,
+            0xec, 0xf8, 0x42, 0x7e
+        };
+        memcpy(out, empty_md5, 16);
+        return;
     }
-
-    constexpr uint8_t hashLen = 16;
-
-    uint8_t remoteMd5Hash[hashLen];
-    const int statusCode = Modem::simpleGetBin(
-        REMOTE_RFID_MD5_CHECKSUM_PATH, remoteMd5Hash, hashLen, modemIMEI, config.serverPassword);
-
-    if (statusCode != 200)
-    {
-        fileLog.warningln("Unexpected status code " + String(statusCode));
-        return RfidsChecksumResult::UNEXPECTED_STATUS_CODE;
-    }
-
-    uint8_t fileMd5Hash[hashLen];
 
     File f = StorageManager::openRFIDs(FILE_READ);
-    HelperUtils::md5File(f, fileMd5Hash);
+    HelperUtils::md5File(f, out);
     f.close();
-
-    if (memcmp(fileMd5Hash, remoteMd5Hash, hashLen) == 0)
-    {
-        fileLog.infoln("Files are equal");
-        return RfidsChecksumResult::FILES_ARE_EQUAL;
-    }
-
-    fileLog.infoln("Files differ");
-    return RfidsChecksumResult::FILES_DIFFER;
 }
 
-
-bool RFIDs::downloadRfids()
+void RFIDs::downloadRfidsIfChanged()
 {
     fileLog.infoln("Downloading remote RFIDs JSON");
 
     // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
-    DownloadStream http{
-        REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword
+
+    uint8_t md5Checksum[16];
+    generateChecksum(md5Checksum);
+
+    DownloadStream http
+    {
+        REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword,
+        HelperUtils::toBase64(md5Checksum, 16)
     };
 
     if (!http)
     {
         fileLog.errorln("Failed to open stream for RFIDs download");
-        return false;
+        return;
+    }
+
+    const uint16_t responseCode = http.responseStatusCode();
+
+    if (responseCode == 304)
+    {
+        fileLog.infoln("Server and local RFID UIDs are the same");
+        return;
+    }
+
+    if (responseCode != 200)
+    {
+        fileLog.errorln("Unexpected response code. Using old RFID UIDs");
+        return;
     }
 
     // Open temp file for writing
@@ -95,7 +96,7 @@ bool RFIDs::downloadRfids()
     if (!file)
     {
         fileLog.warningln("Failed to open temp RFIDs file. Download canceled");
-        return false;
+        return;
     }
 
     http.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
@@ -110,7 +111,7 @@ bool RFIDs::downloadRfids()
         fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
         file.close();
         StorageManager::removeTmpRFIDs();
-        return false;
+        return;
     }
 
     const auto rfids = doc.as<JsonArray>();
@@ -126,21 +127,7 @@ bool RFIDs::downloadRfids()
 
     fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
-    return StorageManager::replaceRFIDsFileWithTmpRFIDs();
-}
-
-void RFIDs::downloadRfidsIfChanged()
-{
-    switch (compareChecksums())
-    {
-    case RfidsChecksumResult::FILES_ARE_EQUAL:
-        break;
-    case RfidsChecksumResult::FILES_DIFFER:
-    case RfidsChecksumResult::UNEXPECTED_STATUS_CODE:
-    case RfidsChecksumResult::LOCAL_FILE_DOES_NOT_EXIST:
-        downloadRfids();
-        break;
-    }
+    StorageManager::replaceRFIDsFileWithTmpRFIDs();
 }
 
 bool RFIDs::downloadGPSTrackingConsentedRFIDs()
