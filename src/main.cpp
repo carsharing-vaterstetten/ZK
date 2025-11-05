@@ -31,18 +31,7 @@ void checkNFCTag()
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
         fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
-        if (isLoggedIn)
-        {
-            AccessControl::logout();
-        }
-        else
-        {
-            AccessControl::login(rfidUid);
-            currentRFIDConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfidUid);
-            fileLog.infoln(currentRFIDConsentsToGPSTracking
-                               ? "Logged in RFID consents to GPS tracking"
-                               : "Logged in RFID does not consent to GPS tracking");
-        }
+        accessControl.toggleLogin(rfidUid);
     }
     else
     {
@@ -107,7 +96,7 @@ void loadConfig()
 
 void checkGPS()
 {
-    if (isLoggedIn && !currentRFIDConsentsToGPSTracking) return;
+    if (!accessControl.hasPermissionForGPSTracking()) return;
 
     if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
     {
@@ -200,7 +189,7 @@ void setup()
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
-    AccessControl::init();
+    accessControl.init();
     NFCCardReader::init();
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
@@ -240,7 +229,7 @@ void loop()
     if (millis() >= nextGPSUpdate)
     {
         nextGPSUpdate = millis() + (
-            isLoggedIn ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
+            accessControl.isLoggedIn() ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
         checkGPS();
     }
 }
