@@ -1,12 +1,17 @@
 # Changelog
 
-## [1.0.0] (WIP)
+## [1.0.1]
+
+- Use HTTP caching to check for updated RFID UIDs in one instead of two requests
+- Store logged in RFID to persist them over system restarts
+
+## [1.0.0]
 
 > [!CAUTION]
 > Diese Version vernichtet alle Kompatibilität mit vorherigen Versionen vom Backend, alter EEPROM Configs und altem
 > Dateisystem. Hardware und Backend muss neu aufgesetzt werden.
 
-Noch stehen nicht alle Änderungen fest. Bis dahin gibt es [hier](https://github.com/Finnomator/ZK/issues/1) eine kleine Übersicht.
+Bisher gibt es [hier](https://github.com/Finnomator/ZK/issues/1) eine kleine Übersicht.
 
 ## [0.5.1]
 
