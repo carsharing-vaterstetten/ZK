@@ -228,8 +228,17 @@ void loop()
 
     if (millis() >= nextGPSUpdate)
     {
-        nextGPSUpdate = millis() + (
-            accessControl.isLoggedIn() ? GPS_UPDATE_INTERVAL_WHILE_DRIVING : GPS_UPDATE_INTERVAL_WHILE_STANDING);
-        checkGPS();
+        if (accessControl.isLoggedIn())
+        {
+            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_DRIVING;
+            checkGPS();
+        }
+        else
+        {
+            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_STANDING;
+#if RECORD_GPS_WHILE_STANDING
+            checkGPS();
+#endif
+        }
     }
 }
