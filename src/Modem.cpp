@@ -243,7 +243,13 @@ bool Modem::init(const uint8_t retries)
             continue;
         }
 
-        enableGPS();
+        if (!enableGPS())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the gps could not be enabled. Retrying...");
+            continue;
+        }
 
         fileLog.infoln("Modem startup completed successfully");
         return true;
