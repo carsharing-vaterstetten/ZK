@@ -78,7 +78,7 @@ class Modem
     static uint32_t estimatedDownloadSpeed;
     static uint32_t estimatedUploadSpeed;
 
-    static bool isInit, timeSynced;
+    static bool timeSynced;
     static TinyGsmSim7000* gsmModem;
 
 public:
@@ -121,11 +121,6 @@ public:
     static esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize);
     static void performConnectionSpeedTest();
     static bool getGPS(GPS_DATA_t& out);
-
-    static bool isInitialized()
-    {
-        return isInit;
-    }
 
     static bool timeIsAvailable()
     {

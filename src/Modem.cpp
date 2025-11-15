@@ -15,7 +15,7 @@
 
 TinyGsmSim7000* Modem::gsmModem = nullptr;
 TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
-bool Modem::isInit = false, Modem::timeSynced = false;
+bool Modem::timeSynced = false;
 uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
 uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
@@ -245,7 +245,6 @@ bool Modem::init(const uint8_t retries)
 
         enableGPS();
 
-        isInit = true;
         fileLog.infoln("Modem startup completed successfully");
         return true;
     }
