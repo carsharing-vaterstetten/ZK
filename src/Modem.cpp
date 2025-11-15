@@ -138,10 +138,11 @@ bool Modem::init(const uint8_t retries)
 {
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
+        powerOff();
+
         if (gsmClient != nullptr)
         {
             gsmClient->stop();
-            powerOff();
             delete gsmClient;
         }
 
