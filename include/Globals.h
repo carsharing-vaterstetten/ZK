@@ -7,5 +7,5 @@
 extern Log serialOnlyLog;
 extern Log fileLog;
 extern String modemIMEI;
-extern LED statusLed;
+extern CardReaderLED statusLed;
 extern LocalConfig config;

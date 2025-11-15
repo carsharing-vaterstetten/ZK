@@ -31,17 +31,16 @@ void checkNFCTag()
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
         fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
-        accessControl.toggleLogin(rfidUid);
+        if (accessControl.toggleLogin(rfidUid))
+            statusLed.unlockFlash();
+        else
+            statusLed.lockFlash();
     }
     else
     {
         fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
-        statusLed.setStatusColor(StatusColor::NFCUnknownUIDScanned);
+        statusLed.cardDeclinedFlash();
     }
-
-    delay(2000);
-
-    statusLed.clear();
 }
 
 void calculateNextRestartTime()

@@ -45,8 +45,6 @@ void AccessControl::lockCar()
     digitalWrite(CLOSE_KEY, HIGH);
     delay(200);
     digitalWrite(CLOSE_KEY, LOW);
-
-    statusLed.setStatusColor(StatusColor::CarLocked);
     fileLog.infoln("Car locked");
 }
 
@@ -56,7 +54,6 @@ void AccessControl::unlockCar()
     digitalWrite(OPEN_KEY, HIGH);
     delay(200);
     digitalWrite(OPEN_KEY, LOW);
-    statusLed.setStatusColor(StatusColor::CarUnlocked);
     fileLog.infoln("Car unlocked");
 }
 
@@ -66,8 +63,8 @@ void AccessControl::login(const uint32_t rfid)
     unlockCar();
     loggedInRfidConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfid);
     fileLog.infoln(loggedInRfidConsentsToGPSTracking.value()
-                               ? "Logged in RFID consents to GPS tracking"
-                               : "Logged in RFID does not consent to GPS tracking");
+                       ? "Logged in RFID consents to GPS tracking"
+                       : "Logged in RFID does not consent to GPS tracking");
     persistentStorage.putULong(loggedInRfidKey, rfid);
 }
 
@@ -79,10 +76,16 @@ void AccessControl::logout()
     persistentStorage.remove(loggedInRfidKey);
 }
 
-void AccessControl::toggleLogin(const uint32_t rfid)
+bool AccessControl::toggleLogin(const uint32_t rfid)
 {
-    if (isLoggedIn()) logout();
-    else login(rfid);
+    if (isLoggedIn())
+    {
+        logout();
+        return false;
+    }
+
+    login(rfid);
+    return true;
 }
 
 bool AccessControl::isLoggedIn() const

@@ -5,7 +5,7 @@
 Log serialOnlyLog{};
 Log fileLog{};
 String modemIMEI = "";
-LED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
+CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
 LocalConfig config{
     DEFAULT_CONFIG_APN,
     DEFAULT_CONFIG_GPRS_USER,

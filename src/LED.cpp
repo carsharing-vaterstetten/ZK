@@ -23,6 +23,32 @@ void LED::clear()
     neo.show();
 }
 
+void LED::flash(const StatusColor color, const uint16_t durationMs)
+{
+    setStatusColor(color);
+    delay(durationMs);
+    clear();
+}
+
+void CardReaderLED::unlockFlash()
+{
+    flash(StatusColor::CarUnlocked, 100);
+    delay(100);
+    flash(StatusColor::CarUnlocked, 100);
+}
+
+void CardReaderLED::lockFlash()
+{
+    flash(StatusColor::CarLocked, 100);
+    delay(100);
+    flash(StatusColor::CarLocked, 100);
+}
+
+void CardReaderLED::cardDeclinedFlash()
+{
+    flash(StatusColor::NFCUnknownUIDScanned, 1500);
+}
+
 uint32_t LED::getStatusColorValue(const StatusColor color)
 {
     switch (color)

@@ -18,7 +18,7 @@ public:
     void end();
     void login(uint32_t rfid);
     void logout();
-    void toggleLogin(uint32_t rfid);
+    bool toggleLogin(uint32_t rfid);
     [[nodiscard]] bool isLoggedIn() const;
     [[nodiscard]] std::optional<uint32_t> loggedInRfid() const;
     [[nodiscard]] bool hasPermissionForGPSTracking() const;
