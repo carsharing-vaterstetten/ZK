@@ -148,6 +148,7 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
     switch (downloadResult)
     {
     case DownloadResult::FAILED_TO_OPEN_STREAM:
+    case DownloadResult::UNEXPECTED_STATUS_CODE:
         fileLog.errorln("Download failed");
         StorageManager::removeTmpRFIDs();
         return false;
