@@ -172,6 +172,7 @@ void setup()
     // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
     modemIMEI = Modem::getIMEI();
     fileLog.infoln("Modem IMEI: " + modemIMEI);
+    fileLog.infoln("Signal Quality: " + String(Modem::getSignalQuality()));
 
     // Do the connection speed test before any up-/downloads
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
@@ -219,6 +220,8 @@ void loop()
         Modem::performConnectionSpeedTest();
         GPS::uploadFileAndDelete(true, true, 2);
         Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+
+        fileLog.infoln("Restarting now");
 
         ESP.restart();
     }

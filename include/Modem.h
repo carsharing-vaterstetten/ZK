@@ -141,4 +141,9 @@ public:
     {
         return estimatedUploadSpeed;
     }
+
+    static int16_t getSignalQuality()
+    {
+        return gsmModem->getSignalQuality();
+    }
 };
