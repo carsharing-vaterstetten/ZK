@@ -4,20 +4,11 @@
 #include "Config.h"
 #include "Globals.h"
 #include <HelperUtils.h>
-#include <ctime>
 
 #include "Backend.h"
+#include "LocalConfig.h"
 #include "StorageManager.h"
 #include "WatchdogHandler.h"
-
-#define SERIAL_AT Serial1
-#define SERIAL_AT_BAUD 115200U
-
-TinyGsmSim7000* Modem::gsmModem = nullptr;
-TinyGsmSim7000::GsmClientSim7000* Modem::gsmClient = nullptr;
-bool Modem::timeSynced = false;
-uint32_t Modem::estimatedUploadSpeed = 2500U; // [B/s]
-uint32_t Modem::estimatedDownloadSpeed = 5000U; // [B/s]
 
 // DownloadStream constructor implementation
 DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
@@ -64,17 +55,22 @@ DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, cons
     const size_t totalLen = contentLength();
     fileLog.infoln("Content length: " + String(totalLen) + " B");
 
-    const uint32_t downloadTime = totalLen / Modem::getEstimatedDownloadSpeed();
+    const uint32_t downloadTime = totalLen / modem.getEstimatedDownloadSpeed();
 
     fileLog.debugln("Download will take approximately " + String(downloadTime) + "s");
 
-    if (Modem::increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
+    if (modem.increaseWatchdogTimeoutForFileDownload(totalLen) != ESP_OK)
     {
         fileLog.errorln("Failed to increase TWDT timeout. Stream open canceled");
         return;
     }
 
     isValid = true;
+}
+
+DownloadStream::DownloadStream(const String& remotePath, const String& cacheChecksum) : DownloadStream(
+    remotePath, modem.gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword, cacheChecksum)
+{
 }
 
 void Modem::powerOn()
@@ -99,16 +95,16 @@ void Modem::powerOff()
 
 bool Modem::enableGPS()
 {
-    gsmModem->sendAT("+CGPIO=0,48,1,1");
+    gsmModem.sendAT("+CGPIO=0,48,1,1");
 
-    if (gsmModem->waitResponse(10000L) != 1)
+    if (gsmModem.waitResponse(10000L) != 1)
     {
         fileLog.errorln("Set GPS Power HIGH Failed");
     }
 
     fileLog.infoln("Enabling GPS... ");
 
-    const bool success = gsmModem->enableGPS();
+    const bool success = gsmModem.enableGPS();
 
     fileLog.logInfoOrErrorln(success, "Enabled GPS", "Failed to enable GPS");
 
@@ -118,16 +114,16 @@ bool Modem::enableGPS()
 
 bool Modem::disableGPS()
 {
-    gsmModem->sendAT("+CGPIO=0,48,1,0");
+    gsmModem.sendAT("+CGPIO=0,48,1,0");
 
-    if (gsmModem->waitResponse(10000L) != 1)
+    if (gsmModem.waitResponse(10000L) != 1)
     {
         fileLog.errorln("Set GPS Power LOW Failed");
     }
 
     fileLog.infoln("Disabling GPS...");
 
-    const bool success = gsmModem->disableGPS();
+    const bool success = gsmModem.disableGPS();
 
     fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
 
@@ -140,33 +136,24 @@ bool Modem::init(const uint8_t retries)
     {
         powerOff();
 
-        if (gsmClient != nullptr)
-        {
-            gsmClient->stop();
-            delete gsmClient;
-        }
-
-        delete gsmModem;
-
-        gsmModem = new TinyGsmSim7000{SERIAL_AT};
-        gsmClient = new TinyGsmSim7000::GsmClientSim7000{*gsmModem};
+        if (attempt > 0) gsmClient.stop();
 
         fileLog.infoln("Initializing modem...");
         powerOn();
-        SERIAL_AT.begin(SERIAL_AT_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
+        SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
 
-        while (!gsmModem->testAT())
+        while (!gsmModem.testAT())
             delay(10);
 
         fileLog.infoln("Modem connected to serial");
 
-        const bool modemInitSuccess = gsmModem->init(config.simPin.c_str());
+        const bool modemInitSuccess = gsmModem.init(config.simPin.c_str());
         fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
                                    "There was an error while initializing the modem");
 
-        fileLog.infoln("Modem info: " + gsmModem->getModemInfo());
+        fileLog.infoln("Modem info: " + gsmModem.getModemInfo());
 
-        const SimStatus simStatus = gsmModem->getSimStatus();
+        const SimStatus simStatus = gsmModem.getSimStatus();
         const String msg = "Sim status: " + HelperUtils::simStatusToString(simStatus);
         fileLog.logInfoOrWarningln(simStatus == SIM_READY, msg, msg);
 
@@ -175,7 +162,7 @@ bool Modem::init(const uint8_t retries)
         case SIM_READY: break;
         case SIM_LOCKED:
             {
-                const bool unlockSuccess = gsmModem->simUnlock(config.simPin.c_str());
+                const bool unlockSuccess = gsmModem.simUnlock(config.simPin.c_str());
                 fileLog.logInfoOrWarningln(unlockSuccess,
                                            "Sim unlocked successfully", "Attempt no. " + String(attempt + 1) + " of " +
                                            String(retries + 1) + " failed because the SIM is not ready. Retrying...");
@@ -196,11 +183,11 @@ bool Modem::init(const uint8_t retries)
         }
 
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem->gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
-                                                       config.gprsPassword.c_str());
+        const bool gprsSuccess = gsmModem.gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
+                                                      config.gprsPassword.c_str());
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
-        if (!gsmModem->isGprsConnected())
+        if (!gsmModem.isGprsConnected())
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
@@ -209,11 +196,11 @@ bool Modem::init(const uint8_t retries)
         }
 
         fileLog.infoln("Waiting for network...");
-        const bool networkSuccess = gsmModem->waitForNetwork();
+        const bool networkSuccess = gsmModem.waitForNetwork();
         fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
                                    "The modem did not connect to the network even after waiting");
 
-        if (!gsmModem->isNetworkConnected())
+        if (!gsmModem.isNetworkConnected())
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
@@ -227,7 +214,7 @@ bool Modem::init(const uint8_t retries)
         for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
         {
             int year;
-            gsmModem->getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+            gsmModem.getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
             if (year < 2070 && year >= 2025) break;
             serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
         }
@@ -287,7 +274,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         return UploadResult::FILE_IS_EMPTY;
     }
 
-    HttpClient uploadHttp{*gsmClient, config.server, config.serverPort};
+    HttpClient uploadHttp{gsmClient, config.server, config.serverPort};
 
     uploadHttp.beginRequest();
 
@@ -338,7 +325,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
         if (sendRetry >= maxSendRetries)
         {
             f.close();
-            WatchdogHandler::revertTemporaryIncrease();
+            watchdogHandler.revertTemporaryIncrease();
             fileLog.errorln("Failed to write data to http client");
             return UploadResult::FAILED_TO_SEND_DATA;
         }
@@ -373,7 +360,7 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
     f.close();
 
-    WatchdogHandler::revertTemporaryIncrease();
+    watchdogHandler.revertTemporaryIncrease();
 
     fileLog.infoln("Response status code: " + String(respCode));
 
@@ -466,7 +453,7 @@ endLoop:;
 int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String& username,
                      const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.serverPort};
+    HttpClient http{gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
@@ -495,7 +482,7 @@ int Modem::simpleGet(const String& aUrlPath, String* responseBody, const String&
 int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const size_t size, const String& username,
                         const String& password)
 {
-    HttpClient http{*gsmClient, config.server, config.serverPort};
+    HttpClient http{gsmClient, config.server, config.serverPort};
     http.beginRequest();
     const int err = http.get(aUrlPath);
 
@@ -525,7 +512,7 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
                                    unsigned long* downloadEndMs)
 {
     fileLog.infoln("Downloading " + remotePath + " to " + f.path());
-    DownloadStream downloadStream{remotePath, *gsmClient, config.server, config.serverPort, username, password};
+    DownloadStream downloadStream{remotePath, gsmClient, config.server, config.serverPort, username, password};
 
     if (!downloadStream)
     {
@@ -587,22 +574,22 @@ time_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
     float timezone;
-    gsmModem->getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+    gsmModem.getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
     return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
-esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize)
+esp_err_t Modem::increaseWatchdogTimeoutForFileUpload(const size_t fileSize) const
 {
     const uint32_t uploadTime = fileSize / estimatedUploadSpeed; // [s]
-    if (uploadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
-    return WatchdogHandler::increaseTimeoutTemporarily(uploadTime);
+    if (uploadTime <= watchdogHandler.getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return watchdogHandler.increaseTimeoutTemporarily(uploadTime);
 }
 
-esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize)
+esp_err_t Modem::increaseWatchdogTimeoutForFileDownload(const size_t fileSize) const
 {
     const uint32_t downloadTime = fileSize / estimatedDownloadSpeed; // [s]
-    if (downloadTime <= WatchdogHandler::getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
-    return WatchdogHandler::increaseTimeoutTemporarily(downloadTime);
+    if (downloadTime <= watchdogHandler.getCurrentTimeout() / 10) return ESP_OK; // Doesn't really matter
+    return watchdogHandler.increaseTimeoutTemporarily(downloadTime);
 }
 
 void Modem::performConnectionSpeedTest()
@@ -661,9 +648,9 @@ bool Modem::getGPS(GPS_DATA_t& out)
 {
     uint8_t status;
     int year, month, day, hour, minute, second;
-    const bool success = gsmModem->getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
-                                          reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
-                                          &out.accuracy, &year, &month, &day, &hour, &minute, &second);
+    const bool success = gsmModem.getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
+                                         reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
+                                         &out.accuracy, &year, &month, &day, &hour, &minute, &second);
     if (!success) return false;
 
     out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);

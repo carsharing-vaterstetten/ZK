@@ -2,8 +2,6 @@
 
 #include "Globals.h"
 
-bool StorageManager::flashIsMounted = false;
-
 bool StorageManager::mountLittleFS()
 {
     if (flashIsMounted) return true;
@@ -105,7 +103,7 @@ void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth, con
     nextFile.close();
 }
 
-void StorageManager::logFilesystemsInformation()
+void StorageManager::logFilesystemsInformation() const
 {
     if (flashIsMounted)
     {

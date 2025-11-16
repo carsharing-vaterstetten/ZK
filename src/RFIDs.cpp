@@ -5,6 +5,7 @@
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
+#include "LocalConfig.h"
 #include "Modem.h"
 #include "StorageManager.h"
 
@@ -64,11 +65,7 @@ void RFIDs::downloadRfidsIfChanged()
     uint8_t md5Checksum[16];
     generateChecksum(md5Checksum);
 
-    DownloadStream http
-    {
-        REMOTE_RFID_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI, config.serverPassword,
-        HelperUtils::toBase64(md5Checksum, 16)
-    };
+    DownloadStream http{REMOTE_RFID_PATH, HelperUtils::toBase64(md5Checksum, 16)};
 
     if (!http)
     {
@@ -142,7 +139,7 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
         return false;
     }
 
-    const DownloadResult downloadResult = Modem::downloadFile(
+    const DownloadResult downloadResult = modem.downloadFile(
         REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, modemIMEI, config.serverPassword);
 
     switch (downloadResult)

@@ -1,24 +1,21 @@
 #include "GPS.h"
 
+#include <LittleFS.h>
+
 #include "Backend.h"
-#include "Globals.h"
-#include "Intern.h"
+#include "Log.h"
 #include "Modem.h"
-#include "StorageManager.h"
 
-uint16_t GPS::logBufferIndex = 0;
-GPS_DATA_t GPS::logBuffer[GPS_LOG_BUFFER_SIZE];
-
-void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries) const
 {
     fileLog.infoln("Uploading GPS log(s)");
-    Modem::uploadFileAndDelete(GPS_FILE_UPLOAD_ENDPOINT, GPS_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
+    modem.uploadFileAndDelete(GPS_FILE_UPLOAD_ENDPOINT, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
-bool GPS::writeLogBufferToFile()
+bool GPS::writeLogBufferToFile() const
 {
     const auto dataBytes = reinterpret_cast<const uint8_t*>(&logBuffer);
-    File f = StorageManager::openGPS(FILE_APPEND, true);
+    File f = LittleFS.open(localFilePath, FILE_APPEND, true);
     if (!f)
     {
         fileLog.errorln("Failed to open GPS log file for appending");

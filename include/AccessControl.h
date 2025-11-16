@@ -3,17 +3,27 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#include "Config.h"
+
 class AccessControl
 {
-    Preferences persistentStorage;
+    Preferences persistentStorage{};
     static constexpr auto loggedInRfidKey = "logged in rfid";
-    std::optional<uint32_t> cachedLoggedInRfid;
-    std::optional<bool> loggedInRfidConsentsToGPSTracking;
+    std::optional<uint32_t> cachedLoggedInRfid = std::nullopt;
+    std::optional<bool> loggedInRfidConsentsToGPSTracking = std::nullopt;
 
-    static void unlockCar();
-    static void lockCar();
+    uint8_t keyOpenPin, keyClosePin;
+    const char* storageName;
+
+    void unlockCar() const;
+    void lockCar() const;
 
 public:
+    AccessControl(const uint8_t keyOpenPin, const uint8_t keyClosePin, const char* storageNameIdentifier) :
+        keyOpenPin(keyOpenPin), keyClosePin(keyClosePin), storageName(storageNameIdentifier)
+    {
+    }
+
     bool init();
     void end();
     void login(uint32_t rfid);
@@ -24,4 +34,4 @@ public:
     [[nodiscard]] bool hasPermissionForGPSTracking() const;
 };
 
-extern AccessControl accessControl;
+inline AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};

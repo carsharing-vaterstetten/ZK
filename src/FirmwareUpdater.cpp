@@ -4,6 +4,7 @@
 
 #include "Backend.h"
 #include "Globals.h"
+#include "LocalConfig.h"
 #include "Modem.h"
 #include "StorageManager.h"
 
@@ -21,14 +22,12 @@ void onDownloadProgress(const size_t progress, const size_t total)
     }
 }
 
-bool FirmwareUpdater::performUpdate()
+
+bool FirmwareUpdater::detail::performUpdate()
 {
     fileLog.infoln("Performing OTA update");
 
-    DownloadStream downloadStream{
-        LATEST_FIRMWARE_DOWNLOAD_PATH, *Modem::gsmClient, config.server, config.serverPort, modemIMEI,
-        config.serverPassword
-    };
+    DownloadStream downloadStream{LATEST_FIRMWARE_DOWNLOAD_PATH};
 
     if (!downloadStream)
     {
@@ -82,23 +81,6 @@ bool FirmwareUpdater::performUpdate()
     return true;
 }
 
-uint32_t FirmwareUpdater::getLatestFirmwareSize()
-{
-    fileLog.infoln("Checking update size...");
-
-    String respSize;
-    Modem::simpleGet(LATEST_FIRMWARE_SIZE_ENDPOINT, &respSize, modemIMEI, config.serverPassword);
-    const uint32_t latestFirmwareSize = respSize.toInt();
-
-    fileLog.infoln("Update size: " + String(latestFirmwareSize) + " B");
-
-    if (latestFirmwareSize <= 0)
-    {
-        fileLog.warningln("Invalid update size");
-    }
-
-    return latestFirmwareSize;
-}
 
 FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
 {
@@ -106,8 +88,8 @@ FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
 
     String updateAvailability;
 
-    const int respStatus = Modem::simpleGet(LATEST_FIRMWARE_IS_NEWER_ENDPOINT "?fm_version=" FIRMWARE_VERSION,
-                                            &updateAvailability, modemIMEI, config.serverPassword);
+    const int respStatus = modem.simpleGet(LATEST_FIRMWARE_IS_NEWER_ENDPOINT "?fm_version=" FIRMWARE_VERSION,
+                                           &updateAvailability, modemIMEI, config.serverPassword);
 
     if (respStatus != 200)
     {
@@ -135,7 +117,7 @@ bool FirmwareUpdater::doUpdateIfAvailable()
 {
     if (checkForFirmwareUpdate() == FirmwareUpdateCheckResult::UPDATE_AVAILABLE)
     {
-        return performUpdate();
+        return detail::performUpdate();
     }
     return false;
 }

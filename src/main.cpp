@@ -10,6 +10,8 @@
 #include "FirmwareUpdater.h"
 #include "Globals.h"
 #include "GPS.h"
+#include "HardwareManager.h"
+#include "LocalConfig.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
 #include "WatchdogHandler.h"
@@ -26,7 +28,7 @@ void checkNFCTag()
 {
     uint32_t rfidUid;
 
-    if (!NFCCardReader::readTag(rfidUid)) return; // No card present
+    if (!cardReader.readTag(rfidUid)) return; // No card present
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
@@ -47,7 +49,7 @@ void calculateNextRestartTime()
 {
     int hour, minute, second;
 
-    Modem::getNetworkTime(nullptr, nullptr, nullptr, &hour, &minute, &second, nullptr);
+    modem.getNetworkTime(nullptr, nullptr, nullptr, &hour, &minute, &second, nullptr);
 
     // Calculate milliseconds since midnight
     const unsigned long currentMillis = (hour * 3600 + minute * 60 + second) * 1000;
@@ -81,11 +83,17 @@ void loadConfig()
     fileLog.infoln("Using default config");
 #else
 
-    if (const auto loadedConfig = LocalConfig::fromStorage(); !loadedConfig)
+    const auto loadedConfig = LocalConfig::fromStorage(CONFIG_PREFS_NAME);
+
+    if (loadedConfig.has_value())
+    {
+        config = loadedConfig.value();
+    }
+    else
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
         config = HelperUtils::requestConfig();
-        const bool configSaveSuccess = config.save();
+        const bool configSaveSuccess = StorableConfig{config, CONFIG_PREFS_NAME}.save();
         fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
         WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
     }
@@ -106,7 +114,7 @@ void checkGPS()
     }
 
     GPS_DATA_t gpsData;
-    const bool gpsSuccess = Modem::getGPS(gpsData);
+    const bool gpsSuccess = modem.getGPS(gpsData);
 
     if (!gpsSuccess)
     {
@@ -116,7 +124,7 @@ void checkGPS()
 
     // serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
 
-    GPS::logDataBuffered(gpsData);
+    gps.logDataBuffered(gpsData);
 }
 
 void setup()
@@ -133,11 +141,11 @@ void setup()
 #endif
 
     // Start watchdog
-    WatchdogHandler::setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
-    WatchdogHandler::subscribeTask();
+    watchdogHandler.setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
+    watchdogHandler.subscribeTask();
 
     // Mount filesystems
-    const bool flashInitSuccess = StorageManager::mountLittleFS();
+    const bool flashInitSuccess = storageManager.mountLittleFS();
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
@@ -150,7 +158,7 @@ void setup()
     fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(0)));
     fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
 
-    StorageManager::logFilesystemsInformation();
+    storageManager.logFilesystemsInformation();
 
     // Cleanup
     StorageManager::removeGpsLog();
@@ -162,21 +170,21 @@ void setup()
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     loadConfig(); // We need the config for the Modem
-    Modem::init();
+    modem.init();
     fileLog.infoln(
-        "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + Modem::getGSMDateTime() +
-        ", Unix timestamp: " + String(Modem::getUnixTimestamp()) + ", system time: " + String(
+        "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + modem.getGSMDateTime() +
+        ", Unix timestamp: " + String(modem.getUnixTimestamp()) + ", system time: " + String(
             HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
     calculateNextRestartTime();
 
     // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
-    modemIMEI = Modem::getIMEI();
+    modemIMEI = modem.getIMEI();
     fileLog.infoln("Modem IMEI: " + modemIMEI);
-    fileLog.infoln("Signal Quality: " + String(Modem::getSignalQuality()));
+    fileLog.infoln("Signal Quality: " + String(modem.getSignalQuality()));
 
     // Do the connection speed test before any up-/downloads
 #if !SKIP_INITIAL_CONNECTION_SPEED_TEST
-    Modem::performConnectionSpeedTest();
+    modem.performConnectionSpeedTest();
 #endif
 
     // Now we are ready to check for a firmware update
@@ -187,20 +195,22 @@ void setup()
     fileLog.infoln("Skipped firmware update check");
 #endif
 
+    accessControl.init();
+    HardwareManager::begin();
+    cardReader.init(HardwareManager::nfcSpi, NFC_SS);
+
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
-    accessControl.init();
-    NFCCardReader::init();
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    Modem::uploadLog(true, true, 1);
+    modem.uploadLog(true, true, 1);
     statusLed.clear();
 
     // Set the watchdog to a shorter timeout for the main loop
-    WatchdogHandler::resetTimeout();
+    watchdogHandler.resetTimeout();
     fileLog.infoln("Setup done");
 }
 
@@ -217,9 +227,9 @@ void loop()
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
-        Modem::performConnectionSpeedTest();
-        GPS::uploadFileAndDelete(true, true, 2);
-        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+        modem.performConnectionSpeedTest();
+        gps.uploadFileAndDelete(true, true, 2);
+        modem.uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         fileLog.infoln("Restarting now");
 

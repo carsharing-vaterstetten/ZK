@@ -11,3 +11,4 @@
 #define CONNECTION_SPEED_TEST_FILE_PATH "/speed_test.bin"
 
 #define CONFIG_VERSION "1"
+#define CONFIG_PREFS_NAME "Config v" CONFIG_VERSION

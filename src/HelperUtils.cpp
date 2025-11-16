@@ -89,7 +89,7 @@ LocalConfig HelperUtils::requestConfig()
         "XXX",
         "1234"
     };
-    const String exampleConfigFormat = exampleConfig.toString(false);
+    const String exampleConfigFormat = exampleConfig.toString();
 
     String inputString = "";
 
@@ -189,10 +189,10 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
 
 bool HelperUtils::updateSystemTimeWithModem()
 {
-    if (!Modem::timeIsAvailable())
+    if (!modem.timeIsAvailable())
         return false;
 
-    const time_t seconds = Modem::getUnixTimestamp();
+    const time_t seconds = modem.getUnixTimestamp();
     const timeval now = {.tv_sec = seconds, .tv_usec = 0};
     settimeofday(&now, nullptr);
 

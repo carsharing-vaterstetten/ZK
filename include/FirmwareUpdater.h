@@ -1,6 +1,4 @@
 #pragma once
-#include <sys/_stdint.h>
-
 
 enum class FirmwareUpdateCheckResult
 {
@@ -10,11 +8,13 @@ enum class FirmwareUpdateCheckResult
     UNKNOWN_RESPONSE,
 };
 
-class FirmwareUpdater
+namespace FirmwareUpdater
 {
-    static bool performUpdate();
-    static uint32_t getLatestFirmwareSize();
-public:
-    static FirmwareUpdateCheckResult checkForFirmwareUpdate();
-    static bool doUpdateIfAvailable();
-};
+    namespace detail
+    {
+        bool performUpdate();
+    }
+
+    FirmwareUpdateCheckResult checkForFirmwareUpdate();
+    bool doUpdateIfAvailable();
+}

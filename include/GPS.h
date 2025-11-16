@@ -1,6 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>
+
+#include "Intern.h"
 
 #pragma pack(push, 1)
 struct GPS_DATA_t
@@ -21,13 +23,20 @@ struct GPS_DATA_t
 
 class GPS
 {
-    static GPS_DATA_t logBuffer[GPS_LOG_BUFFER_SIZE];
-    static uint16_t logBufferIndex;
+    GPS_DATA_t logBuffer[GPS_LOG_BUFFER_SIZE];
+    uint16_t logBufferIndex = 0;
+    const char* localFilePath;
 
-    static bool writeLogBufferToFile();
+    bool writeLogBufferToFile() const;
 
 public:
-    static void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
-    static void logDataBuffered(const GPS_DATA_t& data);
-    static bool flush();
+    explicit GPS(const char* filePath) : localFilePath(filePath)
+    {
+    }
+
+    void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries) const;
+    void logDataBuffered(const GPS_DATA_t& data);
+    bool flush();
 };
+
+inline GPS gps{GPS_FILE_PATH};

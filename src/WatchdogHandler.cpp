@@ -3,13 +3,8 @@
 #include <esp_task_wdt.h>
 
 #include "Config.h"
-#include "Globals.h"
 
-uint32_t WatchdogHandler::currentTimeout = UINT32_MAX;
-uint32_t WatchdogHandler::timeoutBeforeTempSet = UINT32_MAX;
-bool WatchdogHandler::tempTimeoutSet = false;
-
-uint32_t WatchdogHandler::getCurrentTimeout()
+uint32_t WatchdogHandler::getCurrentTimeout() const
 {
     return currentTimeout;
 }
@@ -40,7 +35,8 @@ esp_err_t WatchdogHandler::setTimeout(const uint32_t timeout)
     esp_task_wdt_reset(); // Reset watchdog to ensure it does not immediately trigger when setting to a lower timeout
     const esp_err_t watchdog_init_err = esp_task_wdt_init(timeout, true);
     fileLog.logInfoOrErrorln(watchdog_init_err == ESP_OK, "TWDT timeout set successfully to " + String(timeout) + " s",
-                             "Setting TWDT timeout to " + String(timeout) + " s failed. Error " + String(watchdog_init_err));
+                             "Setting TWDT timeout to " + String(timeout) + " s failed. Error " + String(
+                                 watchdog_init_err));
     if (watchdog_init_err == ESP_OK)
     {
         currentTimeout = timeout;
@@ -62,7 +58,8 @@ esp_err_t WatchdogHandler::taskWDTReset()
 esp_err_t WatchdogHandler::subscribeTask()
 {
     const esp_err_t task_wdt_add_error = esp_task_wdt_add(nullptr);
-    fileLog.logInfoOrErrorln(task_wdt_add_error == ESP_OK, "Successfully subscribed current task to TWDT.",
+    isSubscribedToTask = task_wdt_add_error == ESP_OK;
+    fileLog.logInfoOrErrorln(isSubscribedToTask, "Successfully subscribed current task to TWDT.",
                              "Failed to subscribe current task to TWDT. Error " + String(task_wdt_add_error));
     return task_wdt_add_error;
 }

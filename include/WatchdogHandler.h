@@ -3,16 +3,19 @@
 
 class WatchdogHandler
 {
-    static uint32_t currentTimeout;
-    static uint32_t timeoutBeforeTempSet;
-    static bool tempTimeoutSet;
+    uint32_t currentTimeout = UINT32_MAX;
+    uint32_t timeoutBeforeTempSet = UINT32_MAX;
+    bool tempTimeoutSet = false;
+    bool isSubscribedToTask = false;
 public:
-    static esp_err_t setTimeout(uint32_t timeout);
-    static esp_err_t resetTimeout();
+    esp_err_t setTimeout(uint32_t timeout);
+    esp_err_t resetTimeout();
     static esp_err_t taskWDTReset();
-    static esp_err_t subscribeTask();
-    static uint32_t getCurrentTimeout();
+    esp_err_t subscribeTask();
+    uint32_t getCurrentTimeout() const;
 
-    static esp_err_t increaseTimeoutTemporarily(uint32_t timeout);
-    static esp_err_t revertTemporaryIncrease();
+    esp_err_t increaseTimeoutTemporarily(uint32_t timeout);
+    esp_err_t revertTemporaryIncrease();
 };
+
+inline WatchdogHandler watchdogHandler;

@@ -76,3 +76,6 @@ private:
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);
 };
+
+inline Log serialOnlyLog{};
+inline Log fileLog{};

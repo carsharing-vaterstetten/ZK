@@ -5,11 +5,11 @@
 
 class NFCCardReader
 {
-    static Adafruit_PN532 * nfc;
+    Adafruit_PN532* nfc = nullptr;
 
 public:
-    NFCCardReader() = delete;
-
-    static bool init();
-    static bool readTag(uint32_t &uid);
+    bool init(SPIClass& spi, uint8_t cs) ;
+    bool readTag(uint32_t &uid) const;
 };
+
+inline NFCCardReader cardReader{};

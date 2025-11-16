@@ -1,12 +1,14 @@
 #pragma once
 #include <SPI.h>
 
-class HardwareManager
+#include "Config.h"
+
+namespace HardwareManager
 {
-    static bool nfcSpiInitialized;
+    inline SPIClass nfcSpi{NFC_SPI};
 
-public:
-    static void ensureNFCSPIInitialized();
-
-    static SPIClass* nfcSpi;
-};
+    inline void begin()
+    {
+        nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI);
+    }
+}

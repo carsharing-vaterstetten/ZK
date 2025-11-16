@@ -1,18 +1,14 @@
 #include "AccessControl.h"
 #include "Config.h"
-#include "Globals.h"
 #include "HelperUtils.h"
-#include "LED.h"
 #include "RFIDs.h"
-
-#define STORAGE_VERSION "1"
 
 bool AccessControl::init()
 {
-    pinMode(OPEN_KEY, OUTPUT);
-    pinMode(CLOSE_KEY, OUTPUT);
+    pinMode(keyOpenPin, OUTPUT);
+    pinMode(keyClosePin, OUTPUT);
 
-    const bool storageInitSuccess = persistentStorage.begin("AccCtrl v" STORAGE_VERSION, false);
+    const bool storageInitSuccess = persistentStorage.begin(storageName, false);
 
     if (storageInitSuccess)
     {
@@ -40,20 +36,20 @@ void AccessControl::end()
     persistentStorage.end();
 }
 
-void AccessControl::lockCar()
+void AccessControl::lockCar() const
 {
-    digitalWrite(CLOSE_KEY, HIGH);
+    digitalWrite(keyClosePin, HIGH);
     delay(200);
-    digitalWrite(CLOSE_KEY, LOW);
+    digitalWrite(keyClosePin, LOW);
     fileLog.infoln("Car locked");
 }
 
 
-void AccessControl::unlockCar()
+void AccessControl::unlockCar() const
 {
-    digitalWrite(OPEN_KEY, HIGH);
+    digitalWrite(keyOpenPin, HIGH);
     delay(200);
-    digitalWrite(OPEN_KEY, LOW);
+    digitalWrite(keyOpenPin, LOW);
     fileLog.infoln("Car unlocked");
 }
 
@@ -103,5 +99,3 @@ bool AccessControl::hasPermissionForGPSTracking() const
     if (!loggedInRfidConsentsToGPSTracking.has_value()) return true;
     return loggedInRfidConsentsToGPSTracking.value();
 }
-
-AccessControl accessControl;

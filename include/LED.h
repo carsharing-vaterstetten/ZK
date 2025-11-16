@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
+#include "Config.h"
+
 enum class StatusColor
 {
     InitializationPhase,
@@ -42,3 +44,5 @@ public:
     void lockFlash();
     void cardDeclinedFlash();
 };
+
+inline CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};

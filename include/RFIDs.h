@@ -9,12 +9,11 @@ enum class RfidsChecksumResult
     UNEXPECTED_STATUS_CODE,
 };
 
-class RFIDs
+namespace RFIDs
 {
-public:
-    static bool isRegisteredRFID(uint32_t rfid);
-    static void generateChecksum(uint8_t out[16]);
-    static void downloadRfidsIfChanged();
-    static bool downloadGPSTrackingConsentedRFIDs();
-    static bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
-};
+    bool isRegisteredRFID(uint32_t rfid);
+    void generateChecksum(uint8_t out[16]);
+    void downloadRfidsIfChanged();
+    bool downloadGPSTrackingConsentedRFIDs();
+    bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
+}

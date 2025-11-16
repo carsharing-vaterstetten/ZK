@@ -6,12 +6,10 @@
 
 class StorageManager
 {
-    static bool flashIsMounted;
+    bool flashIsMounted = false;
 
 public:
-    StorageManager() = delete; // Prevent instantiation
-
-    static bool mountLittleFS();
+    bool mountLittleFS();
 
     static File openLog(const char* mode, const bool create = false)
     {
@@ -81,8 +79,10 @@ public:
 
     static void logFilesystemTree(uint8_t maxDepth);
 
-    static void logFilesystemsInformation();
+    void logFilesystemsInformation() const;
 
 private:
     static void logDirTree(const char* dirname, uint8_t maxDepth, uint8_t indent);
 };
+
+inline StorageManager storageManager;

@@ -1,18 +1,14 @@
 #include "NFCCardReader.h"
 
 #include "Config.h"
-#include "Globals.h"
-#include "HardwareManager.h"
 
-Adafruit_PN532* NFCCardReader::nfc = nullptr;
-
-bool NFCCardReader::init()
+bool NFCCardReader::init(SPIClass& spi, const uint8_t cs)
 {
     fileLog.infoln("Connecting to NFC board...");
 
-    HardwareManager::ensureNFCSPIInitialized();
+    delete nfc;
+    nfc = new Adafruit_PN532{cs, &spi};
 
-    nfc = new Adafruit_PN532(NFC_SS, HardwareManager::nfcSpi);
     nfc->begin();
 
     const uint32_t versionData = nfc->getFirmwareVersion();
@@ -35,8 +31,10 @@ bool NFCCardReader::init()
     return true;
 }
 
-bool NFCCardReader::readTag(uint32_t& uid)
+bool NFCCardReader::readTag(uint32_t& uid) const
 {
+    if (nfc == nullptr) return false;
+
     uint8_t uidArr[7] = {};
     uint8_t uidLength;
 

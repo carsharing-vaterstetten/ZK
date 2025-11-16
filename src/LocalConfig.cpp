@@ -2,7 +2,9 @@
 
 #include <Preferences.h>
 
-bool LocalConfig::save() const
+#include "Config.h"
+
+bool StorableConfig::save() const
 {
     Preferences prefs;
     if (!prefs.begin(prefsName, false)) return false;
@@ -20,14 +22,9 @@ bool LocalConfig::save() const
     return true;
 }
 
-String LocalConfig::toString(const bool withVersion) const
+String LocalConfig::toString() const
 {
     String str;
-
-    if (withVersion)
-    {
-        str += "Version: " CONFIG_VERSION " ";
-    }
 
     str += String(apnKey) + "=" + apn + ";";
     str += String(gprsUserKey) + "=" + gprsUser + ";";
@@ -40,8 +37,25 @@ String LocalConfig::toString(const bool withVersion) const
     return str;
 }
 
+String StorableConfig::toString() const
+{
+    String str;
 
-std::optional<LocalConfig> LocalConfig::fromStorage()
+    str += prefsName;
+    str += ": ";
+    str += String(apnKey) + "=" + apn + ";";
+    str += String(gprsUserKey) + "=" + gprsUser + ";";
+    str += String(gprsPasswordKey) + "=" + gprsPassword + ";";
+    str += String(serverKey) + "=" + server + ";";
+    str += String(serverPortKey) + "=" + serverPort + ";";
+    str += String(serverPasswordKey) + "=" + serverPassword + ";";
+    str += String(simPinKey) + "=" + simPin + ";";
+
+    return str;
+}
+
+
+std::optional<LocalConfig> LocalConfig::fromStorage(const char* prefsName)
 {
     Preferences prefs;
 
@@ -57,10 +71,20 @@ std::optional<LocalConfig> LocalConfig::fromStorage()
         prefs.getString(serverKey).c_str(),
         prefs.getUShort(serverPortKey),
         prefs.getString(serverPasswordKey).c_str(),
-        prefs.getString(simPinKey).c_str()
+        prefs.getString(simPinKey).c_str(),
     };
 
     prefs.end();
 
     return c;
 }
+
+LocalConfig config{
+    DEFAULT_CONFIG_APN,
+    DEFAULT_CONFIG_GPRS_USER,
+    DEFAULT_CONFIG_GPRS_PASSWORD,
+    DEFAULT_CONFIG_SERVER,
+    DEFAULT_CONFIG_PORT,
+    DEFAULT_CONFIG_PASSWORD,
+    DEFAULT_SIM_PIN
+};
