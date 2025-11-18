@@ -11,7 +11,7 @@
 #include "WatchdogHandler.h"
 
 // DownloadStream constructor implementation
-DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
+DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, const String& server, const uint16_t port,
                                const String& username, const String& password, const String& cacheChecksum)
     : HttpClient(gsmClient, server, port), isValid(false)
 {
@@ -247,67 +247,48 @@ bool Modem::init(const uint8_t retries)
     return false;
 }
 
-UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode, String* response, const int bufferSize,
-                               unsigned long* uploadStartMs, unsigned long* uploadEndMs)
+UploadResult Modem::uploadData(const String& endpoint, Stream& stream, const uint32_t streamLen, int* statusCode,
+                               String* response, unsigned long* uploadStartMs,
+                               unsigned long* uploadEndMs, const bool logToLogFile)
 {
-    const String filePath = f.path();
-    const bool isFileLogFile = filePath == LOG_FILE_PATH;
-
-    f.flush();
-    const size_t fileSize = f.size();
-
-    String msg = "Uploading " + filePath + " (" + String(fileSize) + " B) to " + endpoint;
-
-    if (isFileLogFile)
-    {
-        serialOnlyLog.infoln(msg);
-    }
-    else
-    {
-        fileLog.debugln(msg);
-    }
-
-    if (fileSize == 0)
-    {
-        f.close();
-        fileLog.warningln("File is empty, not uploading");
-        return UploadResult::FILE_IS_EMPTY;
-    }
-
     HttpClient uploadHttp{gsmClient, config.server, config.serverPort};
 
     uploadHttp.beginRequest();
 
     const int err = uploadHttp.post(endpoint);
 
+    const Log* log = logToLogFile ? &fileLog : &serialOnlyLog;
+
     if (err != 0)
     {
-        f.close();
-        fileLog.errorln("Failed to upload file. Error " + String(err));
+        log->errorln("Failed to upload file. Error " + String(err));
         return UploadResult::HTTP_REQUEST_ERROR;
     }
 
-    if (increaseWatchdogTimeoutForFileUpload(fileSize) != ESP_OK)
+    if (increaseWatchdogTimeoutForFileUpload(streamLen) != ESP_OK)
     {
-        f.close();
-        fileLog.errorln("Failed to increase TWDT timeout. Upload aborted");
+        log->errorln("Failed to increase TWDT timeout. Upload aborted");
         return UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
     }
 
     uploadHttp.sendBasicAuth(modemIMEI, config.serverPassword);
     uploadHttp.sendHeader("Content-Type", "application/octet-stream");
-    uploadHttp.sendHeader("Content-Length", String(fileSize));
+    uploadHttp.sendHeader("Content-Length", String(streamLen));
     uploadHttp.beginBody();
 
+    constexpr size_t bufferSize = 512;
     uint8_t buffer[bufferSize];
-    size_t totalBytesUploaded = 0;
-    size_t nextPrint = fileSize / 10;
+    size_t totalBytesUploaded = 0, totalBytesRead = 0;
+    size_t nextPrint = streamLen / 10;
+
+    log->infoln("Uploading " + String(streamLen) + " B to " + endpoint);
 
     if (uploadStartMs) *uploadStartMs = millis();
 
-    while (f.available())
+    while (stream.available() && streamLen > totalBytesRead)
     {
-        const size_t bytesRead = f.read(buffer, bufferSize);
+        const size_t bytesRead = stream.readBytes(buffer, bufferSize);
+        totalBytesRead += bytesRead;
 
         if (bytesRead <= 0) break;
 
@@ -324,7 +305,6 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
         if (sendRetry >= maxSendRetries)
         {
-            f.close();
             watchdogHandler.revertTemporaryIncrease();
             fileLog.errorln("Failed to write data to http client");
             return UploadResult::FAILED_TO_SEND_DATA;
@@ -334,18 +314,8 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
         if (totalBytesUploaded >= nextPrint)
         {
-            msg = "Uploaded " + String(totalBytesUploaded) + " B of " + String(fileSize) + " B";
-
-            if (isFileLogFile)
-            {
-                serialOnlyLog.debugln(msg);
-            }
-            else
-            {
-                fileLog.debugln(msg);
-            }
-
-            nextPrint += fileSize / 10;
+            log->debugln("Uploaded " + String(totalBytesUploaded) + " B of " + String(streamLen) + " B");
+            nextPrint += streamLen / 10;
         }
     }
 
@@ -353,12 +323,12 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
 
     uploadHttp.endRequest();
 
+    log->infoln("Upload complete");
+
     const int respCode = uploadHttp.responseStatusCode();
 
     if (statusCode) *statusCode = respCode;
     if (response) *response = uploadHttp.responseBody();
-
-    f.close();
 
     watchdogHandler.revertTemporaryIncrease();
 
@@ -372,35 +342,21 @@ UploadResult Modem::uploadFile(const String& endpoint, File& f, int* statusCode,
     return UploadResult::UNEXPECTED_STATUS_CODE;
 }
 
-UploadAndRetryResult Modem::uploadFileAndDelete(
-    const String& endpoint, const String& filePath, const bool deleteIfSuccess,
-    const bool deleteAfterRetrying, const uint32_t retries, const int bufferSize,
-    unsigned long* uploadStartMs, unsigned long* uploadEndMs)
+UploadAndRetryResult Modem::uploadDataAndRetry(const String& endpoint, Stream& stream, const uint32_t streamLen,
+                                               const uint32_t retries, unsigned long* uploadStartMs,
+                                               unsigned long* uploadEndMs,
+                                               const bool logToLogFile = true)
 {
-    if (!LittleFS.exists(filePath))
-    {
-        fileLog.errorln(filePath + " does not exist");
-        return UploadAndRetryResult::FILE_DOES_NOT_EXIST;
-    }
-
     UploadResult uploadResult;
     uint32_t attemptNo = 0;
 
     do
     {
-        File f = LittleFS.open(filePath, FILE_READ);
-
-        if (!f)
-        {
-            fileLog.errorln("Failed to open " + filePath);
-            return UploadAndRetryResult::FAILED_TO_OPEN_FILE;
-        }
-
-        uploadResult = uploadFile(endpoint, f, nullptr, nullptr, bufferSize, uploadStartMs, uploadEndMs);
+        uploadResult = uploadData(endpoint, stream, streamLen, nullptr, nullptr, uploadStartMs, uploadEndMs,
+                                  logToLogFile);
 
         switch (uploadResult)
         {
-        case UploadResult::FILE_IS_EMPTY:
         case UploadResult::SUCCESS:
             goto endLoop;
         case UploadResult::HTTP_REQUEST_ERROR:
@@ -412,7 +368,7 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
 
         fileLog.errorln(
             "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
-            " failed at uploading " + filePath + " to " + endpoint);
+            " failed at uploading to " + endpoint);
 
         ++attemptNo;
     }
@@ -420,17 +376,8 @@ UploadAndRetryResult Modem::uploadFileAndDelete(
 
 endLoop:;
 
-    if (deleteAfterRetrying || (uploadResult == UploadResult::SUCCESS && deleteIfSuccess))
-    {
-        const bool removeSuccess = StorageManager::remove(filePath);
-        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
-                                 "Failed to delete " + filePath);
-    }
-
     switch (uploadResult)
     {
-    case UploadResult::FILE_IS_EMPTY:
-        return UploadAndRetryResult::FILE_IS_EMPTY;
     case UploadResult::HTTP_REQUEST_ERROR:
         return UploadAndRetryResult::HTTP_REQUEST_ERROR;
     case UploadResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
@@ -446,6 +393,72 @@ endLoop:;
 
     // ReSharper disable once CppDFAUnreachableCode
     throw std::invalid_argument("Invalid result");
+}
+
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const String& endpoint, File& f, const bool deleteIfSuccess,
+                                                    const bool deleteAfterRetrying, const uint32_t retries)
+{
+    if (!f)
+    {
+        fileLog.errorln("Failed to open file");
+        return UploadFileAndRetryResult::FAILED_TO_OPEN_FILE;
+    }
+
+    const size_t fileSize = f.size();
+
+    if (fileSize <= 0)
+    {
+        fileLog.infoln("File is empty. Nothing to upload");
+        return UploadFileAndRetryResult::FILE_IS_EMPTY;
+    }
+
+    const String filePath = f.path();
+
+    const UploadAndRetryResult uploadResult = uploadDataAndRetry(endpoint, f, fileSize, retries, nullptr, nullptr,
+                                                                 filePath != LOG_FILE_PATH);
+
+    f.close();
+
+    if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
+    {
+        const bool removeSuccess = StorageManager::remove(filePath);
+        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
+                                 "Failed to delete " + filePath);
+    }
+
+    switch (uploadResult)
+    {
+    case UploadAndRetryResult::HTTP_REQUEST_ERROR:
+        return UploadFileAndRetryResult::HTTP_REQUEST_ERROR;
+    case UploadAndRetryResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+        return UploadFileAndRetryResult::FAILED_TO_INCREASE_TWDT_TIMEOUT;
+    case UploadAndRetryResult::SUCCESS:
+        return UploadFileAndRetryResult::SUCCESS;
+    case UploadAndRetryResult::UNEXPECTED_STATUS_CODE:
+        return UploadFileAndRetryResult::UNEXPECTED_STATUS_CODE;
+    case UploadAndRetryResult::FAILED_TO_SEND_DATA:
+        return UploadFileAndRetryResult::FAILED_TO_SEND_DATA;
+    case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
+        return UploadFileAndRetryResult::SUCCESS_AFTER_RETRYING;
+    }
+
+    // ReSharper disable once CppDFAUnreachableCode
+    throw std::invalid_argument("Invalid result");
+}
+
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const String& endpoint, const String& filePath,
+                                                    const bool deleteIfSuccess, const bool deleteAfterRetrying,
+                                                    const uint32_t retries)
+{
+    if (!LittleFS.exists(filePath))
+    {
+        fileLog.errorln(filePath + " does not exist");
+        return UploadFileAndRetryResult::FILE_DOES_NOT_EXIST;
+    }
+
+    File f = LittleFS.open(filePath, FILE_READ);
+
+    return uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 
@@ -507,34 +520,32 @@ int Modem::simpleGetBin(const String& aUrlPath, uint8_t* responseBody, const siz
 }
 
 
-DownloadResult Modem::downloadFile(const String& remotePath, File& f, const String& username,
-                                   const String& password, const int bufferSize, unsigned long* downloadStartMs,
+DownloadResult Modem::downloadData(const String& remotePath, Stream& f, const String& username,
+                                   const String& password, unsigned long* downloadStartMs,
                                    unsigned long* downloadEndMs)
 {
-    fileLog.infoln("Downloading " + remotePath + " to " + f.path());
     DownloadStream downloadStream{remotePath, gsmClient, config.server, config.serverPort, username, password};
 
     if (!downloadStream)
     {
         fileLog.errorln("Failed to open stream for download");
-        f.close();
         return DownloadResult::FAILED_TO_OPEN_STREAM;
     }
 
     if (downloadStream.responseStatusCode() != 200)
     {
         fileLog.errorln("Unexpected status code. Download canceled");
-        f.close();
         return DownloadResult::UNEXPECTED_STATUS_CODE;
     }
 
+    constexpr size_t bufferSize = 512;
     uint8_t buf[bufferSize];
 
     const size_t totalLen = downloadStream.contentLength();
     size_t downloaded = 0;
     size_t nextPrint = totalLen / 10;
 
-    fileLog.infoln("Downloading " + String(totalLen) + " B");
+    fileLog.infoln("Downloading " + String(totalLen) + " B from " + remotePath);
 
     if (downloadStartMs) *downloadStartMs = millis();
 
@@ -556,8 +567,6 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 
     if (downloadEndMs) *downloadEndMs = millis();
 
-    f.close();
-
     fileLog.infoln("Download complete");
 
     return DownloadResult::SUCCESS;
@@ -565,9 +574,11 @@ DownloadResult Modem::downloadFile(const String& remotePath, File& f, const Stri
 
 void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
 {
-    fileLog.infoln("Uploading log file");
-    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying,
-                        retries);
+    File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
+    const size_t fileSize = f.size();
+    f.close();
+    fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
+    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 time_t Modem::getUnixTimestamp()
@@ -597,23 +608,17 @@ void Modem::performConnectionSpeedTest()
 #if !SKIP_ALL_CONNECTION_SPEED_TESTS
     fileLog.infoln("Performing connection speed test");
 
-    // Use LittleFS for simplicity and reliability
-    File df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_WRITE, true);
+    RandomStream rs{};
 
     unsigned long downloadStart, downloadEnd;
-    const DownloadResult downloadResult = downloadFile(
-        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), df, modemIMEI,
-        config.serverPassword, 512, &downloadStart, &downloadEnd);
-    df.close();
-
-    df = LittleFS.open(CONNECTION_SPEED_TEST_FILE_PATH, FILE_READ);
-    const size_t fileSize = df.size();
-    df.close();
+    const DownloadResult downloadResult = downloadData(
+        DOWNLOAD_TEST_ENDPOINT "?file_size=" + String(CONNECTION_SPEED_TEST_FILE_SIZE), rs, modemIMEI,
+        config.serverPassword, &downloadStart, &downloadEnd);
 
     if (downloadResult == DownloadResult::SUCCESS)
     {
         const float downloadSeconds = static_cast<float>(downloadEnd - downloadStart) / 1000.0f;
-        estimatedDownloadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / downloadSeconds);
+        estimatedDownloadSpeed = static_cast<uint32_t>(CONNECTION_SPEED_TEST_FILE_SIZE / downloadSeconds);
         if (estimatedDownloadSpeed == 0) estimatedDownloadSpeed = 1;
         fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
     }
@@ -622,18 +627,17 @@ void Modem::performConnectionSpeedTest()
         fileLog.errorln(
             "Download test failed. Aborting further tests. Defaulting to " + String(estimatedUploadSpeed) + " B/s UP, "
             + String(estimatedDownloadSpeed) + " B/s DOWN");
-        LittleFS.remove(CONNECTION_SPEED_TEST_FILE_PATH);
         return;
     }
 
     unsigned long uploadStart, uploadEnd;
-    const UploadAndRetryResult uploadResult = uploadFileAndDelete(
-        UPLOAD_TEST_ENDPOINT, CONNECTION_SPEED_TEST_FILE_PATH, true, true, 3, 512, &uploadStart, &uploadEnd);
+    const UploadAndRetryResult uploadResult = uploadDataAndRetry(
+        UPLOAD_TEST_ENDPOINT, rs, CONNECTION_SPEED_TEST_FILE_SIZE, 3, &uploadStart, &uploadEnd);
 
     if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {
         const float uploadSeconds = static_cast<float>(uploadEnd - uploadStart) / 1000.0f;
-        estimatedUploadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / uploadSeconds);
+        estimatedUploadSpeed = static_cast<uint32_t>(CONNECTION_SPEED_TEST_FILE_SIZE / uploadSeconds);
         if (estimatedUploadSpeed == 0) estimatedUploadSpeed = 1;
         fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
     }

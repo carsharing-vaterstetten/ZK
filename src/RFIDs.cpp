@@ -139,8 +139,10 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
         return false;
     }
 
-    const DownloadResult downloadResult = modem.downloadFile(
+    const DownloadResult downloadResult = modem.downloadData(
         REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, modemIMEI, config.serverPassword);
+
+    file.close();
 
     switch (downloadResult)
     {

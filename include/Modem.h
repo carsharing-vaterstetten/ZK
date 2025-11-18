@@ -9,14 +9,13 @@
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <FS.h>
-
 #include "Config.h"
 #include "WatchdogHandler.h"
 #include "GPS.h"
 
 #define SERIAL_AT Serial1
 
-#define BASE_UPLOAD_RESULTS FILE_IS_EMPTY, UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
+#define BASE_UPLOAD_RESULTS UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
 #define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS, UNEXPECTED_STATUS_CODE
 
 enum class UploadResult
@@ -24,9 +23,22 @@ enum class UploadResult
     BASE_UPLOAD_RESULTS,
 };
 
+enum class UploadFileResult
+{
+    BASE_UPLOAD_RESULTS,
+    FILE_IS_EMPTY
+};
+
 enum class UploadAndRetryResult
 {
     BASE_UPLOAD_RESULTS,
+    SUCCESS_AFTER_RETRYING,
+};
+
+enum class UploadFileAndRetryResult
+{
+    BASE_UPLOAD_RESULTS,
+    FILE_IS_EMPTY,
     FILE_DOES_NOT_EXIST,
     FAILED_TO_OPEN_FILE,
     SUCCESS_AFTER_RETRYING,
@@ -35,6 +47,34 @@ enum class UploadAndRetryResult
 enum class DownloadResult
 {
     BASE_DOWNLOAD_RESULTS,
+};
+
+class RandomStream final : public Stream
+{
+    int available() override
+    {
+        return 1; // always something to read
+    }
+
+    int read() override
+    {
+        return random(0, 256); // return random byte
+    }
+
+    int peek() override
+    {
+        return random(0, 256); // not really peek-safe, but fine for quick & dirty
+    }
+
+    void flush() override
+    {
+        // nothing to flush
+    }
+
+    size_t write(uint8_t) override
+    {
+        return 1; // discard writes
+    }
 };
 
 // HTTP download stream that automatically manages connection and watchdog timeout
@@ -98,19 +138,23 @@ public:
     }
 
     bool init(uint8_t retries = 2);
-    UploadResult uploadFile(const String& endpoint, File& f, int* statusCode, String* response,
-                            int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
-                            unsigned long* uploadEndMs = nullptr);
-    UploadAndRetryResult uploadFileAndDelete(const String& endpoint, const String& filePath,
-                                             bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries,
-                                             int bufferSize = 256, unsigned long* uploadStartMs = nullptr,
-                                             unsigned long* uploadEndMs = nullptr);
+    UploadResult uploadData(const String& endpoint, Stream& stream, uint32_t streamLen, int* statusCode,
+                            String* response,
+                            unsigned long* uploadStartMs = nullptr, unsigned long* uploadEndMs = nullptr,
+                            bool logToLogFile = true);
+    UploadAndRetryResult uploadDataAndRetry(const String& endpoint, Stream& stream, uint32_t streamLen,
+                                            uint32_t retries, unsigned long* uploadStartMs, unsigned long* uploadEndMs,
+                                            bool logToLogFile);
+    UploadFileAndRetryResult uploadFileAndDelete(const String& endpoint, File& f, bool deleteIfSuccess,
+                                                 bool deleteAfterRetrying, uint32_t retries);
+    UploadFileAndRetryResult uploadFileAndDelete(const String& endpoint, const String& filePath, bool deleteIfSuccess,
+                                                 bool deleteAfterRetrying, uint32_t retries);
     int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
                   const String& password = "");
     int simpleGetBin(const String& aUrlPath, uint8_t* responseBody, size_t size, const String& username = "",
                      const String& password = "");
-    DownloadResult downloadFile(const String& remotePath, File& f, const String& username = "",
-                                const String& password = "", int bufferSize = 512,
+    DownloadResult downloadData(const String& remotePath, Stream& f, const String& username = "",
+                                const String& password = "",
                                 unsigned long* downloadStartMs = nullptr,
                                 unsigned long* downloadEndMs = nullptr);
     void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
