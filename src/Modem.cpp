@@ -102,7 +102,7 @@ bool Modem::enableGPS()
         fileLog.errorln("Set GPS Power HIGH Failed");
     }
 
-    fileLog.infoln("Enabling GPS... ");
+    fileLog.debugln("Enabling GPS... ");
 
     const bool success = gsmModem.enableGPS();
 
@@ -121,7 +121,7 @@ bool Modem::disableGPS()
         fileLog.errorln("Set GPS Power LOW Failed");
     }
 
-    fileLog.infoln("Disabling GPS...");
+    fileLog.debugln("Disabling GPS...");
 
     const bool success = gsmModem.disableGPS();
 

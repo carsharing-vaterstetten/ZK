@@ -4,7 +4,7 @@
 
 bool NFCCardReader::init(SPIClass& spi, const uint8_t cs)
 {
-    fileLog.infoln("Connecting to NFC board...");
+    fileLog.debugln("Connecting to NFC board...");
 
     delete nfc;
     nfc = new Adafruit_PN532{cs, &spi};

@@ -31,7 +31,7 @@ bool StorageManager::move(const String& oldPath, const String& newPath, const bo
     {
         if (deleteIfNewExists)
         {
-            fileLog.infoln(newPath + " exists. Removing...");
+            fileLog.debugln(newPath + " exists. Removing...");
 
             if (!LittleFS.remove(newPath))
             {
@@ -39,7 +39,7 @@ bool StorageManager::move(const String& oldPath, const String& newPath, const bo
                 return false;
             }
 
-            fileLog.infoln("Removed file");
+            fileLog.debugln("Removed file");
         }
         else
         {
