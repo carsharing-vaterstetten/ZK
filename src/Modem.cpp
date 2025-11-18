@@ -419,6 +419,21 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const String& endpoint, File
 
     f.close();
 
+    // Log to file
+    switch (uploadResult)
+    {
+    case UploadAndRetryResult::UNEXPECTED_STATUS_CODE:
+    case UploadAndRetryResult::HTTP_REQUEST_ERROR:
+    case UploadAndRetryResult::FAILED_TO_INCREASE_TWDT_TIMEOUT:
+    case UploadAndRetryResult::FAILED_TO_SEND_DATA:
+        fileLog.errorln("Failed to upload file");
+        break;
+    case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
+    case UploadAndRetryResult::SUCCESS:
+        fileLog.infoln("File uploaded successfully");
+        break;
+    }
+
     if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
     {
         const bool removeSuccess = StorageManager::remove(filePath);
