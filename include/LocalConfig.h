@@ -60,7 +60,7 @@ public:
     {
         const auto localConfig = LocalConfig::fromStorage(prefsName);
         if (!localConfig.has_value()) return std::nullopt;
-        return StorableConfig{localConfig.value(), prefsName};
+        return std::optional{StorableConfig{localConfig.value(), prefsName}};
     }
 
     bool save() const;
