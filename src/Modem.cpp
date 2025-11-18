@@ -632,7 +632,7 @@ void Modem::performConnectionSpeedTest()
 
     if (uploadResult == UploadAndRetryResult::SUCCESS || uploadResult == UploadAndRetryResult::SUCCESS_AFTER_RETRYING)
     {
-        const float uploadSeconds = static_cast<float>(uploadEnd - downloadStart) / 1000.0f;
+        const float uploadSeconds = static_cast<float>(uploadEnd - uploadStart) / 1000.0f;
         estimatedUploadSpeed = static_cast<uint32_t>(static_cast<float>(fileSize) / uploadSeconds);
         if (estimatedUploadSpeed == 0) estimatedUploadSpeed = 1;
         fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
