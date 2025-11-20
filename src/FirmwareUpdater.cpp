@@ -22,24 +22,32 @@ void onDownloadProgress(const size_t progress, const size_t total)
     }
 }
 
-
-bool FirmwareUpdater::detail::performUpdate()
+void FirmwareUpdater::doUpdateIfAvailable()
 {
-    fileLog.infoln("Performing OTA update");
+    fileLog.infoln("Checking for firmware update");
 
-    DownloadStream downloadStream{LATEST_FIRMWARE_DOWNLOAD_PATH};
+    DownloadStream downloadStream{LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION};
 
     if (!downloadStream)
     {
-        fileLog.errorln("Failed to open stream for download");
-        return false;
+        fileLog.errorln("Failed to open stream for update");
+        return;
+    }
+
+    if (downloadStream.responseStatusCode() == 204)
+    {
+        fileLog.infoln("Already running latest firmware");
+        return;
     }
 
     if (downloadStream.responseStatusCode() != 200)
     {
-        fileLog.errorln("Unexpected status code. Update canceled");
-        return false;
+        fileLog.errorln("Unexpected status code. Failed to check for update");
+        return;
     }
+
+    fileLog.infoln("Newer version available");
+    fileLog.infoln("Performing OTA update");
 
     const size_t updateSize = downloadStream.contentLength();
     fileLog.infoln("Update size: " + String(updateSize) + " B");
@@ -47,7 +55,7 @@ bool FirmwareUpdater::detail::performUpdate()
     if (!Update.begin(updateSize))
     {
         fileLog.errorln("Not enough space for OTA");
-        return false;
+        return;
     }
 
     nextDownloadProgressPrint = 0;
@@ -58,19 +66,19 @@ bool FirmwareUpdater::detail::performUpdate()
     if (written != updateSize)
     {
         fileLog.errorln("Write failed. Written " + String(written) + " B / " + String(updateSize) + " B");
-        return false;
+        return;
     }
 
     if (!Update.end())
     {
         fileLog.errorln("Update failed: " + String(Update.getError()));
-        return false;
+        return;
     }
 
     if (!Update.isFinished())
     {
         fileLog.errorln("Update not finished?");
-        return false;
+        return;
     }
 
     fileLog.infoln("Update complete. Rebooting in 5 seconds...");
@@ -78,46 +86,4 @@ bool FirmwareUpdater::detail::performUpdate()
     ESP.restart();
 
     // Never reaches here
-    return true;
-}
-
-
-FirmwareUpdateCheckResult FirmwareUpdater::checkForFirmwareUpdate()
-{
-    fileLog.infoln("Checking for firmware update");
-
-    String updateAvailability;
-
-    const int respStatus = modem.simpleGet(LATEST_FIRMWARE_IS_NEWER_ENDPOINT "?fm_version=" FIRMWARE_VERSION,
-                                           &updateAvailability, modemIMEI, config.serverPassword);
-
-    if (respStatus != 200)
-    {
-        fileLog.warningln(
-            "Failed to check for update: Response status: " + String(respStatus));
-        return FirmwareUpdateCheckResult::ERROR;
-    }
-
-    if (updateAvailability == "true")
-    {
-        fileLog.infoln("Newer version available");
-        return FirmwareUpdateCheckResult::UPDATE_AVAILABLE;
-    }
-    if (updateAvailability == "false")
-    {
-        fileLog.infoln("Already running latest firmware");
-        return FirmwareUpdateCheckResult::NO_UPDATE_AVAILABLE;
-    }
-
-    fileLog.errorln("Unknown response: " + updateAvailability);
-    return FirmwareUpdateCheckResult::UNKNOWN_RESPONSE;
-}
-
-bool FirmwareUpdater::doUpdateIfAvailable()
-{
-    if (checkForFirmwareUpdate() == FirmwareUpdateCheckResult::UPDATE_AVAILABLE)
-    {
-        return detail::performUpdate();
-    }
-    return false;
 }
