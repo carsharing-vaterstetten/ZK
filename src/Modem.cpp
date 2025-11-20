@@ -52,7 +52,16 @@ DownloadStream::DownloadStream(const String& remotePath, Client& gsmClient, cons
         return;
     }
 
-    const size_t totalLen = contentLength();
+    const long totalLen = contentLength();
+
+    if (totalLen <= 0 || responseCode == 204)
+    {
+        // Yes, totalLen can be -1
+        fileLog.infoln("Empty body. Nothing to download");
+        isValid = true;
+        return;
+    }
+
     fileLog.infoln("Content length: " + String(totalLen) + " B");
 
     const uint32_t downloadTime = totalLen / modem.getEstimatedDownloadSpeed();
