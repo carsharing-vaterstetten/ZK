@@ -89,6 +89,8 @@ bool Modem::init(const uint8_t retries)
 
         fileLog.infoln("Modem info: " + gsmModem.getModemInfo());
 
+        gsmModem.factoryDefault();
+
         const SimStatus simStatus = gsmModem.getSimStatus();
         const String msg = "Sim status: " + HelperUtils::simStatusToString(simStatus);
         fileLog.logInfoOrWarningln(simStatus == SIM_READY, msg, msg);
@@ -117,6 +119,9 @@ bool Modem::init(const uint8_t retries)
                 return false;
             }
         }
+
+        gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
+        gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
 
         fileLog.infoln("Connecting GPRS...");
         const bool gprsSuccess = gsmModem.gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
