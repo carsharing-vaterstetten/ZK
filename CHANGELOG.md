@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0]
+
+- Interne Code-Refaktorisierungen
+- Behebt, dass das Modem beim ersten Versuch keine GPRS-Verbindung herstellt
+- GPS wird erneut aktiviert, wenn der erste Versuch fehlschlägt
+- LED blinkt zweimal grün beim Login und zweimal rot beim Logout statt einmal lang
+- Neue Konfigurationsoption, um GPS-Aufzeichnung zu deaktivieren, wenn niemand eingeloggt ist
+- Upload-Geschwindigkeit wird jetzt korrekt berechnet
+- Geschwindigkeitstest der Verbindung erfolgt jetzt in einer Anfrage statt in zwei
+- Watchdog wird vom HttpClient gepingt → Geschwindigkeitstests nicht mehr nötig → kann mit
+  `GIVE_CONNECTION_SPEED_ESTIMATE` deaktiviert werden
+- Firmware-Update wird in einer einzigen Anfrage geprüft und heruntergeladen statt in zwei
+- Mehr Logging, kleine Fehlerbehebungen
+
 ## [1.0.1]
 
 - Use HTTP caching to check for updated RFID UIDs in one instead of two requests
