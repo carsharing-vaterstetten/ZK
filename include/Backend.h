@@ -21,8 +21,7 @@
 #define REMOTE_RFID_PATH RFIDS_ROUTE "/"
 
 // Vehicle/Other router
-#define UPLOAD_TEST_ENDPOINT OTHER_ROUTE "/upload-test"
-#define DOWNLOAD_TEST_ENDPOINT OTHER_ROUTE "/download-test"
+#define CONNECTION_SPEED_TEST_ENDPOINT OTHER_ROUTE "/up-down-test"
 
 // Vehicle/Firmware router
 #define LATEST_FIRMWARE_ENDPOINT FIRMWARE_ROUTE "/latest"

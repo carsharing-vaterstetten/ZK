@@ -48,9 +48,8 @@
 #define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 
 // Connection speed test
-#define SKIP_INITIAL_CONNECTION_SPEED_TEST false // true for faster startup
-#define SKIP_ALL_CONNECTION_SPEED_TESTS false
-#define CONNECTION_SPEED_TEST_FILE_SIZE (16U * 1024U) // Smaller files result in less accurate connection speed estimates
+#define GIVE_CONNECTION_SPEED_ESTIMATE false
+#define CONNECTION_SPEED_TEST_FILE_SIZE 16384 // Smaller files result in less accurate connection speed estimates. Number must not be (16 * 1024)!!! to convert it to a string literal!!!
 
 // Config override
 #define USE_DEFAULT_CONFIG false // Useful for development or mass deployment

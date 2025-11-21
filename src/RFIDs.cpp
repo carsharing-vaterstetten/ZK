@@ -2,10 +2,10 @@
 
 #include "mbedtls/md5.h"
 #include <ArduinoJson.h>
+#include "Api.h"
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
-#include "LocalConfig.h"
 #include "Modem.h"
 #include "StorageManager.h"
 
@@ -60,28 +60,28 @@ void RFIDs::downloadRfidsIfChanged()
 {
     fileLog.infoln("Downloading remote RFIDs JSON");
 
-    // Open HTTP stream (watchdog timeout and cleanup handled automatically by DownloadStream)
-
     uint8_t md5Checksum[16];
     generateChecksum(md5Checksum);
+    String base64Checksum = HelperUtils::toBase64(md5Checksum, 16);
 
-    DownloadStream http{REMOTE_RFID_PATH, HelperUtils::toBase64(md5Checksum, 16)};
+    HttpRequest req = HttpRequest::get(REMOTE_RFID_PATH, {{"if-none-match", base64Checksum}});
+    const ApiResponse resp = api.makeRequest(req);
 
-    if (!http)
+    if (!resp.valid)
     {
-        fileLog.errorln("Failed to open stream for RFIDs download");
+        fileLog.errorln("Request failed");
         return;
     }
 
-    const uint16_t responseCode = http.responseStatusCode();
+    fileLog.infoln("Response code: " + String(resp.responseCode));
 
-    if (responseCode == 304)
+    if (resp.responseCode == 304)
     {
         fileLog.infoln("Server and local RFID UIDs are the same");
         return;
     }
 
-    if (responseCode != 200)
+    if (resp.responseCode != 200)
     {
         fileLog.errorln("Unexpected response code. Using old RFID UIDs");
         return;
@@ -96,12 +96,12 @@ void RFIDs::downloadRfidsIfChanged()
         return;
     }
 
-    http.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
+    resp.body.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
 
     // Parse JSON from stream
     fileLog.infoln("Parsing JSON stream");
     JsonDocument doc;
-    const DeserializationError error = deserializeJson(doc, http);
+    const DeserializationError error = deserializeJson(doc, resp.body);
 
     if (error)
     {
@@ -139,20 +139,34 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
         return false;
     }
 
-    const DownloadResult downloadResult = modem.downloadData(
-        REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH, file, modemIMEI, config.serverPassword);
+    HttpRequest req = HttpRequest::get(REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH);
+    const ApiResponse resp = api.makeRequest(req);
+
+    if (!resp.valid)
+    {
+        fileLog.warningln("Request failed");
+        return false;
+    }
+
+    fileLog.infoln("Response code: " + String(resp.responseCode));
+
+    if (resp.responseCode != 200)
+    {
+        fileLog.errorln("Unexpected response code" + String(resp.responseCode));
+        return false;
+    }
+
+    uint32_t bytesDownloaded = ApiClient::fetch(resp, file);
 
     file.close();
 
-    switch (downloadResult)
+    if (bytesDownloaded != resp.bodyLength)
     {
-    case DownloadResult::FAILED_TO_OPEN_STREAM:
-    case DownloadResult::UNEXPECTED_STATUS_CODE:
-        fileLog.errorln("Download failed");
+        fileLog.errorln(
+            "Downloaded size (" + String(bytesDownloaded) + " B) does not match content size (" +
+            String(resp.bodyLength) + " B). GPS UIDs not updated");
         StorageManager::removeTmpRFIDs();
         return false;
-    case DownloadResult::SUCCESS:
-        break;
     }
 
     fileLog.infoln("Successfully downloaded file");

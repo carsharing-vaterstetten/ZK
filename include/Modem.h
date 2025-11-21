@@ -7,16 +7,15 @@
 #define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
 #include <TinyGsmClient.h>
-#include <ArduinoHttpClient.h>
 #include <FS.h>
+
+#include "ApiStreams.h"
 #include "Config.h"
-#include "WatchdogHandler.h"
 #include "GPS.h"
 
 #define SERIAL_AT Serial1
 
-#define BASE_UPLOAD_RESULTS UNEXPECTED_STATUS_CODE, HTTP_REQUEST_ERROR, FAILED_TO_INCREASE_TWDT_TIMEOUT, SUCCESS, FAILED_TO_SEND_DATA
-#define BASE_DOWNLOAD_RESULTS FAILED_TO_OPEN_STREAM, SUCCESS, UNEXPECTED_STATUS_CODE
+#define BASE_UPLOAD_RESULTS SUCCESS, FAILED
 
 enum class UploadResult
 {
@@ -44,76 +43,6 @@ enum class UploadFileAndRetryResult
     SUCCESS_AFTER_RETRYING,
 };
 
-enum class DownloadResult
-{
-    BASE_DOWNLOAD_RESULTS,
-};
-
-class RandomStream final : public Stream
-{
-    int available() override
-    {
-        return 1; // always something to read
-    }
-
-    int read() override
-    {
-        return random(0, 256); // return random byte
-    }
-
-    int peek() override
-    {
-        return random(0, 256); // not really peek-safe, but fine for quick & dirty
-    }
-
-    void flush() override
-    {
-        // nothing to flush
-    }
-
-    size_t write(uint8_t) override
-    {
-        return 1; // discard writes
-    }
-};
-
-// HTTP download stream that automatically manages connection and watchdog timeout
-class DownloadStream : public HttpClient
-{
-public:
-    // Open HTTP GET stream with automatic setup and watchdog management
-    DownloadStream(const String& remotePath, Client& gsmClient, const String& server, uint16_t port,
-                   const String& username = "", const String& password = "", const String& cacheChecksum = "");
-
-    explicit DownloadStream(const String& remotePath, const String& cacheChecksum = "");
-
-    // Constructor for invalid/null stream
-    DownloadStream() : HttpClient(*(Client*)nullptr, "", 0), isValid(false), responseCode(0)
-    {
-    }
-
-    ~DownloadStream() override
-    {
-        if (isValid)
-        {
-            HttpClient::stop();
-            if (responseCode != 304)
-                watchdogHandler.revertTemporaryIncrease();
-        }
-    }
-
-    explicit operator bool() const { return isValid; }
-
-    [[nodiscard]] int responseStatusCode() const
-    {
-        return responseCode;
-    }
-
-private:
-    bool isValid;
-    int responseCode;
-};
-
 class Modem
 {
     static void powerOn();
@@ -121,8 +50,6 @@ class Modem
     bool enableGPS();
     bool disableGPS();
 
-    uint32_t estimatedDownloadSpeed = 3000;
-    uint32_t estimatedUploadSpeed = 1000;
     bool timeSynced = false;
 
     unsigned long serialBaud;
@@ -138,26 +65,14 @@ public:
     }
 
     bool init(uint8_t retries = 2);
-    UploadResult uploadData(const String& endpoint, Stream& stream, uint32_t streamLen, int* statusCode,
-                            String* response,
-                            unsigned long* uploadStartMs = nullptr, unsigned long* uploadEndMs = nullptr,
-                            bool logToLogFile = true);
-    UploadAndRetryResult uploadDataAndRetry(const String& endpoint, Stream& stream, uint32_t streamLen,
-                                            uint32_t retries, unsigned long* uploadStartMs, unsigned long* uploadEndMs,
-                                            bool logToLogFile);
-    UploadFileAndRetryResult uploadFileAndDelete(const String& endpoint, File& f, bool deleteIfSuccess,
-                                                 bool deleteAfterRetrying, uint32_t retries);
-    UploadFileAndRetryResult uploadFileAndDelete(const String& endpoint, const String& filePath, bool deleteIfSuccess,
-                                                 bool deleteAfterRetrying, uint32_t retries);
-    int simpleGet(const String& aUrlPath, String* responseBody, const String& username = "",
-                  const String& password = "");
-    int simpleGetBin(const String& aUrlPath, uint8_t* responseBody, size_t size, const String& username = "",
-                     const String& password = "");
-    DownloadResult downloadData(const String& remotePath, Stream& f, const String& username = "",
-                                const String& password = "",
-                                unsigned long* downloadStartMs = nullptr,
-                                unsigned long* downloadEndMs = nullptr);
-    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
+    static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, uint32_t streamLen,
+                                                   uint32_t retries);
+    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, File& f, bool deleteIfSuccess,
+                                                        bool deleteAfterRetrying, uint32_t retries);
+    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath, bool deleteIfSuccess,
+                                                        bool deleteAfterRetrying, uint32_t retries);
+    static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
@@ -172,9 +87,9 @@ public:
     }
 
     [[nodiscard]] time_t getUnixTimestamp();
-    esp_err_t increaseWatchdogTimeoutForFileUpload(size_t fileSize) const;
-    esp_err_t increaseWatchdogTimeoutForFileDownload(size_t fileSize) const;
-    void performConnectionSpeedTest();
+#if GIVE_CONNECTION_SPEED_ESTIMATE
+    static void performConnectionSpeedTest();
+#endif
     bool getGPS(GPS_DATA_t& out);
 
     [[nodiscard]] bool timeIsAvailable() const
@@ -185,16 +100,6 @@ public:
     String getIMEI()
     {
         return gsmModem.getIMEI();
-    }
-
-    [[nodiscard]] uint32_t getEstimatedDownloadSpeed() const
-    {
-        return estimatedDownloadSpeed;
-    }
-
-    [[nodiscard]] uint32_t getEstimatedUploadSpeed() const
-    {
-        return estimatedUploadSpeed;
     }
 
     int16_t getSignalQuality()

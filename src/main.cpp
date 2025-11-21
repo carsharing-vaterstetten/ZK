@@ -6,6 +6,7 @@
 #include <esp32-hal.h>
 #include "esp_log.h"
 #include "AccessControl.h"
+#include "Api.h"
 #include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
@@ -171,6 +172,8 @@ void setup()
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     loadConfig(); // We need the config for the Modem
     modem.init();
+    fileLog.infoln("Signal Quality: " + String(modem.getSignalQuality()));
+
     fileLog.infoln(
         "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + modem.getGSMDateTime() +
         ", Unix timestamp: " + String(modem.getUnixTimestamp()) + ", system time: " + String(
@@ -180,11 +183,12 @@ void setup()
     // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
     modemIMEI = modem.getIMEI();
     fileLog.infoln("Modem IMEI: " + modemIMEI);
-    fileLog.infoln("Signal Quality: " + String(modem.getSignalQuality()));
+
+    api.begin(config.server, config.serverPort, modem, modemIMEI, config.serverPassword);
 
     // Do the connection speed test before any up-/downloads
-#if !SKIP_INITIAL_CONNECTION_SPEED_TEST
-    modem.performConnectionSpeedTest();
+#if GIVE_CONNECTION_SPEED_ESTIMATE
+    Modem::performConnectionSpeedTest();
 #endif
 
     // Now we are ready to check for a firmware update
@@ -206,7 +210,7 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    modem.uploadLog(true, true, 1);
+    Modem::uploadLog(true, true, 1);
     statusLed.clear();
 
     // Set the watchdog to a shorter timeout for the main loop
@@ -227,9 +231,9 @@ void loop()
         fileLog.infoln("Time reached to upload log and restart ESP32");
 
         statusLed.setStatusColor(StatusColor::UploadingLogs);
-        modem.performConnectionSpeedTest();
+
         gps.uploadFileAndDelete(true, true, 2);
-        modem.uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         fileLog.infoln("Restarting now");
 

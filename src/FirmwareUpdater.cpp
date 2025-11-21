@@ -2,6 +2,7 @@
 
 #include <Update.h>
 
+#include "Api.h"
 #include "Backend.h"
 #include "Globals.h"
 #include "LocalConfig.h"
@@ -26,21 +27,24 @@ void FirmwareUpdater::doUpdateIfAvailable()
 {
     fileLog.infoln("Checking for firmware update");
 
-    DownloadStream downloadStream{LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION};
+    HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
+    const ApiResponse resp = api.makeRequest(req);
 
-    if (!downloadStream)
+    if (!resp.valid)
     {
-        fileLog.errorln("Failed to open stream for update");
+        fileLog.errorln("Request failed");
         return;
     }
 
-    if (downloadStream.responseStatusCode() == 204)
+    fileLog.infoln("Response code: " + String(resp.responseCode));
+
+    if (resp.responseCode == 204)
     {
         fileLog.infoln("Already running latest firmware");
         return;
     }
 
-    if (downloadStream.responseStatusCode() != 200)
+    if (resp.responseCode != 200)
     {
         fileLog.errorln("Unexpected status code. Failed to check for update");
         return;
@@ -49,7 +53,7 @@ void FirmwareUpdater::doUpdateIfAvailable()
     fileLog.infoln("Newer version available");
     fileLog.infoln("Performing OTA update");
 
-    const size_t updateSize = downloadStream.contentLength();
+    const size_t updateSize = resp.bodyLength;
     fileLog.infoln("Update size: " + String(updateSize) + " B");
 
     if (!Update.begin(updateSize))
@@ -61,7 +65,7 @@ void FirmwareUpdater::doUpdateIfAvailable()
     nextDownloadProgressPrint = 0;
     Update.onProgress(onDownloadProgress);
 
-    const size_t written = Update.writeStream(downloadStream);
+    const size_t written = Update.writeStream(resp.body);
 
     if (written != updateSize)
     {
