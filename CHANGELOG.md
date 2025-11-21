@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.1]
+
+- Modem wird auf LTE und CAT-M festgesetzt → verbessert Up- und Download von 2 kbit/s auf etwa 10 kbit/s und verkürzt
+  die Verbindungsaufbauzeit.
+
 ## [1.1.0]
 
 - Interne Code-Refaktorisierungen
