@@ -123,25 +123,7 @@ bool Modem::init(const uint8_t retries)
         gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
         gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
 
-        fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem.gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
-                                                      config.gprsPassword.c_str());
-        fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
-
-        if (!gsmModem.isGprsConnected())
-        {
-            fileLog.warningln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the GPRS failed to connect. Retrying...");
-            continue;
-        }
-
-        fileLog.infoln("Waiting for network...");
-        const bool networkSuccess = gsmModem.waitForNetwork();
-        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
-                                   "The modem did not connect to the network even after waiting");
-
-        if (!gsmModem.isNetworkConnected())
+        if (!ensureNetworkConnection())
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
@@ -186,6 +168,40 @@ bool Modem::init(const uint8_t retries)
     fileLog.criticalln("Failed to start and connect the modem");
 
     return false;
+}
+
+bool Modem::ensureNetworkConnection()
+{
+    fileLog.infoln("Connecting modem to network");
+
+    if (!gsmModem.isNetworkConnected())
+    {
+        fileLog.infoln("Waiting for network...");
+        const bool networkSuccess = gsmModem.waitForNetwork();
+        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
+                                   "The modem did not connect to the network even after waiting");
+        if (!gsmModem.isNetworkConnected()) return false;
+    }
+    else
+    {
+        fileLog.infoln("Network already connected");
+    }
+
+    if (!gsmModem.isGprsConnected())
+    {
+        fileLog.infoln("Connecting GPRS...");
+        const bool gprsSuccess = gsmModem.gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
+                                                      config.gprsPassword.c_str());
+        fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+        if (!gsmModem.isGprsConnected()) return false;
+    }
+    else
+    {
+        fileLog.infoln("GPRS already connected");
+    }
+
+    return true;
 }
 
 ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32_t streamLen)

@@ -65,6 +65,7 @@ public:
     }
 
     bool init(uint8_t retries = 2);
+    bool ensureNetworkConnection();
     static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, uint32_t streamLen,
                                                    uint32_t retries);
