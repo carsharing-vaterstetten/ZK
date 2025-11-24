@@ -233,7 +233,15 @@ void loop()
         statusLed.setStatusColor(StatusColor::UploadingLogs);
         modem.ensureNetworkConnection();
 
-        gps.uploadFileAndDelete(true, true, 2);
+        if (StorageManager::exists(GPS_FILE_PATH))
+        {
+            gps.uploadFileAndDelete(true, true, 2);
+        }
+        else
+        {
+            fileLog.infoln("No GPS data recorded. Nothing to upload");
+        }
+
         Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
         fileLog.infoln("Restarting now");
