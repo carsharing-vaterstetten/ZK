@@ -4,7 +4,6 @@
 
 #include "Api.h"
 #include "Backend.h"
-#include "Globals.h"
 #include "LocalConfig.h"
 #include "Modem.h"
 #include "StorageManager.h"

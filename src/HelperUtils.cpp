@@ -1,7 +1,6 @@
 // HelperUtils.cpp
 
 #include "HelperUtils.h"
-#include "Globals.h"
 #include "mbedtls/md5.h"
 #include <iomanip>
 #include "mbedtls/base64.h"

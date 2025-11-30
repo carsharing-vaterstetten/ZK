@@ -4,7 +4,6 @@
 #include <ArduinoJson.h>
 #include "Api.h"
 #include "Backend.h"
-#include "Globals.h"
 #include "HelperUtils.h"
 #include "Modem.h"
 #include "StorageManager.h"

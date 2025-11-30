@@ -1,6 +1,6 @@
 #include "StorageManager.h"
 
-#include "Globals.h"
+#include "Log.h"
 
 bool StorageManager::mountLittleFS()
 {
