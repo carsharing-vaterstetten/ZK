@@ -11,38 +11,127 @@
 
 void Modem::powerOn()
 {
-    pinMode(PWR_PIN, OUTPUT);
-    pinMode(POWER_PIN, OUTPUT);
-
-    digitalWrite(POWER_PIN, HIGH);
-
-    digitalWrite(PWR_PIN, LOW);
-    delay(1000);
-    digitalWrite(PWR_PIN, HIGH);
+    pinMode(BOARD_POWERON_PIN, OUTPUT);
+    digitalWrite(BOARD_POWERON_PIN, HIGH);
+    fileLog.infoln("Modem power on");
 }
 
-void Modem::powerOff()
+void Modem::turnOn()
 {
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, LOW);
-    delay(1500);
-    digitalWrite(PWR_PIN, HIGH);
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    fileLog.infoln("Modem turned on");
+}
+
+void Modem::turnOff()
+{
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    fileLog.infoln("Modem turned off");
+}
+
+bool Modem::powerOff()
+{
+    fileLog.debugln("Powering off modem...");
+    const bool success = gsmModem.poweroff();
+    fileLog.logInfoOrErrorln(success, "Modem powered off successfully", "Failed to power off modem");
+    return success;
+}
+
+void Modem::wakeup()
+{
+    fileLog.debugln("Waking up modem");
+
+    if (modemIsAwake)
+    {
+        fileLog.infoln("Modem already awake");
+        return;
+    }
+
+    pinMode(MODEM_DTR_PIN, OUTPUT);
+    digitalWrite(MODEM_DTR_PIN, LOW);
+    // delay(2000);
+    gsmModem.sleepEnable(false);
+    modemIsAwake = true;
+    fileLog.infoln("Modem wakeup sent");
+}
+
+void Modem::wakeupAndWait(const uint32_t timeoutMs)
+{
+    wakeup();
+    waitForATResponse(timeoutMs);
+    fileLog.infoln("Modem awake and responsive");
+}
+
+bool Modem::beginSleep()
+{
+    pinMode(MODEM_DTR_PIN, OUTPUT);
+    digitalWrite(MODEM_DTR_PIN, HIGH);
+    const bool success = gsmModem.sleepEnable(true);
+    fileLog.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
+    if (success)
+    {
+        modemIsAwake = false;
+    }
+    return success;
+}
+
+/// Only sends the modem to sleep if no functions are needed
+/// Returns true if the modem was sent to sleep. Returns false if it cannot sleep or already sleeps.
+bool Modem::requestSleep()
+{
+    if (gpsIsEnabled || !modemIsAwake)
+        return false;
+
+    return beginSleep();
+}
+
+bool Modem::waitForATResponse(const uint32_t timeoutMs)
+{
+    const uint64_t startMs = millis();
+
+    while (millis() - startMs < timeoutMs)
+    {
+        if (gsmModem.testAT(100)) return true;
+    }
+
+    return false;
 }
 
 bool Modem::enableGPS()
 {
+    fileLog.debugln("Enabling GPS...");
+
+    if (gsmModem.isEnableGPS())
+    {
+        gpsIsEnabled = true;
+        fileLog.debugln("GPS already enabled");
+        return true;
+    }
+
     gsmModem.sendAT("+CGPIO=0,48,1,1");
 
     if (gsmModem.waitResponse(10000L) != 1)
     {
-        fileLog.errorln("Set GPS Power HIGH Failed");
+        fileLog.errorln("Set GPS Power HIGH failed");
     }
-
-    fileLog.debugln("Enabling GPS... ");
 
     const bool success = gsmModem.enableGPS();
 
-    fileLog.logInfoOrErrorln(success, "Enabled GPS", "Failed to enable GPS");
+    fileLog.logInfoOrCriticalErrorln(success, "Enabled GPS", "Failed to enable GPS");
+
+    if (success)
+    {
+        gpsIsEnabled = true;
+    }
 
     return success;
 }
@@ -50,36 +139,58 @@ bool Modem::enableGPS()
 
 bool Modem::disableGPS()
 {
+    fileLog.debugln("Disabling GPS...");
+
+    if (!gsmModem.isEnableGPS())
+    {
+        gpsIsEnabled = false;
+        fileLog.debugln("GPS already disabled");
+        return true;
+    }
+
     gsmModem.sendAT("+CGPIO=0,48,1,0");
 
     if (gsmModem.waitResponse(10000L) != 1)
     {
-        fileLog.errorln("Set GPS Power LOW Failed");
+        fileLog.errorln("Set GPS Power LOW failed");
     }
-
-    fileLog.debugln("Disabling GPS...");
 
     const bool success = gsmModem.disableGPS();
 
     fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
 
+    if (success)
+    {
+        gpsIsEnabled = false;
+    }
+
     return success;
 }
 
-bool Modem::init(const uint8_t retries)
+bool Modem::init(const bool enableGPS_, const uint8_t retries)
 {
+    fileLog.infoln("Initializing modem...");
+
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
-        powerOff();
+        turnOff();
 
         if (attempt > 0) gsmClient.stop();
 
-        fileLog.infoln("Initializing modem...");
-        powerOn();
         SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
 
-        while (!gsmModem.testAT())
-            delay(10);
+        wakeup();
+        powerOn();
+        gsmModem.factoryDefault();
+        turnOn();
+
+        if (!waitForATResponse())
+        {
+            fileLog.warningln(
+                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
+                " failed because the modem did not respond. Retrying...");
+            continue;
+        }
 
         fileLog.infoln("Modem connected to serial");
 
@@ -88,37 +199,6 @@ bool Modem::init(const uint8_t retries)
                                    "There was an error while initializing the modem");
 
         fileLog.infoln("Modem info: " + gsmModem.getModemInfo());
-
-        gsmModem.factoryDefault();
-
-        const SimStatus simStatus = gsmModem.getSimStatus();
-        const String msg = "Sim status: " + HelperUtils::simStatusToString(simStatus);
-        fileLog.logInfoOrWarningln(simStatus == SIM_READY, msg, msg);
-
-        switch (simStatus)
-        {
-        case SIM_READY: break;
-        case SIM_LOCKED:
-            {
-                const bool unlockSuccess = gsmModem.simUnlock(config.simPin.c_str());
-                fileLog.logInfoOrWarningln(unlockSuccess,
-                                           "Sim unlocked successfully", "Attempt no. " + String(attempt + 1) + " of " +
-                                           String(retries + 1) + " failed because the SIM is not ready. Retrying...");
-                if (unlockSuccess) break;
-
-                continue;
-            }
-        case SIM_ERROR:
-            fileLog.errorln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the SIM card has an unknown status. Retrying...");
-            continue;
-        case SIM_ANTITHEFT_LOCKED:
-            {
-                fileLog.errorln("The SIM card is antitheft locked");
-                return false;
-            }
-        }
 
         gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
         gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
@@ -153,7 +233,7 @@ bool Modem::init(const uint8_t retries)
             continue;
         }
 
-        if (!enableGPS())
+        if (enableGPS_ && !enableGPS())
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
@@ -172,20 +252,9 @@ bool Modem::init(const uint8_t retries)
 
 bool Modem::ensureNetworkConnection()
 {
-    fileLog.infoln("Connecting modem to network");
+    // yes connecting GPRS first and network later is very important. Otherwise, reconnecting doesn't work!
 
-    if (!gsmModem.isNetworkConnected())
-    {
-        fileLog.infoln("Waiting for network...");
-        const bool networkSuccess = gsmModem.waitForNetwork();
-        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
-                                   "The modem did not connect to the network even after waiting");
-        if (!gsmModem.isNetworkConnected()) return false;
-    }
-    else
-    {
-        fileLog.infoln("Network already connected");
-    }
+    fileLog.infoln("Connecting modem to network");
 
     if (!gsmModem.isGprsConnected())
     {
@@ -194,14 +263,44 @@ bool Modem::ensureNetworkConnection()
                                                       config.gprsPassword.c_str());
         fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
 
-        if (!gsmModem.isGprsConnected()) return false;
+        if (!gprsSuccess) return false;
     }
     else
     {
         fileLog.infoln("GPRS already connected");
     }
 
+    if (!gsmModem.isNetworkConnected())
+    {
+        fileLog.infoln("Waiting for network...");
+        const bool networkSuccess = gsmModem.waitForNetwork();
+        fileLog.logInfoOrWarningln(networkSuccess, "The modem is now connected to the network",
+                                   "The modem did not connect to the network even after waiting");
+        if (!networkSuccess) return false;
+    }
+    else
+    {
+        fileLog.infoln("Network already connected");
+    }
+
     return true;
+}
+
+bool Modem::disconnectNetwork()
+{
+    fileLog.debugln("Disconnecting GPRS...");
+
+    if (!gsmModem.isGprsConnected())
+    {
+        fileLog.infoln("GPRS already disconnected");
+        return true;
+    }
+
+    const bool success = gsmModem.gprsDisconnect();
+
+    fileLog.logInfoOrErrorln(success, "GPRS disconnected successfully", "GPRS failed to disconnect");
+
+    return success;
 }
 
 ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32_t streamLen)

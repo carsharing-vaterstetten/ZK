@@ -20,10 +20,14 @@
 #define LED_COUNT 4
 
 // Modem pins
-#define PIN_TX 27
-#define PIN_RX 26
-#define PWR_PIN 4
-#define POWER_PIN 25
+#define MODEM_DTR_PIN           (32)
+#define MODEM_RX_PIN            (26)
+#define MODEM_TX_PIN            (27)
+#define BOARD_POWERON_PIN       (25)
+#define BOARD_PWRKEY_PIN        (4)
+
+#define MODEM_POWERON_PULSE_WIDTH_MS      (1000)
+#define MODEM_POWEROFF_PULSE_WIDTH_MS     (1300)
 
 // Car key pins
 #define OPEN_KEY 15

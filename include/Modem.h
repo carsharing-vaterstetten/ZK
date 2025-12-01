@@ -45,16 +45,13 @@ enum class UploadFileAndRetryResult
 
 class Modem
 {
-    static void powerOn();
-    static void powerOff();
-    bool enableGPS();
-    bool disableGPS();
 
-    bool timeSynced = false;
+    bool timeSynced = false, modemIsAwake = false, gpsIsEnabled = false;
 
     unsigned long serialBaud;
     int8_t rxPin, txPin;
     TinyGsmSim7000 gsmModem{SERIAL_AT};
+    bool beginSleep();
 
 public:
     TinyGsmSim7000::GsmClientSim7000 gsmClient{gsmModem}; // TODO: abstract this
@@ -64,16 +61,30 @@ public:
     {
     }
 
-    bool init(uint8_t retries = 2);
+    bool powerOff();
+    static void powerOn();
+    static void turnOn();
+    static void turnOff();
+    bool requestSleep();
+
+    bool init(bool enableGPS_ = true, uint8_t retries = 2);
     bool ensureNetworkConnection();
+    void wakeup();
+    void wakeupAndWait(uint32_t timeoutMs = 10000);
+    bool waitForATResponse(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, uint32_t streamLen,
                                                    uint32_t retries);
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, File& f, bool deleteIfSuccess,
                                                         bool deleteAfterRetrying, uint32_t retries);
-    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath, bool deleteIfSuccess,
+    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath,
+                                                        bool deleteIfSuccess,
                                                         bool deleteAfterRetrying, uint32_t retries);
     static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+
+    bool disconnectNetwork();
+    bool enableGPS();
+    bool disableGPS();
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
@@ -107,6 +118,16 @@ public:
     {
         return gsmModem.getSignalQuality();
     }
+
+    [[nodiscard]] bool isSleeping() const
+    {
+        return !modemIsAwake;
+    }
+
+    [[nodiscard]] bool isGPSEnabled() const
+    {
+        return gpsIsEnabled;
+    }
 };
 
-inline Modem modem{115200, PIN_RX, PIN_TX};
+inline Modem modem{115200, MODEM_RX_PIN, MODEM_TX_PIN};
