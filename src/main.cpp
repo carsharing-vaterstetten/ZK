@@ -24,6 +24,7 @@ unsigned long nextWatchdogResetMs;
 unsigned long nextGPSUpdate;
 unsigned long targetMillis;
 
+unsigned long lastLogin, lastLogout; // These are volatile
 
 void checkNFCTag()
 {
@@ -35,9 +36,20 @@ void checkNFCTag()
     {
         fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
         if (accessControl.toggleLogin(rfidUid))
+        {
+            lastLogin = millis();
             statusLed.unlockFlash();
+            if (accessControl.hasPermissionForGPSTracking())
+            {
+                modem.wakeupAndWait();
+                modem.enableGPS();
+            }
+        }
         else
+        {
+            lastLogout = millis();
             statusLed.lockFlash();
+        }
     }
     else
     {
@@ -128,6 +140,32 @@ void checkGPS()
     gps.logDataBuffered(gpsData);
 }
 
+void restartRoutine()
+{
+    fileLog.infoln("Time reached to upload log and restart ESP32");
+
+    statusLed.setStatusColor(StatusColor::UploadingLogs);
+
+    modem.wakeupAndWait();
+    modem.ensureNetworkConnection();
+
+    if (StorageManager::exists(GPS_FILE_PATH))
+    {
+        gps.uploadFileAndDelete(true, true, 2);
+    }
+    else
+    {
+        fileLog.infoln("No GPS data recorded. Nothing to upload");
+    }
+
+    Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+
+    fileLog.infoln("Restarting now");
+
+    ESP.restart();
+}
+
+
 void setup()
 {
     // Start serial communication
@@ -167,11 +205,13 @@ void setup()
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
     statusLed.init();
+    accessControl.init();
 
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     loadConfig(); // We need the config for the Modem
-    modem.init();
+    modem.init(
+        RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()));
     fileLog.infoln("Signal Quality: " + String(modem.getSignalQuality()));
 
     fileLog.infoln(
@@ -199,7 +239,6 @@ void setup()
     fileLog.infoln("Skipped firmware update check");
 #endif
 
-    accessControl.init();
     HardwareManager::begin();
     cardReader.init(HardwareManager::nfcSpi, NFC_SS);
 
@@ -212,6 +251,10 @@ void setup()
     statusLed.setStatusColor(StatusColor::UploadingLogs);
     Modem::uploadLog(true, true, 1);
     statusLed.clear();
+
+    // Power saving
+    modem.disconnectNetwork();
+    modem.requestSleep();
 
     // Set the watchdog to a shorter timeout for the main loop
     watchdogHandler.resetTimeout();
@@ -227,27 +270,7 @@ void loop()
     }
 
     if (millis() >= targetMillis)
-    {
-        fileLog.infoln("Time reached to upload log and restart ESP32");
-
-        statusLed.setStatusColor(StatusColor::UploadingLogs);
-        modem.ensureNetworkConnection();
-
-        if (StorageManager::exists(GPS_FILE_PATH))
-        {
-            gps.uploadFileAndDelete(true, true, 2);
-        }
-        else
-        {
-            fileLog.infoln("No GPS data recorded. Nothing to upload");
-        }
-
-        Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
-
-        fileLog.infoln("Restarting now");
-
-        ESP.restart();
-    }
+        restartRoutine();
 
     checkNFCTag();
 
@@ -265,5 +288,17 @@ void loop()
             checkGPS();
 #endif
         }
+    }
+
+    if (millis() - lastLogin > 10000 && millis() - lastLogout > 10000)
+    {
+#if !RECORD_GPS_WHILE_STANDING
+        if (modem.isGPSEnabled() && !(accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
+        {
+            modem.disableGPS();
+        }
+#endif
+
+        modem.requestSleep();
     }
 }
