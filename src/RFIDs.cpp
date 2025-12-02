@@ -10,6 +10,12 @@
 
 bool RFIDs::isRegisteredRFID(const uint32_t rfid)
 {
+    if (!StorageManager::exists(RFID_FILE_PATH))
+    {
+        fileLog.errorln("Failed to check UID, file does not exist");
+        return false;
+    }
+
     File file = StorageManager::openRFIDs(FILE_READ);
 
     if (!file)
