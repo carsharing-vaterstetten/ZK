@@ -61,7 +61,7 @@ void Modem::wakeup()
     // delay(2000);
     gsmModem.sleepEnable(false);
     modemIsAwake = true;
-    fileLog.infoln("Modem wakeup sent");
+    fileLog.debugln("Modem wakeup sent");
 }
 
 void Modem::wakeupAndWait(const uint32_t timeoutMs)
