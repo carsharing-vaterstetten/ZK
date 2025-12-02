@@ -283,6 +283,14 @@ bool Modem::ensureNetworkConnection()
         fileLog.infoln("Network already connected");
     }
 
+    // Wait for signal
+    int16_t signalQuality = gsmModem.getSignalQuality();
+    for (int i = 0; i < 20 && signalQuality == 99; ++i)
+    {
+        delay(500);
+        signalQuality = gsmModem.getSignalQuality();
+    }
+
     return true;
 }
 
