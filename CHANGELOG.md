@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2]
+
+- Maßnahmen zum Energiesparen:
+  - Modem und GPS werden nur verwendet, wenn sie tatsächlich gebraucht werden
+  - Falls das Modem nicht benötigt wird, wird es in den Schlafmodus versetzt
+- Fehlerbehebungen
+
 ## [1.1.1]
 
 - Modem wird auf LTE und CAT-M festgesetzt → verbessert Up- und Download von 2 kbit/s auf etwa 10 kbit/s und verkürzt
