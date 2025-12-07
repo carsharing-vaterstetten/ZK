@@ -1,6 +1,6 @@
 #pragma once
 
-#define FIRMWARE_VERSION "1.1.2-main"
+#define FIRMWARE_VERSION "1.1.3-main"
 
 // Local paths
 #define RFID_FILE_PATH "/rfids.bin"

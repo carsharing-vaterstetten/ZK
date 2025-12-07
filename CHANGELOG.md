@@ -1,10 +1,16 @@
 # Changelog
 
+## [1.1.3]
+
+- Verhindern des versehentlichen mehrfachen wieder auf- bzw. zusperren, wenn die Karte zu lange an den Scanner gehalten
+  wurde. Die LED leuchtet hellblau, um dies zu signalisieren.
+- UIDs werden direkt im RAM verglichen
+
 ## [1.1.2]
 
 - Maßnahmen zum Energiesparen:
-  - Modem und GPS werden nur verwendet, wenn sie tatsächlich gebraucht werden
-  - Falls das Modem nicht benötigt wird, wird es in den Schlafmodus versetzt
+    - Modem und GPS werden nur verwendet, wenn sie tatsächlich gebraucht werden
+    - Falls das Modem nicht benötigt wird, wird es in den Schlafmodus versetzt
 - Fehlerbehebungen
 
 ## [1.1.1]
