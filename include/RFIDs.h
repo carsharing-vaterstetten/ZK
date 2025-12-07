@@ -16,4 +16,5 @@ namespace RFIDs
     void downloadRfidsIfChanged();
     bool downloadGPSTrackingConsentedRFIDs();
     bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
+    bool load();
 }

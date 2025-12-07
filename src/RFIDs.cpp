@@ -8,7 +8,16 @@
 #include "Modem.h"
 #include "StorageManager.h"
 
+std::vector<uint32_t> rfids;
+
 bool RFIDs::isRegisteredRFID(const uint32_t rfid)
+{
+    return std::binary_search(rfids.begin(), rfids.end(), rfid);
+}
+
+/// Call this function to load the UIDs into RAM to be able to check if a UID is registered.
+/// So always call this on startup and after the file changed on the disk (e.g. after remote download)
+bool RFIDs::load()
 {
     if (!StorageManager::exists(RFID_FILE_PATH))
     {
@@ -16,29 +25,29 @@ bool RFIDs::isRegisteredRFID(const uint32_t rfid)
         return false;
     }
 
-    File file = StorageManager::openRFIDs(FILE_READ);
+    File f = StorageManager::openRFIDs(FILE_READ);
 
-    if (!file)
+    if (!f)
     {
         fileLog.errorln("Failed to open rfid file for reading");
         return false;
     }
 
-    const size_t rfidsCount = file.size() / 4;
-    uint32_t buffer;
+    constexpr size_t uidSize = sizeof(uint32_t);
+    const size_t uidsCount = f.size() / uidSize;
 
-    for (int i = 0; i < rfidsCount; i++)
-    {
-        file.read(reinterpret_cast<uint8_t*>(&buffer), 4);
-        if (buffer == rfid)
-        {
-            file.close();
-            return true;
-        }
-    }
+    rfids.clear();
+    rfids.resize(uidsCount);
+    f.read(reinterpret_cast<uint8_t*>(rfids.data()), uidsCount * sizeof(uint32_t));
 
-    file.close();
-    return false;
+    fileLog.debugln("Sorting RFIDs...");
+
+    std::sort(rfids.begin(), rfids.end()); // it has to be sorted for binary search
+
+    fileLog.infoln(
+        "Loaded and sorted " + String(rfids.size()) + " UIDs (consumes " + rfids.capacity() * uidSize + " B)");
+
+    return true;
 }
 
 void RFIDs::generateChecksum(uint8_t out[16])

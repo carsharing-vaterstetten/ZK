@@ -258,6 +258,7 @@ void setup()
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
+    RFIDs::load();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
