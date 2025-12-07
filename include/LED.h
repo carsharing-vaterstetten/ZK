@@ -15,6 +15,7 @@ enum class StatusColor
     CarUnlocked,
     CarLocked,
     NFCUnknownUIDScanned,
+    WaitingForNFCCardToBeRemoved,
 };
 
 class LED

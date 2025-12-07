@@ -69,6 +69,8 @@ uint32_t LED::getStatusColorValue(const StatusColor color)
         return 0x00FF00;
     case StatusColor::NFCUnknownUIDScanned:
         return 0xFF0000;
+    case StatusColor::WaitingForNFCCardToBeRemoved:
+        return 0x00FFFF;
     default:
         return 0;
     }

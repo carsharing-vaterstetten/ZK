@@ -28,9 +28,19 @@ unsigned long lastLogin, lastLogout; // These are volatile
 
 void checkNFCTag()
 {
-    uint32_t rfidUid;
+    const auto [status, rfidUid] = cardReader.scan();
 
-    if (!cardReader.readTag(rfidUid)) return; // No card present
+    switch (status)
+    {
+    case ScanStatus::NoCard:
+        return;
+    case ScanStatus::NewCard:
+        break;
+    case ScanStatus::Duplicate:
+        fileLog.infoln("Ignored duplicate scan");
+        statusLed.flash(StatusColor::WaitingForNFCCardToBeRemoved, 1000);
+        return;
+    }
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
@@ -56,6 +66,8 @@ void checkNFCTag()
         fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
         statusLed.cardDeclinedFlash();
     }
+
+    delay(2000); // wait a little for the card to be removed
 }
 
 void calculateNextRestartTime()
@@ -290,7 +302,7 @@ void loop()
         }
     }
 
-    if (millis() - lastLogin > 10000 && millis() - lastLogout > 10000)
+    if (millis() - lastLogin > 20000 && millis() - lastLogout > 20000)
     {
 #if !RECORD_GPS_WHILE_STANDING
         if (modem.isGPSEnabled() && !(accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
