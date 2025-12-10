@@ -35,12 +35,11 @@ void checkNFCTag()
     case ScanStatus::NoCard:
         return;
     case ScanStatus::NewCard:
-        break;
     case ScanStatus::Duplicate:
-        fileLog.infoln("Ignored duplicate scan");
-        statusLed.flash(StatusColor::WaitingForNFCCardToBeRemoved, 1000);
-        return;
+        break;
     }
+
+    const unsigned long firstScanMs = millis();
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
@@ -67,7 +66,41 @@ void checkNFCTag()
         statusLed.cardDeclinedFlash();
     }
 
-    delay(2000); // wait a little for the card to be removed
+    // Wait for 2 seconds for the card to be removed
+    constexpr size_t waitForRemovalMs = 2000;
+    while (millis() - firstScanMs < waitForRemovalMs)
+        delay(10);
+
+    // Then check again for two 1 second if a card is present
+    constexpr size_t waitForScanMs = 1000;
+    bool scannedDuplicate = false;
+    while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs)
+    {
+        if (cardReader.scan().status == ScanStatus::Duplicate)
+        {
+            scannedDuplicate = true;
+            break;
+        }
+    }
+
+    if (!scannedDuplicate) return;
+
+    // If it scanned the same card twice wait another 3 seconds for it to be removed
+    // and indicate a cooldown via the LED. The LED starts full brightness cyan and fades out
+
+    constexpr size_t showLedMs = 3000;
+    const unsigned long s = millis();
+
+    while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs + showLedMs)
+    {
+        const unsigned long t = millis() - s;
+        const uint8_t gb = t >= showLedMs ? 0 : 255 - t * 255 / showLedMs;
+        statusLed.setColor((gb << 8) | gb);
+    }
+
+    // From the first card scan to here it should be 6 seconds
+
+    statusLed.clear();
 }
 
 void calculateNextRestartTime()

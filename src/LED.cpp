@@ -17,6 +17,12 @@ void LED::setStatusColor(const StatusColor color)
     neo.show();
 }
 
+void LED::setColor(const uint32_t hex)
+{
+    neo.fill(hex);
+    neo.show();
+}
+
 void LED::clear()
 {
     neo.clear();

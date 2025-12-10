@@ -25,6 +25,7 @@ public:
 
     bool init();
     void setStatusColor(StatusColor color);
+    void setColor(uint32_t hex);
     void clear();
     void flash(StatusColor color, uint16_t durationMs);
 
