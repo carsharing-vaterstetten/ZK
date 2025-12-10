@@ -1,9 +1,7 @@
 .pio
 .vscode/**
 include/Config.h
-/include/Config_home.h
-/include/Config_dev.h
-/include/Config_prod.h
+configs
 .DS_Store
 .idea
 /data/*
