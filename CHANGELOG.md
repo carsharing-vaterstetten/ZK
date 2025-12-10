@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.4]
+
+- Nutzerfreundliche Verhinderung von Doppel-Scans: Die LED leuchtet hellblau, wenn eine Karte doppelt gescannt wird, und
+  erlischt anschließend. Sobald sie erloschen ist, kann wieder gescannt werden.
+- RAM-Nutzung wird protokolliert.
+
 ## [1.1.3]
 
 - Verhindern des versehentlichen mehrfachen wieder auf- bzw. zusperren, wenn die Karte zu lange an den Scanner gehalten
