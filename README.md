@@ -29,16 +29,16 @@ Die Pinbelegung kann in [`include/Config.h`](include/Config.h) angepasst werden.
 
 ### LED Bedeutung
 
-| LED Farbe         | Bedeutung                                                                                                                             |
-|-------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Weiß              | Das ESP32-Board wurde gerade gestartet und wird initialisiert.                                                                        |
-| Lila              | Es wird nach Firmware-Updates gesucht und diese werden ggf. installiert.                                                              |
-| Orange            | Die Zugangskarten werden aktualisiert.                                                                                                |
-| Blau              | Logs werden auf den Server hochgeladen.                                                                                               |
-| Kurz doppelt Grün | Auto aufgeschlossen.                                                                                                                  |
-| Kurz doppelt Rot  | Auto zugeschlossen.                                                                                                                   |
-| Lange (1,5s) Rot  | Gescannte RFID Karte ist nicht autorisiert.                                                                                           |
-| Hellblau / Cyan   | Die RFID Karte wurde innerhalb kurzer Zeit mehrfach gescannt. Bitte Karte für 10 Sekunden vom Scanner entfernen und erneut probieren. |
+| LED Farbe         | Bedeutung                                                                                                           |
+|-------------------|---------------------------------------------------------------------------------------------------------------------|
+| Weiß              | Das ESP32-Board wurde gerade gestartet und wird initialisiert.                                                      |
+| Lila              | Es wird nach Firmware-Updates gesucht und diese werden ggf. installiert.                                            |
+| Orange            | Die Zugangskarten werden aktualisiert.                                                                              |
+| Blau              | Logs werden auf den Server hochgeladen.                                                                             |
+| Kurz doppelt Grün | Auto aufgeschlossen.                                                                                                |
+| Kurz doppelt Rot  | Auto zugeschlossen.                                                                                                 |
+| Lange (1,5s) Rot  | Gescannte RFID Karte ist nicht autorisiert.                                                                         |
+| Hellblau / Cyan   | Die RFID Karte wurde innerhalb kurzer Zeit mehrfach gescannt. Sobald die LED erlischt, kann erneut gescannt werden. |
 
 ## Referenzen
 
