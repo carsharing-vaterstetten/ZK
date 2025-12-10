@@ -242,8 +242,6 @@ void setup()
     fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(0)));
     fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
 
-    storageManager.logFilesystemsInformation();
-
     // Cleanup
     StorageManager::removeGpsLog();
 
@@ -292,6 +290,9 @@ void setup()
     RFIDs::downloadRfidsIfChanged();
     RFIDs::downloadGPSTrackingConsentedRFIDs();
     RFIDs::load();
+
+    HelperUtils::logRAMUsage(fileLog, LOGGING_LEVEL_INFO);
+    storageManager.logFilesystemsInformation();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);

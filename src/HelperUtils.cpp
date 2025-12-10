@@ -228,7 +228,8 @@ String HelperUtils::simStatusToString(const SimStatus status)
     return "UNKNOWN";
 }
 
-String HelperUtils::millisToIsoString(const uint64_t ms) {
+String HelperUtils::millisToIsoString(const uint64_t ms)
+{
     const auto seconds = static_cast<time_t>(ms / 1000ULL); // convert to seconds
     tm timeinfo{};
     gmtime_r(&seconds, &timeinfo); // use UTC time
@@ -265,7 +266,7 @@ String HelperUtils::getResetReasonHumanReadable(const int reset_reason)
     }
 }
 
-String HelperUtils::toBase64(const uint8_t *data, size_t len)
+String HelperUtils::toBase64(const uint8_t* data, size_t len)
 {
     unsigned char encoded[64]; // plenty of space for 16-byte MD5
     size_t out_len = 0;
@@ -274,4 +275,14 @@ String HelperUtils::toBase64(const uint8_t *data, size_t len)
     encoded[out_len] = '\0'; // null-terminate
 
     return {reinterpret_cast<char*>(encoded)};
+}
+
+void HelperUtils::logRAMUsage(const Log& log, const uint8_t level)
+{
+    log.logMsgln(String("RAM Usage: Total Free: ") + esp_get_free_heap_size() + " B" +
+                 " | Internal Free: " + heap_caps_get_free_size(MALLOC_CAP_INTERNAL) + " B" +
+                 " | External Free: " + heap_caps_get_free_size(MALLOC_CAP_SPIRAM) + " B" +
+                 " | Largest Internal Block: " + heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) + " B",
+                 level
+    );
 }
