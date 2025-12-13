@@ -27,7 +27,7 @@ void FirmwareUpdater::doUpdateIfAvailable()
     fileLog.infoln("Checking for firmware update");
 
     HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
-    const ApiResponse resp = api.makeRequest(req);
+    ApiResponse resp = api.makeRequest(req);
 
     if (!resp.valid)
     {
@@ -60,6 +60,18 @@ void FirmwareUpdater::doUpdateIfAvailable()
         fileLog.errorln("Not enough space for OTA");
         return;
     }
+
+    if (resp.headers.count("x-md5"))
+    {
+        if (!Update.setMD5(resp.headers.at("x-md5").c_str()))
+        {
+            fileLog.errorln("Failed to set MD5. Update canceled");
+            return;
+        }
+    }
+    else
+        fileLog.warningln("MD5 header not found. Skipping MD5 verification.");
+
 
     nextDownloadProgressPrint = 0;
     Update.onProgress(onDownloadProgress);
