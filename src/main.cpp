@@ -248,10 +248,10 @@ void setup()
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
     statusLed.init();
-    accessControl.init();
 
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
+    accessControl.init();
     loadConfig(); // We need the config for the Modem
     modem.init(
         RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()));
