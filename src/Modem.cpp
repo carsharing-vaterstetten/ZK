@@ -167,9 +167,37 @@ bool Modem::disableGPS()
     return success;
 }
 
+std::tuple<bool, uint32_t> Modem::autoBaud()
+{
+    fileLog.infoln("Baud rate scanning...");
+
+    SERIAL_AT.updateBaudRate(serialBaud);
+    if (waitForATResponse())
+        return {true, serialBaud};
+
+    // Higher values are certainly unstable
+    constexpr uint32_t baudRates[] = {300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 921600};
+
+    for (const uint32_t baudRate : baudRates)
+    {
+        SERIAL_AT.updateBaudRate(baudRate);
+        if (!waitForATResponse(1000))
+        {
+            fileLog.debugln("Baud rate " + String(baudRate) + " failed");
+            continue;
+        }
+
+        return {true, baudRate};
+    }
+
+    return {false, 0};
+}
+
 bool Modem::init(const bool enableGPS_, const uint8_t retries)
 {
     fileLog.infoln("Initializing modem...");
+
+    SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
 
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
@@ -177,26 +205,35 @@ bool Modem::init(const bool enableGPS_, const uint8_t retries)
 
         if (attempt > 0) gsmClient.stop();
 
-        SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
-
         wakeup();
         powerOn();
         gsmModem.factoryDefault();
         turnOn();
 
-        if (!waitForATResponse())
+        auto [baudSuccess, autoBaudRate] = autoBaud();
+
+        if (!baudSuccess)
         {
             fileLog.warningln(
                 "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the modem did not respond. Retrying...");
+                " failed because the modem did not respond to any baud rate. Retrying...");
             continue;
         }
 
-        fileLog.infoln("Modem connected to serial");
+        fileLog.infoln("Modem connected to serial (" + String(autoBaudRate) + " Hz)");
 
         const bool modemInitSuccess = gsmModem.init(config.simPin.c_str());
         fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
                                    "There was an error while initializing the modem");
+
+        if (serialBaud != autoBaudRate)
+        {
+            const uint32_t newBaud = attempt == 0 ? serialBaud : 115200; // fallback baud rate
+            gsmModem.setBaud(newBaud);
+            SERIAL_AT.flush();
+            SERIAL_AT.updateBaudRate(newBaud);
+            fileLog.debugln("Set baud rate to " + String(newBaud));
+        }
 
         fileLog.infoln("Modem info: " + gsmModem.getModemInfo());
 

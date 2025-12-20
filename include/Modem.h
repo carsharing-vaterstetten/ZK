@@ -52,6 +52,7 @@ class Modem
     int8_t rxPin, txPin;
     TinyGsmSim7000 gsmModem{SERIAL_AT};
     bool beginSleep();
+    std::tuple<bool, uint32_t> autoBaud();
 
 public:
     TinyGsmSim7000::GsmClientSim7000 gsmClient{gsmModem}; // TODO: abstract this
@@ -130,4 +131,4 @@ public:
     }
 };
 
-inline Modem modem{115200, MODEM_RX_PIN, MODEM_TX_PIN};
+inline Modem modem{230400, MODEM_RX_PIN, MODEM_TX_PIN};
