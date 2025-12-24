@@ -10,7 +10,6 @@
 #include <FS.h>
 
 #include "ApiStreams.h"
-#include "Config.h"
 #include "GPS.h"
 
 #define SERIAL_AT Serial1
@@ -45,7 +44,6 @@ enum class UploadFileAndRetryResult
 
 class Modem
 {
-
     bool timeSynced = false, modemIsAwake = false, gpsIsEnabled = false;
 
     unsigned long serialBaud;
@@ -53,14 +51,12 @@ class Modem
     TinyGsmSim7000 gsmModem{SERIAL_AT};
     bool beginSleep();
     std::tuple<bool, uint32_t> autoBaud();
+    const char *gprsUser = "", *gprsPassword = "", *apn = "";
 
 public:
     TinyGsmSim7000::GsmClientSim7000 gsmClient{gsmModem}; // TODO: abstract this
 
-    Modem(const uint32_t serialBaud, const int8_t rxPin,
-          const int8_t txPin) : serialBaud(serialBaud), rxPin(rxPin), txPin(txPin)
-    {
-    }
+    Modem(uint32_t serialBaud, int8_t rxPin, int8_t txPin);
 
     bool powerOff();
     static void powerOn();
@@ -68,8 +64,9 @@ public:
     static void turnOff();
     bool requestSleep();
 
-    bool init(bool enableGPS_ = true, uint8_t retries = 2);
-    bool ensureNetworkConnection();
+    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint8_t retries = 2);
+    bool syncTime(size_t maxRetries = 20);
+    bool ensureNetworkConnection(size_t maxRetries = 2);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
     bool waitForATResponse(uint32_t timeoutMs = 10000);
@@ -100,9 +97,7 @@ public:
     }
 
     [[nodiscard]] time_t getUnixTimestamp();
-#if GIVE_CONNECTION_SPEED_ESTIMATE
     static void performConnectionSpeedTest();
-#endif
     bool getGPS(GPS_DATA_t& out);
 
     [[nodiscard]] bool timeIsAvailable() const
@@ -130,5 +125,3 @@ public:
         return gpsIsEnabled;
     }
 };
-
-inline Modem modem{230400, MODEM_RX_PIN, MODEM_TX_PIN};

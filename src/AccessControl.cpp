@@ -1,9 +1,9 @@
 #include "AccessControl.h"
-#include "Config.h"
+#include "Globals.h"
 #include "HelperUtils.h"
 #include "RFIDs.h"
 
-bool AccessControl::init()
+bool AccessControl::begin()
 {
     pinMode(keyOpenPin, OUTPUT);
     pinMode(keyClosePin, OUTPUT);

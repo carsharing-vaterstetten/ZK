@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
-#include "Config.h"
-
 enum class StatusColor
 {
     InitializationPhase,
@@ -23,28 +21,30 @@ class LED
 public:
     LED(uint16_t ledCount, int16_t ledPin, neoPixelType type);
 
-    bool init();
-    void setStatusColor(StatusColor color);
+    bool begin();
     void setColor(uint32_t hex);
     void clear();
-    void flash(StatusColor color, uint16_t durationMs);
+    void flash(uint32_t hexColor, uint16_t durationMs);
 
-private:
+protected:
     Adafruit_NeoPixel neo;
+};
+
+class StatusLED : public LED
+{
+public:
+    using LED::LED;
+    void setStatusColor(StatusColor color);
+    void flash(StatusColor color, uint16_t durationMs);
     static uint32_t getStatusColorValue(StatusColor color);
 };
 
-class CardReaderLED : public LED
+class CardReaderLED : public StatusLED
 {
 public:
-    CardReaderLED(const uint16_t ledCount, const int16_t ledPin, const neoPixelType type)
-        : LED(ledCount, ledPin, type)
-    {
-    }
+    CardReaderLED(uint16_t ledCount, int16_t ledPin, neoPixelType type);
 
     void unlockFlash();
     void lockFlash();
     void cardDeclinedFlash();
 };
-
-inline CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};

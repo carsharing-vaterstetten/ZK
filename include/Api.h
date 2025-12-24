@@ -1,36 +1,18 @@
 #pragma once
-#include <utility>
 
 #include "ApiStreams.h"
-#include "LocalConfig.h"
-#include "Modem.h"
 
+class Modem;
 
 class ApiClient
 {
 protected:
     bool isReady = false;
-
-public:
-    std::optional<WdClient> httpClient;
-    Modem* modem = nullptr;
+    WdClient* httpClient = nullptr;
     std::optional<String> defaultBasicAuthUsername = std::nullopt, defaultBasicAuthPassword = std::nullopt;
 
-    ApiClient() : httpClient(std::nullopt)
-    {
-    }
-
-    void begin(const String& server, uint16_t port, Modem& m, String username, String password)
-    {
-        modem = &m;
-        httpClient.emplace(modem->gsmClient, server, port);
-        defaultBasicAuthUsername = std::move(username);
-        defaultBasicAuthPassword = std::move(password);
-        isReady = true;
-    }
-
-    ApiResponse makeRequest(HttpRequest& request);
+public:
+    void begin(const String& server, uint16_t port, const String& username, const String& password);
+    ApiResponse makeRequest(HttpRequest& request) const;
     static uint32_t fetch(const ApiResponse& resp, Stream& destination);
 };
-
-inline ApiClient api;

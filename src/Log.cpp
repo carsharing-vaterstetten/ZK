@@ -2,7 +2,6 @@
 
 #include <LittleFS.h>
 
-#include "Config.h"
 #include "HelperUtils.h"
 #include "Modem.h"
 
@@ -14,9 +13,10 @@
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
-void Log::enableSerialLogging(const uint8_t loggingLevel, const String& serialName)
+void Log::enableSerialLogging(const bool colorize, const uint8_t loggingLevel, const String& serialName)
 {
     logToSerial = true;
+    colorizeSerialLogging = colorize;
     serialLoggingLevel = loggingLevel;
     serialLoggingName = serialName;
 }
@@ -78,13 +78,15 @@ void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel
     Serial.print("[");
     Serial.print(HelperUtils::millisToIsoString(timestamp));
     Serial.print("][");
-#if COLORIZE_SERIAL_LOGGING
-    Serial.print(getLoggingLevelColor(loggingLevel));
-#endif
+
+    if (colorizeSerialLogging)
+        Serial.print(getLoggingLevelColor(loggingLevel));
+
     Serial.print(getLoggingLevelChar(loggingLevel));
-#if COLORIZE_SERIAL_LOGGING
-    Serial.print(COLOR_RESET);
-#endif
+
+    if (colorizeSerialLogging)
+        Serial.print(COLOR_RESET);
+
     Serial.print("]");
 
     if (serialLoggingName.isEmpty())
@@ -98,17 +100,14 @@ void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel
         Serial.print("] ");
     }
 
-#if COLORIZE_SERIAL_LOGGING
-    if (loggingLevel >= LOGGING_LEVEL_ERROR)
+
+    if (colorizeSerialLogging && loggingLevel >= LOGGING_LEVEL_ERROR)
         Serial.print(BACKGROUND_COLOR_RED);
-#endif
 
     Serial.print(text);
 
-#if COLORIZE_SERIAL_LOGGING
-    if (loggingLevel >= LOGGING_LEVEL_ERROR)
+    if (colorizeSerialLogging && loggingLevel >= LOGGING_LEVEL_ERROR)
         Serial.print(COLOR_RESET);
-#endif
 
     Serial.println();
 }

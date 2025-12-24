@@ -1,9 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
 #include <Preferences.h>
-
-#include "Config.h"
 
 class AccessControl
 {
@@ -24,7 +21,7 @@ public:
     {
     }
 
-    bool init();
+    bool begin();
     void end();
     void login(uint32_t rfid);
     void logout();
@@ -34,4 +31,3 @@ public:
     [[nodiscard]] bool hasPermissionForGPSTracking() const;
 };
 
-inline AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};

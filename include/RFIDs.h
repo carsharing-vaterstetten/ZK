@@ -12,7 +12,6 @@ enum class RfidsChecksumResult
 namespace RFIDs
 {
     bool isRegisteredRFID(uint32_t rfid);
-    void generateChecksum(uint8_t out[16]);
     void downloadRfidsIfChanged();
     bool downloadGPSTrackingConsentedRFIDs();
     bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);

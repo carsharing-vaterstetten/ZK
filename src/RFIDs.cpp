@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include "Api.h"
 #include "Backend.h"
+#include "Globals.h"
 #include "HelperUtils.h"
 #include "Modem.h"
 #include "StorageManager.h"
@@ -50,7 +51,7 @@ bool RFIDs::load()
     return true;
 }
 
-void RFIDs::generateChecksum(uint8_t out[16])
+void generateChecksum(uint8_t out[16])
 {
     if (!StorageManager::rfidsFileExists())
     {
@@ -125,10 +126,10 @@ void RFIDs::downloadRfidsIfChanged()
         return;
     }
 
-    const auto rfids = doc.as<JsonArray>();
+    const auto rfidsArr = doc.as<JsonArray>();
 
-    fileLog.infoln("Writing " + String(rfids.size()) + " RFIDs to file");
-    for (const JsonVariant rfidVariant : rfids)
+    fileLog.infoln("Writing " + String(rfidsArr.size()) + " RFIDs to file");
+    for (const JsonVariant rfidVariant : rfidsArr)
     {
         const auto rfid = rfidVariant.as<uint32_t>();
         file.write(reinterpret_cast<const uint8_t*>(&rfid), sizeof(rfid));
@@ -166,11 +167,11 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
 
     if (resp.responseCode != 200)
     {
-        fileLog.errorln("Unexpected response code" + String(resp.responseCode));
+        fileLog.errorln("Unexpected response code " + String(resp.responseCode));
         return false;
     }
 
-    uint32_t bytesDownloaded = ApiClient::fetch(resp, file);
+    const uint32_t bytesDownloaded = ApiClient::fetch(resp, file);
 
     file.close();
 

@@ -1,13 +1,18 @@
 // Modem.cpp
 
 #include "Modem.h"
-#include "Config.h"
 #include <HelperUtils.h>
 
 #include "Api.h"
 #include "Backend.h"
+#include "Globals.h"
 #include "LocalConfig.h"
 #include "StorageManager.h"
+
+Modem::Modem(const uint32_t serialBaud, const int8_t rxPin, const int8_t txPin) : serialBaud(serialBaud),
+    rxPin(rxPin), txPin(txPin)
+{
+}
 
 void Modem::powerOn()
 {
@@ -169,14 +174,14 @@ bool Modem::disableGPS()
 
 std::tuple<bool, uint32_t> Modem::autoBaud()
 {
-    fileLog.infoln("Baud rate scanning...");
+    fileLog.debugln("Baud rate scanning...");
 
     SERIAL_AT.updateBaudRate(serialBaud);
     if (waitForATResponse())
         return {true, serialBaud};
 
     // Higher values are certainly unstable
-    constexpr uint32_t baudRates[] = {300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 921600};
+    constexpr uint32_t baudRates[] = {9600, 115200, 300, 600, 1200, 2400, 4800, 19200, 38400, 57600, 230400, 921600};
 
     for (const uint32_t baudRate : baudRates)
     {
@@ -193,14 +198,20 @@ std::tuple<bool, uint32_t> Modem::autoBaud()
     return {false, 0};
 }
 
-bool Modem::init(const bool enableGPS_, const uint8_t retries)
+bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const uint8_t retries)
 {
     fileLog.infoln("Initializing modem...");
+
+    gprsUser = user;
+    gprsPassword = password;
+    apn = netApn;
 
     SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
 
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
+        fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
+
         turnOff();
 
         if (attempt > 0) gsmClient.stop();
@@ -214,15 +225,13 @@ bool Modem::init(const bool enableGPS_, const uint8_t retries)
 
         if (!baudSuccess)
         {
-            fileLog.warningln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the modem did not respond to any baud rate. Retrying...");
+            fileLog.warningln("Attempt failed because the modem did not respond to any baud rate");
             continue;
         }
 
         fileLog.infoln("Modem connected to serial (" + String(autoBaudRate) + " Hz)");
 
-        const bool modemInitSuccess = gsmModem.init(config.simPin.c_str());
+        const bool modemInitSuccess = gsmModem.init(simPin);
         fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
                                    "There was an error while initializing the modem");
 
@@ -240,45 +249,8 @@ bool Modem::init(const bool enableGPS_, const uint8_t retries)
         gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
         gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
 
-        if (!ensureNetworkConnection())
-        {
-            fileLog.warningln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the network is not connected. Retrying...");
-            continue;
-        }
+        fileLog.infoln("Modem initialized");
 
-        fileLog.infoln("Syncing time");
-        constexpr uint8_t maxNetTimeSyncAttempts = 20;
-        uint8_t syncAttempt = 0;
-        for (; syncAttempt < maxNetTimeSyncAttempts; ++syncAttempt)
-        {
-            int year;
-            gsmModem.getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-            if (year < 2070 && year >= 2025) break;
-            serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
-        }
-        timeSynced = syncAttempt < maxNetTimeSyncAttempts;
-        HelperUtils::updateSystemTimeWithModem();
-        fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
-
-        if (!timeSynced)
-        {
-            fileLog.warningln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the the modem could not synchronise time. Retrying...");
-            continue;
-        }
-
-        if (enableGPS_ && !enableGPS())
-        {
-            fileLog.warningln(
-                "Attempt no. " + String(attempt + 1) + " of " + String(retries + 1) +
-                " failed because the gps could not be enabled. Retrying...");
-            continue;
-        }
-
-        fileLog.infoln("Modem startup completed successfully");
         return true;
     }
 
@@ -287,7 +259,29 @@ bool Modem::init(const bool enableGPS_, const uint8_t retries)
     return false;
 }
 
-bool Modem::ensureNetworkConnection()
+bool Modem::syncTime(const size_t maxRetries)
+{
+    fileLog.infoln("Syncing time");
+    uint8_t syncAttempt = 0;
+
+    for (; syncAttempt <= maxRetries; ++syncAttempt)
+    {
+        int year;
+        const bool getTimeSuccess = gsmModem.
+            getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
+        if (year < 2070 && year >= 2025) break;
+        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+    }
+
+    timeSynced = syncAttempt < maxRetries;
+    HelperUtils::updateSystemTimeWithModem();
+    fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
+
+    return timeSynced;
+}
+
+bool Modem::ensureNetworkConnection(const size_t maxRetries)
 {
     // yes connecting GPRS first and network later is very important. Otherwise, reconnecting doesn't work!
 
@@ -296,9 +290,19 @@ bool Modem::ensureNetworkConnection()
     if (!gsmModem.isGprsConnected())
     {
         fileLog.infoln("Connecting GPRS...");
-        const bool gprsSuccess = gsmModem.gprsConnect(config.apn.c_str(), config.gprsUser.c_str(),
-                                                      config.gprsPassword.c_str());
-        fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+
+        bool gprsSuccess = false;
+
+        for (size_t retry = 0; retry <= maxRetries; ++retry)
+        {
+            gprsSuccess = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
+
+            String msgPrefix = "Try " + String(retry + 1) + " of " + String(maxRetries + 1) + ": ";
+            fileLog.logInfoOrWarningln(gprsSuccess, msgPrefix + "GPRS connected successfully",
+                                       msgPrefix + "Failed to connect GPRS");
+
+            if (gprsSuccess) break;
+        }
 
         if (!gprsSuccess) return false;
     }
@@ -322,11 +326,21 @@ bool Modem::ensureNetworkConnection()
 
     // Wait for signal
     int16_t signalQuality = gsmModem.getSignalQuality();
-    for (int i = 0; i < 20 && signalQuality == 99; ++i)
+    int signalTry = 0;
+    for (; signalTry <= maxRetries && signalQuality == 99; ++signalTry)
     {
-        delay(500);
+        fileLog.debugln("Waiting for signal...");
+        delay(1000);
         signalQuality = gsmModem.getSignalQuality();
     }
+
+    if (signalTry >= maxRetries)
+    {
+        fileLog.errorln("Could not get signal");
+        return false;
+    }
+
+    fileLog.debugln("Got signal");
 
     return true;
 }
@@ -467,7 +481,6 @@ time_t Modem::getUnixTimestamp()
     return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
-#if GIVE_CONNECTION_SPEED_ESTIMATE
 void Modem::performConnectionSpeedTest()
 {
     fileLog.infoln("Performing connection speed test");
@@ -501,7 +514,6 @@ void Modem::performConnectionSpeedTest()
     const uint32_t estimatedDownloadSpeed = CONNECTION_SPEED_TEST_FILE_SIZE * 1000 / downloadTimeMs;
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
-#endif
 
 bool Modem::getGPS(GPS_DATA_t& out)
 {

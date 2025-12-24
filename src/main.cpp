@@ -7,11 +7,10 @@
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Api.h"
-#include "Config.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
 #include "GPS.h"
-#include "HardwareManager.h"
+#include "Config.h"
 #include "LocalConfig.h"
 #include "RFIDs.h"
 #include "StorageManager.h"
@@ -22,7 +21,7 @@
 
 unsigned long nextWatchdogResetMs;
 unsigned long nextGPSUpdate;
-unsigned long targetMillis;
+unsigned long restartTargetMs;
 
 unsigned long lastLogin, lastLogout; // These are volatile
 
@@ -110,20 +109,20 @@ void calculateNextRestartTime()
     modem.getNetworkTime(nullptr, nullptr, nullptr, &hour, &minute, &second, nullptr);
 
     // Calculate milliseconds since midnight
-    const unsigned long currentMillis = (hour * 3600 + minute * 60 + second) * 1000;
+    const unsigned long timeOfDayInMs = (hour * 3600 + minute * 60 + second) * 1000;
 
-    if (currentMillis < TARGET_TIME_FOR_ESP_RESTART)
+    if (timeOfDayInMs < TARGET_TIME_FOR_ESP_RESTART)
     {
-        targetMillis = TARGET_TIME_FOR_ESP_RESTART - currentMillis;
+        restartTargetMs = TARGET_TIME_FOR_ESP_RESTART - timeOfDayInMs;
     }
     else
     {
-        targetMillis = DAY_MILLIS - (currentMillis - TARGET_TIME_FOR_ESP_RESTART);
+        restartTargetMs = DAY_MILLIS - (timeOfDayInMs - TARGET_TIME_FOR_ESP_RESTART);
     }
 
-    targetMillis += millis();
+    restartTargetMs += millis();
 
-    fileLog.infoln("Next restart planed in " + String(targetMillis / 1000) + " seconds");
+    fileLog.infoln("Next restart planed in " + String(restartTargetMs / 1000) + " seconds");
 }
 
 int espLogHandler(const char* fmt, const va_list args)
@@ -137,26 +136,24 @@ int espLogHandler(const char* fmt, const va_list args)
 
 void loadConfig()
 {
-#if USE_DEFAULT_CONFIG
-    fileLog.infoln("Using default config");
-#else
-
     const auto loadedConfig = LocalConfig::fromStorage(CONFIG_PREFS_NAME);
+    LocalConfig* newConfig;
 
     if (loadedConfig.has_value())
     {
-        config = loadedConfig.value();
+        newConfig = new LocalConfig{loadedConfig.value()};
     }
     else
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        config = HelperUtils::requestConfig();
-        const bool configSaveSuccess = StorableConfig{config, CONFIG_PREFS_NAME}.save();
+        newConfig = new LocalConfig{HelperUtils::requestConfig()};
+        const bool configSaveSuccess = StorableConfig{*newConfig, CONFIG_PREFS_NAME}.save();
         fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
         WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
     }
-#endif
-    fileLog.infoln("Loaded config: " + config.toString());
+
+    delete config;
+    config = newConfig;
 }
 
 void checkGPS()
@@ -171,18 +168,7 @@ void checkGPS()
         return;
     }
 
-    GPS_DATA_t gpsData;
-    const bool gpsSuccess = modem.getGPS(gpsData);
-
-    if (!gpsSuccess)
-    {
-        // serialOnlyLog.debugln("No GPS data received");
-        return;
-    }
-
-    // serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
-
-    gps.logDataBuffered(gpsData);
+    GPS::getGpsDataAndWriteToFile();
 }
 
 void restartRoutine()
@@ -210,7 +196,6 @@ void restartRoutine()
     ESP.restart();
 }
 
-
 void setup()
 {
     // Start serial communication
@@ -220,8 +205,8 @@ void setup()
     }
 
 #if ENABLE_SERIAL_LOGGING
-    fileLog.enableSerialLogging(SERIAL_LOGGING_LEVEL);
-    serialOnlyLog.enableSerialLogging(SERIAL_LOGGING_LEVEL, "Serial");
+    fileLog.enableSerialLogging(COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
+    serialOnlyLog.enableSerialLogging(COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL, "Serial");
 #endif
 
     // Start watchdog
@@ -229,7 +214,7 @@ void setup()
     watchdogHandler.subscribeTask();
 
     // Mount filesystems
-    const bool flashInitSuccess = storageManager.mountLittleFS();
+    const bool flashInitSuccess = StorageManager::mountLittleFS();
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
@@ -247,14 +232,31 @@ void setup()
 
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
-    statusLed.init();
+    statusLed.begin();
 
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
-    accessControl.init();
+    nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
+    accessControl.begin();
+
+#if USE_DEFAULT_CONFIG
+    fileLog.infoln("Using default config");
+#else
     loadConfig(); // We need the config for the Modem
-    modem.init(
-        RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()));
+#endif
+    fileLog.infoln("Loaded config: " + config->toString());
+
+    // TODO: improve this
+    for (int i = 0; i < 4; ++i)
+    {
+        modem.begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
+                    config->apn.c_str());
+        if (modem.ensureNetworkConnection() && modem.syncTime()) break;
+    }
+
+    if (RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
+        modem.enableGPS();
+
     fileLog.infoln("Signal Quality: " + String(modem.getSignalQuality()));
 
     fileLog.infoln(
@@ -267,7 +269,7 @@ void setup()
     modemIMEI = modem.getIMEI();
     fileLog.infoln("Modem IMEI: " + modemIMEI);
 
-    api.begin(config.server, config.serverPort, modem, modemIMEI, config.serverPassword);
+    api.begin(config->server, config->serverPort, modemIMEI, config->serverPassword);
 
     // Do the connection speed test before any up-/downloads
 #if GIVE_CONNECTION_SPEED_ESTIMATE
@@ -282,8 +284,7 @@ void setup()
     fileLog.infoln("Skipped firmware update check");
 #endif
 
-    HardwareManager::begin();
-    cardReader.init(HardwareManager::nfcSpi, NFC_SS);
+    cardReader.begin();
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
@@ -292,7 +293,7 @@ void setup()
     RFIDs::load();
 
     HelperUtils::logRAMUsage(fileLog, LOGGING_LEVEL_INFO);
-    storageManager.logFilesystemsInformation();
+    StorageManager::logFilesystemsInformation();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
@@ -316,7 +317,7 @@ void loop()
         nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
     }
 
-    if (millis() >= targetMillis)
+    if (millis() >= restartTargetMs)
         restartRoutine();
 
     checkNFCTag();

@@ -1,10 +1,12 @@
 #pragma once
 
-#include "Modem.h"
-
 #define STR_HELPER(s) #s
 #define STR(s) STR_HELPER(s)
 
+#include <FS.h>
+#include "TinyGsmGPRS.tpp"
+
+class Log;
 class LocalConfig;
 
 namespace HelperUtils

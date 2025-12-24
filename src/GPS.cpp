@@ -2,14 +2,41 @@
 
 #include <LittleFS.h>
 
-#include "Backend.h"
-#include "Log.h"
-#include "Modem.h"
+#include "Globals.h"
+
+GPS::GPS(const char* filePath, const char* endpoint) : localFilePath(filePath), fileUploadEndpoint(endpoint)
+{
+}
+
+std::tuple<bool, GPS_DATA_t> GPS::getGpsData()
+{
+    GPS_DATA_t gpsData;
+
+    if (!modem.getGPS(gpsData))
+    {
+        // serialOnlyLog.debugln("No GPS data received");
+        return {false, gpsData};
+    }
+
+    // serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
+
+    return {true, gpsData};
+}
+
+bool GPS::getGpsDataAndWriteToFile()
+{
+    auto [success, data] = getGpsData();
+
+    if (success)
+        gps.logDataBuffered(data);
+
+    return success;
+}
 
 void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries) const
 {
-    fileLog.infoln("Uploading GPS log(s)");
-    Modem::uploadFileAndDelete(GPS_FILE_UPLOAD_ENDPOINT, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
+    fileLog.infoln("Uploading GPS log " + String(fileUploadEndpoint));
+    Modem::uploadFileAndDelete(fileUploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
 bool GPS::writeLogBufferToFile() const

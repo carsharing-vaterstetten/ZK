@@ -4,17 +4,9 @@ LED::LED(const uint16_t ledCount, const int16_t ledPin, const neoPixelType type)
 {
 }
 
-bool LED::init()
+bool LED::begin()
 {
-    if (!neo.begin()) return false;
-    neo.show();
-    return true;
-}
-
-void LED::setStatusColor(const StatusColor color)
-{
-    neo.fill(getStatusColorValue(color));
-    neo.show();
+    return neo.begin();
 }
 
 void LED::setColor(const uint32_t hex)
@@ -29,33 +21,26 @@ void LED::clear()
     neo.show();
 }
 
-void LED::flash(const StatusColor color, const uint16_t durationMs)
+void LED::flash(const uint32_t hexColor, const uint16_t durationMs)
+{
+    setColor(hexColor);
+    delay(durationMs);
+    clear();
+}
+
+void StatusLED::setStatusColor(const StatusColor color)
+{
+    setColor(getStatusColorValue(color));
+}
+
+void StatusLED::flash(const StatusColor color, const uint16_t durationMs)
 {
     setStatusColor(color);
     delay(durationMs);
     clear();
 }
 
-void CardReaderLED::unlockFlash()
-{
-    flash(StatusColor::CarUnlocked, 100);
-    delay(100);
-    flash(StatusColor::CarUnlocked, 100);
-}
-
-void CardReaderLED::lockFlash()
-{
-    flash(StatusColor::CarLocked, 100);
-    delay(100);
-    flash(StatusColor::CarLocked, 100);
-}
-
-void CardReaderLED::cardDeclinedFlash()
-{
-    flash(StatusColor::NFCUnknownUIDScanned, 1500);
-}
-
-uint32_t LED::getStatusColorValue(const StatusColor color)
+uint32_t StatusLED::getStatusColorValue(const StatusColor color)
 {
     switch (color)
     {
@@ -80,4 +65,28 @@ uint32_t LED::getStatusColorValue(const StatusColor color)
     default:
         return 0;
     }
+}
+
+CardReaderLED::CardReaderLED(const uint16_t ledCount, const int16_t ledPin, const neoPixelType type) : StatusLED(
+    ledCount, ledPin, type)
+{
+}
+
+void CardReaderLED::unlockFlash()
+{
+    flash(StatusColor::CarUnlocked, 100);
+    delay(100);
+    flash(StatusColor::CarUnlocked, 100);
+}
+
+void CardReaderLED::lockFlash()
+{
+    flash(StatusColor::CarLocked, 100);
+    delay(100);
+    flash(StatusColor::CarLocked, 100);
+}
+
+void CardReaderLED::cardDeclinedFlash()
+{
+    flash(StatusColor::NFCUnknownUIDScanned, 1500);
 }

@@ -1,8 +1,7 @@
 #pragma once
 
 #include <optional>
-#include <utility>
-#include <Arduino.h>
+#include <WString.h>
 
 class StorableConfig;
 
@@ -17,14 +16,14 @@ public:
     };
 
     // Network
-    String apn, gprsUser, gprsPassword;
+    const String apn, gprsUser, gprsPassword;
 
     // SIM
-    String simPin;
+    const String simPin;
 
     // Backend
-    String server, serverPassword;
-    uint16_t serverPort;
+    const String server, serverPassword;
+    const uint16_t serverPort;
 
     LocalConfig(String apn, String gprsUser, String gprsPassword, String server,
                 const uint16_t serverPort, String serverPassword, String simPin) :
@@ -67,5 +66,3 @@ public:
 
     [[nodiscard]] String toString() const;
 };
-
-extern LocalConfig config;

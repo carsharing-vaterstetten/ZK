@@ -1,41 +1,55 @@
 #include "Api.h"
 
-ApiResponse ApiClient::makeRequest(HttpRequest& request)
-{
-    if (!isReady) return ApiResponse::failed();
+#include "Globals.h"
 
-    WdClient& client = httpClient.value();
-    client.beginRequest();
+void ApiClient::begin(const String& server, const uint16_t port, const String& username, const String& password)
+{
+    delete httpClient;
+    httpClient = new WdClient{modem.gsmClient, server, port};
+    defaultBasicAuthUsername.emplace(username);
+    defaultBasicAuthPassword.emplace(password);
+    isReady = true;
+}
+
+ApiResponse ApiClient::makeRequest(HttpRequest& request) const
+{
+    if (!isReady || httpClient == nullptr) return ApiResponse::failed();
+
+    httpClient->beginRequest();
 
     int err = 0;
 
     switch (request.method)
     {
     case GET:
-        err = client.get(request.path);
+        err = httpClient->get(request.path);
         break;
     case POST:
-        err = client.post(request.path);
+        err = httpClient->post(request.path);
         break;
     case PUT:
-        err = client.put(request.path);
+        err = httpClient->put(request.path);
         break;
     case DELETE:
-        err = client.del(request.path);
+        err = httpClient->del(request.path);
         break;
     }
 
-    if (err != 0) return ApiResponse::failed();
+    if (err != 0)
+    {
+        serialOnlyLog.errorln("Request failed with code " + String(err));
+        return ApiResponse::failed();
+    }
 
     if (defaultBasicAuthUsername.has_value() && defaultBasicAuthPassword.has_value())
     {
-        client.sendBasicAuth(defaultBasicAuthUsername.value(), defaultBasicAuthPassword.value());
+        httpClient->sendBasicAuth(defaultBasicAuthUsername.value(), defaultBasicAuthPassword.value());
     }
 
     for (const auto& [key, value] : request.headers)
-        client.sendHeader(key, value);
+        httpClient->sendHeader(key, value);
 
-    client.beginBody();
+    httpClient->beginBody();
 
     constexpr size_t bufferSize = 512;
     uint8_t buffer[bufferSize];
@@ -49,14 +63,14 @@ ApiResponse ApiClient::makeRequest(HttpRequest& request)
         const size_t bytesRead = request.body.readBytes(buffer, bufferSize);
         totalBytesRead += bytesRead;
 
-        size_t wrote = client.write(buffer, bytesRead);
+        size_t wrote = httpClient->write(buffer, bytesRead);
 
         constexpr size_t maxWriteRetries = 100;
         size_t retry = 0;
 
         for (; retry < maxWriteRetries && wrote == 0; ++retry)
         {
-            wrote = client.write(buffer, bytesRead);
+            wrote = httpClient->write(buffer, bytesRead);
         }
 
         if (wrote == 0 && retry == maxWriteRetries)
@@ -67,27 +81,31 @@ ApiResponse ApiClient::makeRequest(HttpRequest& request)
 
     const uint32_t uploadTimeMs = millis() - uploadStartMs;
 
-    client.endRequest();
+    httpClient->endRequest();
 
-    const int responseCode = client.responseStatusCode();
+    const int responseCode = httpClient->responseStatusCode();
 
-    if (responseCode <= 0) return ApiResponse::failed();
+    if (responseCode <= 0)
+    {
+        serialOnlyLog.errorln("Response code " + String(responseCode));
+        return ApiResponse::failed();
+    }
 
     std::map<String, String> headers{};
 
-    while (client.headerAvailable())
+    while (httpClient->headerAvailable())
     {
-        headers[client.readHeaderName()] = client.readHeaderValue();
+        headers[httpClient->readHeaderName()] = httpClient->readHeaderValue();
     }
 
-    const int contentLength = client.contentLength();
+    const int contentLength = httpClient->contentLength();
 
     if (contentLength <= 0)
     {
         return ApiResponse::empty(responseCode, headers, uploadTimeMs);
     }
 
-    return ApiResponse{responseCode, headers, client, static_cast<uint32_t>(contentLength), uploadTimeMs};
+    return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
 uint32_t ApiClient::fetch(const ApiResponse& resp, Stream& destination)

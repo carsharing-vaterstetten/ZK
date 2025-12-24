@@ -1,6 +1,6 @@
 #include "StorageManager.h"
 
-#include "Log.h"
+#include "Globals.h"
 
 bool StorageManager::mountLittleFS()
 {
@@ -68,13 +68,7 @@ bool StorageManager::remove(const String& path, const bool notExistingOk)
     return removeSuccess;
 }
 
-void StorageManager::logFilesystemTree(const uint8_t maxDepth)
-{
-    Serial.println("/");
-    logDirTree("/", maxDepth, 1);
-}
-
-void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth, const uint8_t indent)
+void _logDirTree(const char* dirname, const uint8_t maxDepth, const uint8_t indent)
 {
     if (maxDepth <= 0) return;
 
@@ -89,7 +83,7 @@ void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth, con
         if (nextFile.isDirectory())
         {
             Serial.println(String(nextFile.name()) + "/");
-            logDirTree(nextFile.path(), maxDepth - 1, indent + 1);
+            _logDirTree(nextFile.path(), maxDepth - 1, indent + 1);
         }
         else
         {
@@ -103,7 +97,18 @@ void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth, con
     nextFile.close();
 }
 
-void StorageManager::logFilesystemsInformation() const
+void StorageManager::logFilesystemTree(const uint8_t maxDepth)
+{
+    Serial.println("/");
+    _logDirTree("/", maxDepth, 1);
+}
+
+void StorageManager::logDirTree(const char* dirname, const uint8_t maxDepth)
+{
+    _logDirTree(dirname, maxDepth, 0);
+}
+
+void StorageManager::logFilesystemsInformation()
 {
     if (flashIsMounted)
     {

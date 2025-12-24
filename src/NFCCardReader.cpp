@@ -1,44 +1,41 @@
 #include "NFCCardReader.h"
 
-#include "Config.h"
+#include "Globals.h"
 
-bool NFCCardReader::init(SPIClass& spi, const uint8_t cs)
+NFCCardReader::NFCCardReader(SPIClass& spi, const uint8_t cs, const unsigned long cooldownMs) : Adafruit_PN532(cs, &spi),
+    _cooldownMs(cooldownMs)
+{
+}
+
+bool NFCCardReader::begin()
 {
     fileLog.debugln("Connecting to NFC board...");
 
-    delete _nfc;
-    _nfc = new Adafruit_PN532{cs, &spi};
+    if (!Adafruit_PN532::begin())
+    {
+        fileLog.criticalln("Failed to initialize NFC card reader. No RFID scanning possible");
+        return false;
+    }
 
-    _nfc->begin();
-
-    const uint32_t versionData = _nfc->getFirmwareVersion();
-
-    if (!versionData)
+    if (!getFirmwareVersion())
     {
         fileLog.criticalln("Failed to connect to NFC board. No RFID scanning possible");
         return false;
     }
 
-    const String chipName = "PN5" + String(versionData >> 24 & 0xFF, HEX);
-    const String firmwareVersion = "Firmware version " + String(versionData >> 16 & 0xFF) + "." + String(
-        versionData >> 8 & 0xFF);
-
-    _nfc->SAMConfig();
+    SAMConfig();
 
     fileLog.infoln("NFC board connected successfully");
-    fileLog.infoln("NFC chip version data: " + chipName + " " + firmwareVersion);
 
     return true;
 }
 
-std::optional<uint32_t> NFCCardReader::readRawTag() const
+std::optional<uint32_t> NFCCardReader::readRawTag()
 {
-    if (_nfc == nullptr) return std::nullopt;
-
     uint8_t uidArr[7] = {};
     uint8_t uidLen = 0;
 
-    if (!_nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
+    if (!readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
         return std::nullopt;
 
     if (uidLen != 4) return std::nullopt;

@@ -2,7 +2,7 @@
 
 #include <esp_task_wdt.h>
 
-#include "Config.h"
+#include "Globals.h"
 
 uint32_t WatchdogHandler::getCurrentTimeout() const
 {

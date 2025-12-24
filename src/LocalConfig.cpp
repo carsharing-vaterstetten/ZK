@@ -2,7 +2,7 @@
 
 #include <Preferences.h>
 
-#include "Config.h"
+#include "Globals.h"
 
 bool StorableConfig::save() const
 {
@@ -62,29 +62,25 @@ std::optional<LocalConfig> LocalConfig::fromStorage(const char* prefsName)
     if (!prefs.begin(prefsName, true)) return std::nullopt;
 
     for (const char* key : allKeys)
-        if (!prefs.isKey(key)) return std::nullopt;
+    {
+        if (!prefs.isKey(key))
+        {
+            fileLog.warningln("Couldnt find required key '" + String(key) + "'");
+            return std::nullopt;
+        }
+    }
 
     LocalConfig c{
-        prefs.getString(apnKey).c_str(),
-        prefs.getString(gprsUserKey).c_str(),
-        prefs.getString(gprsPasswordKey).c_str(),
-        prefs.getString(serverKey).c_str(),
+        prefs.getString(apnKey),
+        prefs.getString(gprsUserKey),
+        prefs.getString(gprsPasswordKey),
+        prefs.getString(serverKey),
         prefs.getUShort(serverPortKey),
-        prefs.getString(serverPasswordKey).c_str(),
-        prefs.getString(simPinKey).c_str(),
+        prefs.getString(serverPasswordKey),
+        prefs.getString(simPinKey),
     };
 
     prefs.end();
 
     return c;
 }
-
-LocalConfig config{
-    DEFAULT_CONFIG_APN,
-    DEFAULT_CONFIG_GPRS_USER,
-    DEFAULT_CONFIG_GPRS_PASSWORD,
-    DEFAULT_CONFIG_SERVER,
-    DEFAULT_CONFIG_PORT,
-    DEFAULT_CONFIG_PASSWORD,
-    DEFAULT_SIM_PIN
-};

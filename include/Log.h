@@ -11,7 +11,7 @@
 class Log
 {
 public:
-    void enableSerialLogging(uint8_t loggingLevel = LOGGING_LEVEL_DEBUG, const String& serialName = "");
+    void enableSerialLogging(bool colorize, uint8_t loggingLevel = LOGGING_LEVEL_DEBUG, const String& serialName = "");
     bool enableFlashLogging(const String& flashLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
 
     void stopSerialLogging();
@@ -67,6 +67,7 @@ private:
     String serialLoggingName;
     bool logToFlash = false;
     bool logToSerial = false;
+    bool colorizeSerialLogging = true;
 
     uint8_t serialLoggingLevel = LOGGING_LEVEL_DEBUG;
     uint8_t flashLoggingLevel = LOGGING_LEVEL_DEBUG;
@@ -76,6 +77,3 @@ private:
     static String getLoggingLevelChar(uint8_t level);
     static String getLoggingLevelColor(uint8_t level);
 };
-
-inline Log serialOnlyLog{};
-inline Log fileLog{};

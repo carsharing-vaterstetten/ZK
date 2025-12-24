@@ -12,5 +12,3 @@ public:
     esp_err_t subscribeTask();
     [[nodiscard]] uint32_t getCurrentTimeout() const;
 };
-
-inline WatchdogHandler watchdogHandler;

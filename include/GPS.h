@@ -1,8 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
-
-#include "Intern.h"
+#include <cstdint>
+#include <tuple>
 
 #pragma pack(push, 1)
 struct GPS_DATA_t
@@ -26,17 +25,16 @@ class GPS
     GPS_DATA_t logBuffer[GPS_LOG_BUFFER_SIZE];
     uint16_t logBufferIndex = 0;
     const char* localFilePath;
+    const char* fileUploadEndpoint;
 
     bool writeLogBufferToFile() const;
+    void logDataBuffered(const GPS_DATA_t& data);
 
 public:
-    explicit GPS(const char* filePath) : localFilePath(filePath)
-    {
-    }
+    explicit GPS(const char* filePath, const char* endpoint);
 
+    static std::tuple<bool, GPS_DATA_t> getGpsData();
     void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries) const;
-    void logDataBuffered(const GPS_DATA_t& data);
+    static bool getGpsDataAndWriteToFile();
     bool flush();
 };
-
-inline GPS gps{GPS_FILE_PATH};
