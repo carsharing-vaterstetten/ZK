@@ -250,7 +250,7 @@ void setup()
     modem.begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
                 config->apn.c_str());
     modem.ensureNetworkConnection();
-    modem.syncTime();
+    HelperUtils::syncTimeWithModem(20);
 
 
     if (RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))

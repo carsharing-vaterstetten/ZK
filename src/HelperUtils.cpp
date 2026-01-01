@@ -189,18 +189,6 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
              year, month, day, hour, minute, second);
 }
 
-bool HelperUtils::updateSystemTimeWithModem()
-{
-    if (!modem.timeIsAvailable())
-        return false;
-
-    const time_t seconds = modem.getUnixTimestamp();
-    const timeval now = {.tv_sec = seconds, .tv_usec = 0};
-    settimeofday(&now, nullptr);
-
-    return true;
-}
-
 /// Same as millis() if system time is not initialized
 uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
 {
@@ -290,7 +278,7 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
     );
 }
 
-void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, size_t retries)
+void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const size_t retries)
 {
     File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
     const size_t fileSize = f.size();
@@ -329,4 +317,31 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
 
     const uint32_t estimatedDownloadSpeed = fileSize * 1000 / downloadTimeMs;
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
+}
+
+bool HelperUtils::syncTimeWithModem(const size_t maxRetries)
+{
+    fileLog.infoln("Syncing time");
+    size_t syncAttempt = 0;
+
+    for (; syncAttempt <= maxRetries; ++syncAttempt)
+    {
+        int year;
+        const bool getTimeSuccess = modem.getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
+        if (year < 2070 && year >= 2025) break;
+        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+    }
+
+    const bool syncSuccess = syncAttempt < maxRetries;
+
+    if (syncSuccess) return false;
+
+    const time_t seconds = modem.getUnixTimestamp();
+    const timeval now = {.tv_sec = seconds, .tv_usec = 0};
+    settimeofday(&now, nullptr);
+
+    fileLog.logInfoOrWarningln(syncSuccess, "Time synced successfully", "Failed to sync time");
+
+    return true;
 }

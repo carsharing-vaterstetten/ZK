@@ -1,11 +1,7 @@
-// Modem.cpp
-
+#include "HelperUtils.h"
 #include "Modem.h"
-#include <HelperUtils.h>
-
 #include "Api.h"
 #include "Globals.h"
-#include "LocalConfig.h"
 #include "StorageManager.h"
 
 Modem::Modem(HardwareSerial& hwSerial, const uint32_t serialBaud, const int8_t rxPin, const int8_t txPin) :
@@ -319,28 +315,6 @@ bool Modem::ensureNetworkConnection(const size_t maxRetries)
     return true;
 }
 
-bool Modem::syncTime(const size_t maxRetries)
-{
-    fileLog.infoln("Syncing time");
-    size_t syncAttempt = 0;
-
-    for (; syncAttempt <= maxRetries; ++syncAttempt)
-    {
-        int year;
-        const bool getTimeSuccess = gsmModem.
-            getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
-        if (year < 2070 && year >= 2025) break;
-        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
-    }
-
-    timeSynced = syncAttempt < maxRetries;
-    HelperUtils::updateSystemTimeWithModem();
-    fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
-
-    return timeSynced;
-}
-
 bool Modem::disconnectNetwork()
 {
     fileLog.debugln("Disconnecting GPRS...");
@@ -360,12 +334,12 @@ bool Modem::disconnectNetwork()
 
 ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32_t streamLen)
 {
-    HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {{"Content-Type", "application/octet-stream"}});
+    const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {{"Content-Type", "application/octet-stream"}});
     return api.makeRequest(req);
 }
 
-UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
-                                               size_t retries)
+UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const size_t streamLen,
+                                               const size_t retries)
 {
     uint32_t attemptNo = 0;
 
@@ -390,7 +364,7 @@ UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& str
 }
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& f, const bool deleteIfSuccess,
-                                                    const bool deleteAfterRetrying, size_t retries)
+                                                    const bool deleteAfterRetrying, const size_t retries)
 {
     if (!f)
     {

@@ -40,7 +40,7 @@ enum class UploadFileAndRetryResult
 class Modem
 {
 protected:
-    bool timeSynced = false, modemIsAwake = false, gpsIsEnabled = false;
+    bool modemIsAwake = false, gpsIsEnabled = false;
     unsigned long serialBaud;
     int8_t rxPin, txPin;
 
@@ -63,7 +63,6 @@ public:
     bool requestSleep();
 
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, size_t retries = 2);
-    bool syncTime(size_t maxRetries = 20);
     bool ensureNetworkConnection(size_t maxRetries = 2);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
@@ -95,11 +94,6 @@ public:
 
     [[nodiscard]] time_t getUnixTimestamp();
     bool getGPS(GPS_DATA_t& out);
-
-    [[nodiscard]] bool timeIsAvailable() const
-    {
-        return timeSynced;
-    }
 
     String getIMEI()
     {

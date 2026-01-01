@@ -25,7 +25,7 @@ void onDownloadProgress(const size_t progress, const size_t total)
 ApiResponse checkForUpdate()
 {
     fileLog.infoln("Checking for firmware update");
-    HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
+    const HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
     const ApiResponse resp = api.makeRequest(req);
     if (!resp.valid) fileLog.errorln("Request failed");
     return resp;

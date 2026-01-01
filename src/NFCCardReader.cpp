@@ -58,7 +58,7 @@ ScanResult NFCCardReader::scan()
     const unsigned long now = millis();
     bool isDuplicate = false;
 
-    if (_lastUid.has_value() && *_lastUid == *currentUid && (now - _lastSeenTime < _cooldownMs))
+    if (_lastUid.has_value() && *_lastUid == *currentUid && now - _lastSeenTime < _cooldownMs)
         isDuplicate = true;
 
     // Update state

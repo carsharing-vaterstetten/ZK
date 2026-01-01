@@ -27,7 +27,6 @@ namespace HelperUtils
     time_t dateTimeToUnixTimestamp(int year, int month, int day, int hour, int minute, int second,
                                    float timezone);
     void dateTimeToString(char* buf, int year, int month, int day, int hour, int minute, int second);
-    bool updateSystemTimeWithModem();
     uint64_t systemTimeMillisecondsSinceEpoche();
     bool isSuccessfulResponse(int statusCode);
     String simStatusToString(SimStatus status);
@@ -37,4 +36,5 @@ namespace HelperUtils
     void logRAMUsage(const Log& log, LoggingLevel level);
     void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, size_t retries);
     void performConnectionSpeedTest(size_t fileSize);
+    bool syncTimeWithModem(size_t maxRetries);
 }
