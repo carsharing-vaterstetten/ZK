@@ -13,7 +13,7 @@
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
-void Log::enableSerialLogging(const bool colorize, const uint8_t loggingLevel, const String& serialName)
+void Log::enableSerialLogging(const bool colorize, const LoggingLevel loggingLevel, const String& serialName)
 {
     logToSerial = true;
     colorizeSerialLogging = colorize;
@@ -21,7 +21,7 @@ void Log::enableSerialLogging(const bool colorize, const uint8_t loggingLevel, c
     serialLoggingName = serialName;
 }
 
-bool Log::enableFlashLogging(const String& flashLogFileName, const uint8_t loggingLevel)
+bool Log::enableFlashLogging(const String& flashLogFileName, const LoggingLevel loggingLevel)
 {
     if (!LittleFS.exists(flashLogFileName))
     {
@@ -49,7 +49,7 @@ void Log::stopFlashLogging()
 
 
 void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const String& ifError,
-                           const uint8_t level) const
+                           const LoggingLevel level) const
 {
     if (success)
     {
@@ -61,7 +61,7 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
     }
 }
 
-void Log::logMsgln(const String& msg, const uint8_t level) const
+void Log::logMsgln(const String& msg, const LoggingLevel level) const
 {
     // = millis() if modem is not initialized
     const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
@@ -73,7 +73,7 @@ void Log::logMsgln(const String& msg, const uint8_t level) const
         appendMsgToFile(timestampMs, level, msg);
 }
 
-void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
+void Log::appendMsgToSerial(const uint64_t timestamp, const LoggingLevel loggingLevel, const String& text) const
 {
     Serial.print("[");
     Serial.print(HelperUtils::millisToIsoString(timestamp));
@@ -101,18 +101,18 @@ void Log::appendMsgToSerial(const uint64_t timestamp, const uint8_t loggingLevel
     }
 
 
-    if (colorizeSerialLogging && loggingLevel >= LOGGING_LEVEL_ERROR)
+    if (colorizeSerialLogging && loggingLevel >= ERROR)
         Serial.print(BACKGROUND_COLOR_RED);
 
     Serial.print(text);
 
-    if (colorizeSerialLogging && loggingLevel >= LOGGING_LEVEL_ERROR)
+    if (colorizeSerialLogging && loggingLevel >= ERROR)
         Serial.print(COLOR_RESET);
 
     Serial.println();
 }
 
-void Log::appendMsgToFile(const uint64_t timestamp, const uint8_t loggingLevel, const String& text) const
+void Log::appendMsgToFile(const uint64_t timestamp, const LoggingLevel loggingLevel, const String& text) const
 {
     File file = LittleFS.open(flashLogPath, FILE_APPEND);
     if (!file) return;
@@ -127,38 +127,38 @@ void Log::appendMsgToFile(const uint64_t timestamp, const uint8_t loggingLevel, 
     file.close();
 }
 
-String Log::getLoggingLevelChar(const uint8_t level)
+String Log::getLoggingLevelChar(const LoggingLevel level)
 {
     switch (level)
     {
-    case LOGGING_LEVEL_DEBUG:
+    case DEBUG:
         return "D";
-    case LOGGING_LEVEL_INFO:
+    case INFO:
         return "I";
-    case LOGGING_LEVEL_WARNING:
+    case WARNING:
         return "W";
-    case LOGGING_LEVEL_ERROR:
+    case ERROR:
         return "E";
-    case LOGGING_LEVEL_CRITICAL:
+    case CRITICAL:
         return "C";
     default:
         throw std::invalid_argument("Invalid logging level");
     }
 }
 
-String Log::getLoggingLevelColor(const uint8_t level)
+String Log::getLoggingLevelColor(const LoggingLevel level)
 {
     switch (level)
     {
-    case LOGGING_LEVEL_DEBUG:
+    case DEBUG:
         return COLOR_GREEN;
-    case LOGGING_LEVEL_INFO:
+    case INFO:
         return COLOR_BLUE;
-    case LOGGING_LEVEL_WARNING:
+    case WARNING:
         return COLOR_YELLOW;
-    case LOGGING_LEVEL_ERROR:
+    case ERROR:
         return COLOR_RED;
-    case LOGGING_LEVEL_CRITICAL:
+    case CRITICAL:
         return COLOR_MAGENTA;
     default:
         throw std::invalid_argument("Invalid logging level");

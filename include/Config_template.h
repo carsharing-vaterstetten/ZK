@@ -1,16 +1,15 @@
 #pragma once
 
-#include "Log.h"
-
 // Serial debugging
 #define ENABLE_SERIAL_LOGGING true // Enable for serial printing
 #define COLORIZE_SERIAL_LOGGING true
 #if ENABLE_SERIAL_LOGGING
-#define SERIAL_LOGGING_LEVEL LOGGING_LEVEL_DEBUG
+#define SERIAL_LOGGING_LEVEL DEBUG // Can be DEBUG, INFO, WARNING, ERROR or CRITICAL
 #endif
-#define FLASH_LOGGING_LEVEL LOGGING_LEVEL_INFO
+#define FLASH_LOGGING_LEVEL INFO
 
-#define UART_BAUD 115200U
+#define USB_SERIAL_BAUD 115200U
+#define MODEM_SERIAL_BAUD 230400U
 
 #define RECORD_GPS_WHILE_STANDING false
 #define GPS_UPDATE_INTERVAL_WHILE_DRIVING 500 // ms
@@ -53,7 +52,7 @@
 
 // Connection speed test
 #define GIVE_CONNECTION_SPEED_ESTIMATE false
-#define CONNECTION_SPEED_TEST_FILE_SIZE 16384 // Smaller files result in less accurate connection speed estimates. Number must not be (16 * 1024)!!! to convert it to a string literal!!!
+#define CONNECTION_SPEED_TEST_FILE_SIZE (32 * 1024) // Smaller files result in less accurate connection speed estimates.
 
 // Config override
 #define USE_DEFAULT_CONFIG false // Useful for development or mass deployment

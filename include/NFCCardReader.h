@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include <Adafruit_PN532.h>
 
 enum class ScanStatus

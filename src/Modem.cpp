@@ -4,13 +4,13 @@
 #include <HelperUtils.h>
 
 #include "Api.h"
-#include "Backend.h"
 #include "Globals.h"
 #include "LocalConfig.h"
 #include "StorageManager.h"
 
-Modem::Modem(const uint32_t serialBaud, const int8_t rxPin, const int8_t txPin) : serialBaud(serialBaud),
-    rxPin(rxPin), txPin(txPin)
+Modem::Modem(HardwareSerial& hwSerial, const uint32_t serialBaud, const int8_t rxPin, const int8_t txPin) :
+    serialBaud(serialBaud),
+    rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem)
 {
 }
 
@@ -176,7 +176,7 @@ std::tuple<bool, uint32_t> Modem::autoBaud()
 {
     fileLog.debugln("Baud rate scanning...");
 
-    SERIAL_AT.updateBaudRate(serialBaud);
+    serial.updateBaudRate(serialBaud);
     if (waitForATResponse())
         return {true, serialBaud};
 
@@ -185,7 +185,7 @@ std::tuple<bool, uint32_t> Modem::autoBaud()
 
     for (const uint32_t baudRate : baudRates)
     {
-        SERIAL_AT.updateBaudRate(baudRate);
+        serial.updateBaudRate(baudRate);
         if (!waitForATResponse(1000))
         {
             fileLog.debugln("Baud rate " + String(baudRate) + " failed");
@@ -205,8 +205,6 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
     gprsUser = user;
     gprsPassword = password;
     apn = netApn;
-
-    SERIAL_AT.begin(serialBaud, SERIAL_8N1, rxPin, txPin);
 
     for (uint8_t attempt = 0; attempt <= retries; ++attempt)
     {
@@ -239,12 +237,10 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
         {
             const uint32_t newBaud = attempt == 0 ? serialBaud : 115200; // fallback baud rate
             gsmModem.setBaud(newBaud);
-            SERIAL_AT.flush();
-            SERIAL_AT.updateBaudRate(newBaud);
+            serial.flush();
+            serial.updateBaudRate(newBaud);
             fileLog.debugln("Set baud rate to " + String(newBaud));
         }
-
-        fileLog.infoln("Modem info: " + gsmModem.getModemInfo());
 
         gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
         gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
@@ -254,31 +250,9 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
         return true;
     }
 
-    fileLog.criticalln("Failed to start and connect the modem");
+    fileLog.criticalln("Failed to initialize the modem");
 
     return false;
-}
-
-bool Modem::syncTime(const size_t maxRetries)
-{
-    fileLog.infoln("Syncing time");
-    uint8_t syncAttempt = 0;
-
-    for (; syncAttempt <= maxRetries; ++syncAttempt)
-    {
-        int year;
-        const bool getTimeSuccess = gsmModem.
-            getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
-        if (year < 2070 && year >= 2025) break;
-        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
-    }
-
-    timeSynced = syncAttempt < maxRetries;
-    HelperUtils::updateSystemTimeWithModem();
-    fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
-
-    return timeSynced;
 }
 
 bool Modem::ensureNetworkConnection(const size_t maxRetries)
@@ -343,6 +317,28 @@ bool Modem::ensureNetworkConnection(const size_t maxRetries)
     fileLog.debugln("Got signal");
 
     return true;
+}
+
+bool Modem::syncTime(const size_t maxRetries)
+{
+    fileLog.infoln("Syncing time");
+    uint8_t syncAttempt = 0;
+
+    for (; syncAttempt <= maxRetries; ++syncAttempt)
+    {
+        int year;
+        const bool getTimeSuccess = gsmModem.
+            getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
+        if (year < 2070 && year >= 2025) break;
+        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
+    }
+
+    timeSynced = syncAttempt < maxRetries;
+    HelperUtils::updateSystemTimeWithModem();
+    fileLog.logInfoOrWarningln(timeSynced, "Time synced successfully", "Failed to sync time");
+
+    return timeSynced;
 }
 
 bool Modem::disconnectNetwork()
@@ -464,55 +460,12 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const 
     return uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
 }
 
-void Modem::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
-{
-    File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
-    const size_t fileSize = f.size();
-    f.close();
-    fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
-    uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
-}
-
 time_t Modem::getUnixTimestamp()
 {
     int year, month, day, hour, minute, second;
     float timezone;
     gsmModem.getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
     return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
-}
-
-void Modem::performConnectionSpeedTest()
-{
-    fileLog.infoln("Performing connection speed test");
-
-    HttpRequest req = HttpRequest::post(
-        CONNECTION_SPEED_TEST_ENDPOINT "?file_size=" STR(CONNECTION_SPEED_TEST_FILE_SIZE), randomStream,
-        CONNECTION_SPEED_TEST_FILE_SIZE);
-    const ApiResponse resp = api.makeRequest(req);
-
-    if (!resp.valid)
-    {
-        fileLog.errorln("Request failed");
-        return;
-    }
-
-    fileLog.infoln("Response code: " + String(resp.responseCode));
-
-    if (resp.responseCode != 200)
-    {
-        fileLog.errorln("Unexpected status code");
-        return;
-    }
-
-    const uint32_t estimatedUploadSpeed = CONNECTION_SPEED_TEST_FILE_SIZE * 1000 / resp.uploadTimeMs;
-    fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
-
-    const uint64_t downloadStartMs = millis();
-    ApiClient::fetch(resp, emptyStream);
-    const uint32_t downloadTimeMs = millis() - downloadStartMs;
-
-    const uint32_t estimatedDownloadSpeed = CONNECTION_SPEED_TEST_FILE_SIZE * 1000 / downloadTimeMs;
-    fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 
 bool Modem::getGPS(GPS_DATA_t& out)

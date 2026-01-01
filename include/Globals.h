@@ -14,7 +14,7 @@
 #include "NFCCardReader.h"
 
 inline String modemIMEI = "";
-inline Modem modem{230400, MODEM_RX_PIN, MODEM_TX_PIN};
+inline Modem modem{Serial1, MODEM_SERIAL_BAUD, MODEM_RX_PIN, MODEM_TX_PIN};
 inline AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};
 inline GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
 inline ApiClient api;

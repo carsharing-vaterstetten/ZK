@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <Modem.h>
 #include <NFCCardReader.h>
 #include <HelperUtils.h>
@@ -189,7 +188,7 @@ void restartRoutine()
         fileLog.infoln("No GPS data recorded. Nothing to upload");
     }
 
-    Modem::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+    HelperUtils::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
 
     fileLog.infoln("Restarting now");
 
@@ -199,7 +198,7 @@ void restartRoutine()
 void setup()
 {
     // Start serial communication
-    Serial.begin(UART_BAUD);
+    Serial.begin(USB_SERIAL_BAUD);
     while (!Serial)
     {
     }
@@ -238,6 +237,7 @@ void setup()
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     accessControl.begin();
+    Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
 
 #if USE_DEFAULT_CONFIG
     fileLog.infoln("Using default config");
@@ -246,13 +246,12 @@ void setup()
 #endif
     fileLog.infoln("Loaded config: " + config->toString());
 
-    // TODO: improve this
-    for (int i = 0; i < 4; ++i)
-    {
-        modem.begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
-                    config->apn.c_str());
-        if (modem.ensureNetworkConnection() && modem.syncTime()) break;
-    }
+
+    modem.begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
+                config->apn.c_str());
+    modem.ensureNetworkConnection();
+    modem.syncTime();
+
 
     if (RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
         modem.enableGPS();
@@ -273,7 +272,7 @@ void setup()
 
     // Do the connection speed test before any up-/downloads
 #if GIVE_CONNECTION_SPEED_ESTIMATE
-    Modem::performConnectionSpeedTest();
+    HelperUtils::performConnectionSpeedTest(CONNECTION_SPEED_TEST_FILE_SIZE);
 #endif
 
     // Now we are ready to check for a firmware update
@@ -292,12 +291,12 @@ void setup()
     RFIDs::downloadGPSTrackingConsentedRFIDs();
     RFIDs::load();
 
-    HelperUtils::logRAMUsage(fileLog, LOGGING_LEVEL_INFO);
+    HelperUtils::logRAMUsage(fileLog, INFO);
     StorageManager::logFilesystemsInformation();
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    Modem::uploadLog(true, true, 1);
+    HelperUtils::uploadLog(true, true, 1);
     statusLed.clear();
 
     // Power saving

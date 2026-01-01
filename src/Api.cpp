@@ -11,7 +11,7 @@ void ApiClient::begin(const String& server, const uint16_t port, const String& u
     isReady = true;
 }
 
-ApiResponse ApiClient::makeRequest(HttpRequest& request) const
+ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 {
     if (!isReady || httpClient == nullptr) return ApiResponse::failed();
 

@@ -1,65 +1,67 @@
 #pragma once
+#include <WString.h>
 
-#include <Arduino.h>
-
-#define LOGGING_LEVEL_DEBUG 0
-#define LOGGING_LEVEL_INFO 1
-#define LOGGING_LEVEL_WARNING 2
-#define LOGGING_LEVEL_ERROR 3
-#define LOGGING_LEVEL_CRITICAL 4
+enum LoggingLevel
+{
+    DEBUG,
+    INFO,
+    WARNING,
+    ERROR,
+    CRITICAL
+};
 
 class Log
 {
 public:
-    void enableSerialLogging(bool colorize, uint8_t loggingLevel = LOGGING_LEVEL_DEBUG, const String& serialName = "");
-    bool enableFlashLogging(const String& flashLogFileName, uint8_t loggingLevel = LOGGING_LEVEL_INFO);
+    void enableSerialLogging(bool colorize, LoggingLevel loggingLevel = DEBUG, const String& serialName = "");
+    bool enableFlashLogging(const String& flashLogFileName, LoggingLevel loggingLevel = INFO);
 
     void stopSerialLogging();
     void stopFlashLogging();
 
-    void logMsgln(const String& msg, uint8_t level) const;
-    void appendMsgToSerial(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
+    void logMsgln(const String& msg, LoggingLevel level) const;
+    void appendMsgToSerial(uint64_t timestamp, LoggingLevel loggingLevel, const String& text) const;
 
     void debugln(const String& msg) const
     {
-        logMsgln(msg, LOGGING_LEVEL_DEBUG);
+        logMsgln(msg, DEBUG);
     }
 
     void infoln(const String& msg) const
     {
-        logMsgln(msg, LOGGING_LEVEL_INFO);
+        logMsgln(msg, INFO);
     }
 
     void warningln(const String& msg) const
     {
-        logMsgln(msg, LOGGING_LEVEL_WARNING);
+        logMsgln(msg, WARNING);
     }
 
     void errorln(const String& msg) const
     {
-        logMsgln(msg, LOGGING_LEVEL_ERROR);
+        logMsgln(msg, ERROR);
     }
 
     void criticalln(const String& msg) const
     {
-        logMsgln(msg, LOGGING_LEVEL_CRITICAL);
+        logMsgln(msg, CRITICAL);
     }
 
-    void logInfoOrLevelln(bool success, const String& ifSuccess, const String& ifError, uint8_t level) const;
+    void logInfoOrLevelln(bool success, const String& ifSuccess, const String& ifError, LoggingLevel level) const;
 
     void logInfoOrWarningln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, LOGGING_LEVEL_WARNING);
+        logInfoOrLevelln(success, ifSuccess, ifError, WARNING);
     }
 
     void logInfoOrErrorln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, LOGGING_LEVEL_ERROR);
+        logInfoOrLevelln(success, ifSuccess, ifError, ERROR);
     }
 
     void logInfoOrCriticalErrorln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, LOGGING_LEVEL_CRITICAL);
+        logInfoOrLevelln(success, ifSuccess, ifError, CRITICAL);
     }
 
 private:
@@ -69,11 +71,11 @@ private:
     bool logToSerial = false;
     bool colorizeSerialLogging = true;
 
-    uint8_t serialLoggingLevel = LOGGING_LEVEL_DEBUG;
-    uint8_t flashLoggingLevel = LOGGING_LEVEL_DEBUG;
+    LoggingLevel serialLoggingLevel = DEBUG;
+    LoggingLevel flashLoggingLevel = DEBUG;
 
-    void appendMsgToFile(uint64_t timestamp, uint8_t loggingLevel, const String& text) const;
+    void appendMsgToFile(uint64_t timestamp, LoggingLevel loggingLevel, const String& text) const;
 
-    static String getLoggingLevelChar(uint8_t level);
-    static String getLoggingLevelColor(uint8_t level);
+    static String getLoggingLevelChar(LoggingLevel level);
+    static String getLoggingLevelColor(LoggingLevel level);
 };

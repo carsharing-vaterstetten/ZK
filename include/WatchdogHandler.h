@@ -1,5 +1,6 @@
 #pragma once
-#include <Arduino.h>
+#include <cstdint>
+#include <esp_err.h>
 
 class WatchdogHandler
 {

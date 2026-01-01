@@ -4,6 +4,8 @@
 #define STR(s) STR_HELPER(s)
 
 #include <FS.h>
+
+#include "Log.h"
 #include "TinyGsmGPRS.tpp"
 
 class Log;
@@ -27,5 +29,7 @@ namespace HelperUtils
     String millisToIsoString(uint64_t ms);
     String getResetReasonHumanReadable(int reset_reason);
     String toBase64(const uint8_t* data, size_t len);
-    void logRAMUsage(const Log& log, uint8_t level);
+    void logRAMUsage(const Log& log, LoggingLevel level);
+    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    void performConnectionSpeedTest(size_t fileSize);
 }

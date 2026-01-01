@@ -1,18 +1,15 @@
 #pragma once
 
-#include <Arduino.h>
+#include <FS.h>
+
+#include "ApiStreams.h"
+#include "GPS.h"
 
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1KiB
 
 #include <TinyGsmClient.h>
-#include <FS.h>
-
-#include "ApiStreams.h"
-#include "GPS.h"
-
-#define SERIAL_AT Serial1
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
 
@@ -44,19 +41,22 @@ enum class UploadFileAndRetryResult
 
 class Modem
 {
+protected:
     bool timeSynced = false, modemIsAwake = false, gpsIsEnabled = false;
-
     unsigned long serialBaud;
     int8_t rxPin, txPin;
-    TinyGsmSim7000 gsmModem{SERIAL_AT};
+
+    TinyGsmSim7000 gsmModem;
+    const char *gprsUser = "", *gprsPassword = "", *apn = "";
+    HardwareSerial& serial;
+
     bool beginSleep();
     std::tuple<bool, uint32_t> autoBaud();
-    const char *gprsUser = "", *gprsPassword = "", *apn = "";
 
 public:
-    TinyGsmSim7000::GsmClientSim7000 gsmClient{gsmModem}; // TODO: abstract this
+    TinyGsmSim7000::GsmClientSim7000 gsmClient;
 
-    Modem(uint32_t serialBaud, int8_t rxPin, int8_t txPin);
+    Modem(HardwareSerial& hwSerial, uint32_t serialBaud, int8_t rxPin, int8_t txPin);
 
     bool powerOff();
     static void powerOn();
@@ -78,7 +78,6 @@ public:
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath,
                                                         bool deleteIfSuccess,
                                                         bool deleteAfterRetrying, uint32_t retries);
-    static void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
 
     bool disconnectNetwork();
     bool enableGPS();
@@ -97,7 +96,6 @@ public:
     }
 
     [[nodiscard]] time_t getUnixTimestamp();
-    static void performConnectionSpeedTest();
     bool getGPS(GPS_DATA_t& out);
 
     [[nodiscard]] bool timeIsAvailable() const

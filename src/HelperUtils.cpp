@@ -3,6 +3,7 @@
 #include "HelperUtils.h"
 #include "mbedtls/md5.h"
 #include <iomanip>
+#include <LittleFS.h>
 
 #include "Globals.h"
 #include "mbedtls/base64.h"
@@ -279,7 +280,7 @@ String HelperUtils::toBase64(const uint8_t* data, const size_t len)
     return {reinterpret_cast<char*>(encoded)};
 }
 
-void HelperUtils::logRAMUsage(const Log& log, const uint8_t level)
+void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
 {
     log.logMsgln(String("RAM Usage: Total Free: ") + esp_get_free_heap_size() + " B" +
                  " | Internal Free: " + heap_caps_get_free_size(MALLOC_CAP_INTERNAL) + " B" +
@@ -287,4 +288,45 @@ void HelperUtils::logRAMUsage(const Log& log, const uint8_t level)
                  " | Largest Internal Block: " + heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) + " B",
                  level
     );
+}
+
+void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+{
+    File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
+    const size_t fileSize = f.size();
+    f.close();
+    fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
+    Modem::uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
+}
+
+void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
+{
+    fileLog.infoln("Performing connection speed test");
+
+    const HttpRequest req = HttpRequest::post(CONNECTION_SPEED_TEST_ENDPOINT, randomStream, fileSize);
+    const ApiResponse resp = api.makeRequest(req);
+
+    if (!resp.valid)
+    {
+        fileLog.errorln("Request failed");
+        return;
+    }
+
+    fileLog.infoln("Response code: " + String(resp.responseCode));
+
+    if (resp.responseCode != 200)
+    {
+        fileLog.errorln("Unexpected status code");
+        return;
+    }
+
+    const uint32_t estimatedUploadSpeed = fileSize * 1000 / resp.uploadTimeMs;
+    fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
+
+    const uint64_t downloadStartMs = millis();
+    ApiClient::fetch(resp, emptyStream);
+    const uint32_t downloadTimeMs = millis() - downloadStartMs;
+
+    const uint32_t estimatedDownloadSpeed = fileSize * 1000 / downloadTimeMs;
+    fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
