@@ -18,7 +18,7 @@ inline String modemIMEI = "";
 inline Modem modem{Serial1, MODEM_SERIAL_BAUD, MODEM_RX_PIN, MODEM_TX_PIN};
 inline AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};
 inline GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
-inline ApiClient api;
+inline ApiClient api{512};
 inline CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
 inline auto config = new LocalConfig{
     DEFAULT_CONFIG_APN,

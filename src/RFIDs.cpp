@@ -171,7 +171,7 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
         return false;
     }
 
-    const uint32_t bytesDownloaded = ApiClient::fetch(resp, file);
+    const uint32_t bytesDownloaded = api.fetch(resp, file);
 
     file.close();
 

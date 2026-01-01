@@ -312,7 +312,7 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
     fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
 
     const uint64_t downloadStartMs = millis();
-    ApiClient::fetch(resp, emptyStream);
+    api.fetch(resp, emptyStream);
     const uint32_t downloadTimeMs = millis() - downloadStartMs;
 
     const uint32_t estimatedDownloadSpeed = fileSize * 1000 / downloadTimeMs;

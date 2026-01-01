@@ -2,6 +2,10 @@
 
 #include "Globals.h"
 
+ApiClient::ApiClient(const size_t bufferSize) : bufferSize(bufferSize)
+{
+}
+
 void ApiClient::begin(const String& server, const uint16_t port, const String& username, const String& password)
 {
     delete httpClient;
@@ -51,7 +55,6 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 
     httpClient->beginBody();
 
-    constexpr size_t bufferSize = 512;
     uint8_t buffer[bufferSize];
 
     const uint64_t uploadStartMs = millis();
@@ -108,11 +111,10 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
     return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination)
+size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
 {
     WdClient& downloadStream = resp.body;
 
-    constexpr size_t bufferSize = 512;
     uint8_t buf[bufferSize];
 
     size_t downloaded = 0;

@@ -212,7 +212,6 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
 
         wakeup();
         powerOn();
-        gsmModem.factoryDefault();
         turnOn();
 
         auto [baudSuccess, autoBaudRate] = autoBaud();
@@ -300,7 +299,7 @@ bool Modem::ensureNetworkConnection(const size_t maxRetries)
     for (; signalTry <= maxRetries && signalQuality == 99; ++signalTry)
     {
         fileLog.debugln("Waiting for signal...");
-        delay(1000);
+        delay(2000);
         signalQuality = gsmModem.getSignalQuality();
     }
 
