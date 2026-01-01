@@ -335,7 +335,7 @@ bool HelperUtils::syncTimeWithModem(const size_t maxRetries)
 
     const bool syncSuccess = syncAttempt < maxRetries;
 
-    if (syncSuccess) return false;
+    if (!syncSuccess) return false;
 
     const time_t seconds = modem.getUnixTimestamp();
     const timeval now = {.tv_sec = seconds, .tv_usec = 0};
