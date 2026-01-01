@@ -1,7 +1,8 @@
 #pragma once
+
 #include <map>
-#include <Stream.h>
-#include "HttpClient.h"
+#include <HttpClient.h>
+
 #include "WatchdogHandler.h"
 
 enum ApiHttpMethod { GET, POST, PUT, DELETE };
@@ -98,9 +99,9 @@ class HttpBase
 {
 public:
     std::map<String, String> headers;
-    uint32_t bodyLength;
+    size_t bodyLength;
 
-    HttpBase(std::map<String, String> headers, const uint32_t bodyLength)
+    HttpBase(std::map<String, String> headers, const size_t bodyLength)
         : headers(std::move(headers)), bodyLength(bodyLength)
     {
     }
@@ -112,12 +113,12 @@ public:
     WdClient& body;
     const int responseCode;
 
-    HttpResponse(const int responseCode, std::map<String, String> headers, WdClient& body, const uint32_t length)
+    HttpResponse(const int responseCode, std::map<String, String> headers, WdClient& body, const size_t length)
         : HttpBase(std::move(headers), length), body(body), responseCode(responseCode)
     {
     }
 
-    HttpResponse(const int responseCode, WdClient& body, const uint32_t length)
+    HttpResponse(const int responseCode, WdClient& body, const size_t length)
         : HttpBase({}, length), body(body), responseCode(responseCode)
     {
     }
@@ -131,7 +132,7 @@ public:
     ApiHttpMethod method;
 
     HttpRequest(const char* path, const ApiHttpMethod method, std::map<String, String> headers, Stream& body,
-                const uint32_t bodyLength)
+                const size_t bodyLength)
         : HttpBase(std::move(headers), bodyLength), body(body), path(path), method(method)
     {
         this->headers["Content-Length"] = String(bodyLength);
@@ -142,7 +143,7 @@ public:
         return HttpRequest{path, GET, std::move(headers), emptyStream, 0};
     }
 
-    static HttpRequest post(const char* path, Stream& body, const uint32_t size, std::map<String, String> headers = {})
+    static HttpRequest post(const char* path, Stream& body, const size_t size, std::map<String, String> headers = {})
     {
         return HttpRequest{path, POST, std::move(headers), body, size};
     }
@@ -154,13 +155,13 @@ public:
     uint32_t uploadTimeMs;
     const bool valid;
 
-    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const uint32_t length,
+    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
                 const uint32_t uploadTimeMs, const bool valid)
         : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(valid)
     {
     }
 
-    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const uint32_t length,
+    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
                 const uint32_t uploadTimeMs)
         : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(true)
     {
@@ -171,9 +172,7 @@ public:
         return ApiResponse{0, {}, emptyClient, 0, 0, false};
     }
 
-    static ApiResponse empty(const int code,
-                             std::map<String, String> headers,
-                             const uint32_t uploadTimeMs)
+    static ApiResponse empty(const int code, std::map<String, String> headers, const uint32_t uploadTimeMs)
     {
         return ApiResponse{code, std::move(headers), emptyClient, 0, uploadTimeMs};
     }

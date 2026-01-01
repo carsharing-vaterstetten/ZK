@@ -1,6 +1,9 @@
 #pragma once
 
+// ReSharper disable once CppUnusedIncludeDirective
+#include <cstdint>
 #include <Adafruit_NeoPixel.h>
+
 
 enum class StatusColor
 {

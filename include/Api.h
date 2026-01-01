@@ -1,7 +1,11 @@
 #pragma once
 
+#include <optional>
+#include <WString.h>
+
 #include "ApiStreams.h"
 
+class WdClient;
 class Modem;
 
 class ApiClient
@@ -14,5 +18,5 @@ protected:
 public:
     void begin(const String& server, uint16_t port, const String& username, const String& password);
     ApiResponse makeRequest(const HttpRequest& request) const;
-    static uint32_t fetch(const ApiResponse& resp, Stream& destination);
+    static size_t fetch(const ApiResponse& resp, Stream& destination);
 };

@@ -101,7 +101,7 @@ bool Modem::requestSleep()
 
 bool Modem::waitForATResponse(const uint32_t timeoutMs)
 {
-    const uint64_t startMs = millis();
+    const unsigned long startMs = millis();
 
     while (millis() - startMs < timeoutMs)
     {
@@ -198,7 +198,7 @@ std::tuple<bool, uint32_t> Modem::autoBaud()
     return {false, 0};
 }
 
-bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const uint8_t retries)
+bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const size_t retries)
 {
     fileLog.infoln("Initializing modem...");
 
@@ -206,7 +206,7 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
     gprsPassword = password;
     apn = netApn;
 
-    for (uint8_t attempt = 0; attempt <= retries; ++attempt)
+    for (size_t attempt = 0; attempt <= retries; ++attempt)
     {
         fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
@@ -322,7 +322,7 @@ bool Modem::ensureNetworkConnection(const size_t maxRetries)
 bool Modem::syncTime(const size_t maxRetries)
 {
     fileLog.infoln("Syncing time");
-    uint8_t syncAttempt = 0;
+    size_t syncAttempt = 0;
 
     for (; syncAttempt <= maxRetries; ++syncAttempt)
     {
@@ -364,8 +364,8 @@ ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32
     return api.makeRequest(req);
 }
 
-UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const uint32_t streamLen,
-                                               const uint32_t retries)
+UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
+                                               size_t retries)
 {
     uint32_t attemptNo = 0;
 
@@ -390,7 +390,7 @@ UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& str
 }
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& f, const bool deleteIfSuccess,
-                                                    const bool deleteAfterRetrying, const uint32_t retries)
+                                                    const bool deleteAfterRetrying, size_t retries)
 {
     if (!f)
     {
@@ -447,7 +447,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& 
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const char* filePath,
                                                     const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                                    const uint32_t retries)
+                                                    const size_t retries)
 {
     if (!LittleFS.exists(filePath))
     {

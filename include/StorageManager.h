@@ -1,5 +1,7 @@
 #pragma once
 
+// ReSharper disable once CppUnusedIncludeDirective
+#include <cstdint>
 #include <LittleFS.h>
 
 #include "Intern.h"
@@ -71,9 +73,9 @@ namespace StorageManager
         return exists(RFID_FILE_PATH);
     }
 
-    void logDirTree(const char* dirname, uint8_t maxDepth);
+    void logDirTree(const char* dirname, size_t maxDepth);
 
-    void logFilesystemTree(uint8_t maxDepth);
+    void logFilesystemTree(size_t maxDepth);
 
     void logFilesystemsInformation();
 }

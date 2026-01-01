@@ -1,15 +1,13 @@
 #pragma once
 
 #include <FS.h>
+#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_T_PCIE
+#define TINY_GSM_RX_BUFFER 1024 // 1 KiB
+#include <TinyGsmClient.h>
 
 #include "ApiStreams.h"
 #include "GPS.h"
-
-#define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_T_PCIE
-#define TINY_GSM_RX_BUFFER 1024 // 1KiB
-
-#include <TinyGsmClient.h>
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
 
@@ -64,20 +62,20 @@ public:
     static void turnOff();
     bool requestSleep();
 
-    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint8_t retries = 2);
+    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, size_t retries = 2);
     bool syncTime(size_t maxRetries = 20);
     bool ensureNetworkConnection(size_t maxRetries = 2);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
     bool waitForATResponse(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
-    static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, uint32_t streamLen,
-                                                   uint32_t retries);
+    static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
+                                                   size_t retries);
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, File& f, bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, uint32_t retries);
+                                                        bool deleteAfterRetrying, size_t retries);
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath,
                                                         bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, uint32_t retries);
+                                                        bool deleteAfterRetrying, size_t retries);
 
     bool disconnectNetwork();
     bool enableGPS();

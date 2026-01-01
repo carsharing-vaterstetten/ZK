@@ -108,7 +108,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
     return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-uint32_t ApiClient::fetch(const ApiResponse& resp, Stream& destination)
+size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination)
 {
     WdClient& downloadStream = resp.body;
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <tuple>
+#include <cstddef>
 
 #pragma pack(push, 1)
 struct GPS_DATA_t
@@ -33,8 +33,7 @@ class GPS
 public:
     explicit GPS(const char* filePath, const char* endpoint);
 
-    static std::tuple<bool, GPS_DATA_t> getGpsData();
-    void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries) const;
+    void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, size_t retries) const;
     static bool getGpsDataAndWriteToFile();
     bool flush();
 };

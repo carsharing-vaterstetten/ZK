@@ -1,5 +1,9 @@
 #pragma once
 
+// ReSharper disable once CppUnusedIncludeDirective
+#include <cstdint>
+#include <optional>
+#include <SPI.h>
 #include <Adafruit_PN532.h>
 
 enum class ScanStatus

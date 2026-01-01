@@ -8,24 +8,10 @@ GPS::GPS(const char* filePath, const char* endpoint) : localFilePath(filePath), 
 {
 }
 
-std::tuple<bool, GPS_DATA_t> GPS::getGpsData()
-{
-    GPS_DATA_t gpsData;
-
-    if (!modem.getGPS(gpsData))
-    {
-        // serialOnlyLog.debugln("No GPS data received");
-        return {false, gpsData};
-    }
-
-    // serialOnlyLog.debugln("Lat: " + String(gpsData.lat, 11) + " Long: " + String(gpsData.lon, 11));
-
-    return {true, gpsData};
-}
-
 bool GPS::getGpsDataAndWriteToFile()
 {
-    auto [success, data] = getGpsData();
+    GPS_DATA_t data;
+    const bool success = modem.getGPS(data);
 
     if (success)
         gps.logDataBuffered(data);
@@ -33,7 +19,7 @@ bool GPS::getGpsDataAndWriteToFile()
     return success;
 }
 
-void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries) const
+void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const size_t retries) const
 {
     fileLog.infoln("Uploading GPS log " + String(fileUploadEndpoint));
     Modem::uploadFileAndDelete(fileUploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);

@@ -290,7 +290,7 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
     );
 }
 
-void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint32_t retries)
+void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, size_t retries)
 {
     File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
     const size_t fileSize = f.size();

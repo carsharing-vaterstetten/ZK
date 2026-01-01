@@ -1,19 +1,24 @@
 #pragma once
 
-#define STR_HELPER(s) #s
-#define STR(s) STR_HELPER(s)
-
+// ReSharper disable once CppUnusedIncludeDirective
+#include <cstdint>
 #include <FS.h>
+#include <optional>
+#include <WString.h>
 
 #include "Log.h"
 #include "TinyGsmGPRS.tpp"
+
+#define STR_HELPER(s) #s
+#define STR(s) STR_HELPER(s)
+
 
 class Log;
 class LocalConfig;
 
 namespace HelperUtils
 {
-    static constexpr uint8_t dateTimeStrLength = 32;
+    static constexpr size_t dateTimeStrLength = 32;
 
     std::optional<LocalConfig> parseConfigString(const String& inputString);
     LocalConfig requestConfig();
@@ -30,6 +35,6 @@ namespace HelperUtils
     String getResetReasonHumanReadable(int reset_reason);
     String toBase64(const uint8_t* data, size_t len);
     void logRAMUsage(const Log& log, LoggingLevel level);
-    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint32_t retries);
+    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, size_t retries);
     void performConnectionSpeedTest(size_t fileSize);
 }
