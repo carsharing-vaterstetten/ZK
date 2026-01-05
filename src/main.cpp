@@ -121,7 +121,7 @@ void calculateNextRestartTime()
 
     restartTargetMs += millis();
 
-    fileLog.infoln("Next restart planed in " + String(restartTargetMs / 1000) + " seconds");
+    fileLog.infoln("Next restart planned in " + String(restartTargetMs / 1000) + " seconds");
 }
 
 int espLogHandler(const char* fmt, const va_list args)
