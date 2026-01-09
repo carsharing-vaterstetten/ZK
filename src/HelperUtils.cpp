@@ -292,7 +292,7 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
     fileLog.infoln("Performing connection speed test");
 
     const HttpRequest req = HttpRequest::post(CONNECTION_SPEED_TEST_ENDPOINT, randomStream, fileSize);
-    const ApiResponse resp = api.makeRequest(req);
+    const ApiResponse resp = api.makeRequest(req, true);
 
     if (!resp.valid)
     {

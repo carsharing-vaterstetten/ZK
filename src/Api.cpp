@@ -16,7 +16,7 @@ void ApiClient::begin(const String& server, const uint16_t port, const String& u
     isReady = true;
 }
 
-ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
+ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders) const
 {
     if (!isReady || httpClient == nullptr) return ApiResponse::failed();
 
@@ -47,9 +47,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
     }
 
     if (defaultBasicAuthUsername.has_value() && defaultBasicAuthPassword.has_value())
-    {
         httpClient->sendBasicAuth(defaultBasicAuthUsername.value(), defaultBasicAuthPassword.value());
-    }
 
     for (const auto& [key, value] : request.headers)
         httpClient->sendHeader(key, value);
@@ -74,6 +72,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 
         for (; retry < maxWriteRetries && wrote == 0; ++retry)
         {
+            yield();
             wrote = httpClient->write(buffer, bytesRead);
         }
 
@@ -97,12 +96,13 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 
     std::map<String, String> headers{};
 
-    while (httpClient->headerAvailable())
-    {
+    while (!ignoreResponseHeaders && httpClient->headerAvailable())
         headers[httpClient->readHeaderName()] = httpClient->readHeaderValue();
-    }
 
     const int contentLength = httpClient->contentLength();
+
+    if (ignoreResponseHeaders)
+        httpClient->skipResponseHeaders();
 
     if (contentLength <= 0)
     {
@@ -120,15 +120,16 @@ size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
 
     size_t downloaded = 0;
 
-    while (downloadStream.connected() || downloadStream.available())
+    while (downloadStream.connected() || downloadStream.available() > 0)
     {
-        while (downloadStream.available())
+        int len = downloadStream.read(buf, readBufferSize);
+        if (len > 0)
         {
-            const size_t len = downloadStream.read(buf, readBufferSize);
             destination.write(buf, len);
             downloaded += len;
         }
+        else
+            yield(); // Prevent CPU spinning if the modem is mid-packet
     }
-
     return downloaded;
 }

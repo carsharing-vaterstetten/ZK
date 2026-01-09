@@ -333,8 +333,10 @@ bool Modem::disconnectNetwork()
 
 ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32_t streamLen)
 {
-    const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {{"Content-Type", "application/octet-stream"}});
-    return api.makeRequest(req);
+    const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {
+                                                  {"Content-Type", "application/octet-stream"}
+                                              });
+    return api.makeRequest(req, true);
 }
 
 UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const size_t streamLen,

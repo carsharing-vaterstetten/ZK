@@ -80,7 +80,7 @@ void RFIDs::downloadRfidsIfChanged()
     String base64Checksum = HelperUtils::toBase64(md5Checksum, 16);
 
     const HttpRequest req = HttpRequest::get(REMOTE_RFID_PATH, {{"if-none-match", base64Checksum}});
-    const ApiResponse resp = api.makeRequest(req);
+    const ApiResponse resp = api.makeRequest(req, true);
 
     if (!resp.valid)
     {
@@ -155,7 +155,7 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs()
     }
 
     const HttpRequest req = HttpRequest::get(REMOTE_GPS_TRACKING_CONSENTED_RFIDS_PATH);
-    const ApiResponse resp = api.makeRequest(req);
+    const ApiResponse resp = api.makeRequest(req, true);
 
     if (!resp.valid)
     {
