@@ -313,9 +313,9 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
 
     const uint64_t downloadStartMs = millis();
     api.fetch(resp, emptyStream);
-    const uint32_t downloadTimeMs = millis() - downloadStartMs;
+    const size_t downloadTimeMs = millis() - downloadStartMs;
 
-    const uint32_t estimatedDownloadSpeed = fileSize * 1000 / downloadTimeMs;
+    const size_t estimatedDownloadSpeed = resp.bodyLength * 1000 / downloadTimeMs;
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 
