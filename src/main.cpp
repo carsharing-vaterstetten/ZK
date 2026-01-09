@@ -177,7 +177,7 @@ void restartRoutine()
     statusLed.setStatusColor(StatusColor::UploadingLogs);
 
     modem.wakeupAndWait();
-    modem.ensureNetworkConnection();
+    modem.ensureNetworkConnection(2, false);
 
     if (StorageManager::exists(GPS_FILE_PATH))
     {

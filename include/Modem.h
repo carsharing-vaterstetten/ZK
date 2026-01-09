@@ -63,7 +63,7 @@ public:
     bool requestSleep();
 
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, size_t retries = 2);
-    bool ensureNetworkConnection(size_t maxRetries = 2);
+    bool ensureNetworkConnection(size_t maxRetries = 2, bool connectNetworkFirst = true);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
     bool waitForATResponse(uint32_t timeoutMs = 10000);
