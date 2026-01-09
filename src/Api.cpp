@@ -2,7 +2,8 @@
 
 #include "Globals.h"
 
-ApiClient::ApiClient(const size_t bufferSize) : bufferSize(bufferSize)
+ApiClient::ApiClient(const size_t writeBufferSize, const size_t readBufferSize) : writeBufferSize(writeBufferSize),
+    readBufferSize(readBufferSize)
 {
 }
 
@@ -55,7 +56,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 
     httpClient->beginBody();
 
-    uint8_t buffer[bufferSize];
+    uint8_t buffer[writeBufferSize];
 
     const uint64_t uploadStartMs = millis();
 
@@ -63,7 +64,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request) const
 
     while (request.body.available() && totalBytesRead < request.bodyLength)
     {
-        const size_t bytesRead = request.body.readBytes(buffer, bufferSize);
+        const size_t bytesRead = request.body.readBytes(buffer, writeBufferSize);
         totalBytesRead += bytesRead;
 
         size_t wrote = httpClient->write(buffer, bytesRead);
@@ -115,7 +116,7 @@ size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
 {
     WdClient& downloadStream = resp.body;
 
-    uint8_t buf[bufferSize];
+    uint8_t buf[readBufferSize];
 
     size_t downloaded = 0;
 
@@ -123,7 +124,7 @@ size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
     {
         while (downloadStream.available())
         {
-            const size_t len = downloadStream.read(buf, bufferSize);
+            const size_t len = downloadStream.read(buf, readBufferSize);
             destination.write(buf, len);
             downloaded += len;
         }
