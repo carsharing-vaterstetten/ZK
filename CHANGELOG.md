@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0]
+
+- Optimierter Cold- und Hot-Start: Das System fährt schneller hoch und stellt zuverlässiger eine Verbindung zum Modem
+  her.
+- Zusätzliche Compiler-Optimierungen: Reduzierung der Firmware-Größe um ca. 50 kB (~10 %).
+- Verbesserte Puffer- und Baudraten-Konfiguration für eine schnellere Netzwerkverbindung.
+- Modem baut die Netzwerkverbindung nun zuverlässig auf.
+- Diverse Bugfixes und Code-Refactoring.
+
+> [!INFO]
+> Wenn diese Firmware später (z. B. per OTA) zurückgerollt wird, muss die Modem-Baudrate in dieser Version auf 115200
+> gesetzt werden, damit die Kommunikation korrekt funktioniert.
+
 ## [1.1.4]
 
 - Nutzerfreundliche Verhinderung von Doppel-Scans: Die LED leuchtet hellblau, wenn eine Karte doppelt gescannt wird, und
