@@ -237,7 +237,7 @@ void setup()
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     accessControl.begin();
-    Serial1.setRxBufferSize(1024);
+    Serial1.setRxBufferSize(2048);
     Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
 
 #if USE_DEFAULT_CONFIG
