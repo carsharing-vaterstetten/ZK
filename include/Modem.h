@@ -50,6 +50,13 @@ protected:
 
     bool beginSleep();
     std::tuple<bool, uint32_t> autoBaud();
+    std::tuple<bool, uint32_t> autoBaud(uint32_t timeoutMs);
+    bool connectNetwork(size_t retries);
+    bool connectGPRS(size_t retries);
+    bool beginHot(const char* simPin);
+    bool beginCold(const char* simPin, size_t retries);
+    bool finishInit(const char* simPin, uint32_t detectedBaud);
+    static void forcePowerCycle();
 
 public:
     TinyGsmSim7000::GsmClientSim7000 gsmClient;
@@ -66,7 +73,6 @@ public:
     bool ensureNetworkConnection(size_t maxRetries = 2, bool connectNetworkFirst = true);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
-    bool waitForATResponse(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
                                                    size_t retries);

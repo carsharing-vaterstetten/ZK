@@ -1,3 +1,5 @@
+#include <esp_system.h>
+
 #include "HelperUtils.h"
 #include "Modem.h"
 #include "Api.h"
@@ -47,6 +49,19 @@ bool Modem::powerOff()
     return success;
 }
 
+
+void Modem::forcePowerCycle()
+{
+    fileLog.warningln("Forcing Modem Power Cycle...");
+
+    digitalWrite(BOARD_POWERON_PIN, LOW); // Cut power completely (Mimic Hard Reset)
+    delay(2000); // Wait for capacitors to discharge
+    digitalWrite(BOARD_POWERON_PIN, HIGH); // Restore power
+    delay(500); // Wait for voltage to stabilize
+
+    fileLog.infoln("Modem power restored");
+}
+
 void Modem::wakeup()
 {
     fileLog.debugln("Waking up modem");
@@ -68,7 +83,7 @@ void Modem::wakeup()
 void Modem::wakeupAndWait(const uint32_t timeoutMs)
 {
     wakeup();
-    waitForATResponse(timeoutMs);
+    gsmModem.testAT(timeoutMs);
     fileLog.infoln("Modem awake and responsive");
 }
 
@@ -93,18 +108,6 @@ bool Modem::requestSleep()
         return false;
 
     return beginSleep();
-}
-
-bool Modem::waitForATResponse(const uint32_t timeoutMs)
-{
-    const unsigned long startMs = millis();
-
-    while (millis() - startMs < timeoutMs)
-    {
-        if (gsmModem.testAT(100)) return true;
-    }
-
-    return false;
 }
 
 bool Modem::enableGPS()
@@ -171,18 +174,17 @@ bool Modem::disableGPS()
 std::tuple<bool, uint32_t> Modem::autoBaud()
 {
     fileLog.debugln("Baud rate scanning...");
-
     serial.updateBaudRate(serialBaud);
-    if (waitForATResponse())
+    if (gsmModem.testAT(20000))
         return {true, serialBaud};
 
     // Higher values are certainly unstable
-    constexpr uint32_t baudRates[] = {9600, 115200, 300, 600, 1200, 2400, 4800, 19200, 38400, 57600, 230400, 921600};
+    constexpr uint32_t baudRates[] = {9600, 115200, 19200, 38400, 57600, 230400, 921600};
 
     for (const uint32_t baudRate : baudRates)
     {
         serial.updateBaudRate(baudRate);
-        if (!waitForATResponse(1000))
+        if (!gsmModem.testAT(1000))
         {
             fileLog.debugln("Baud rate " + String(baudRate) + " failed");
             continue;
@@ -196,58 +198,125 @@ std::tuple<bool, uint32_t> Modem::autoBaud()
 
 bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const size_t retries)
 {
-    fileLog.infoln("Initializing modem...");
-
     gprsUser = user;
     gprsPassword = password;
     apn = netApn;
 
-    for (size_t attempt = 0; attempt <= retries; ++attempt)
+    const esp_reset_reason_t reason = esp_reset_reason();
+
+    // Check if we are coming from a soft restart or a hard power-up
+    if (reason == ESP_RST_SW)
     {
-        fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
+        fileLog.infoln("Modem Hot Start");
+        if (beginHot(simPin)) return true;
 
-        turnOff();
-
-        if (attempt > 0) gsmClient.stop();
-
-        wakeup();
-        powerOn();
-        turnOn();
-
-        auto [baudSuccess, autoBaudRate] = autoBaud();
-
-        if (!baudSuccess)
-        {
-            fileLog.warningln("Attempt failed because the modem did not respond to any baud rate");
-            continue;
-        }
-
-        fileLog.infoln("Modem connected to serial (" + String(autoBaudRate) + " Hz)");
-
-        const bool modemInitSuccess = gsmModem.init(simPin);
-        fileLog.logInfoOrWarningln(modemInitSuccess, "Modem initialized successfully",
-                                   "There was an error while initializing the modem");
-
-        if (serialBaud != autoBaudRate)
-        {
-            const uint32_t newBaud = attempt == 0 ? serialBaud : 115200; // fallback baud rate
-            gsmModem.setBaud(newBaud);
-            serial.flush();
-            serial.updateBaudRate(newBaud);
-            fileLog.debugln("Set baud rate to " + String(newBaud));
-        }
-
-        gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
-        gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
-
-        fileLog.infoln("Modem initialized");
-
-        return true;
+        fileLog.warningln("Hot Start failed, attempting Cold Start fallback...");
+    }
+    else
+    {
+        fileLog.infoln("Modem Cold Start");
     }
 
-    fileLog.criticalln("Failed to initialize the modem");
+    return beginCold(simPin, retries);
+}
+
+bool Modem::beginHot(const char* simPin)
+{
+    // Try the target baud rate immediately
+    auto [success, detectedBaud] = autoBaud(500);
+
+    if (success)
+    {
+        fileLog.infoln("Modem already active at " + String(detectedBaud) + " baud.");
+        return finishInit(simPin, detectedBaud);
+    }
 
     return false;
+}
+
+bool Modem::beginCold(const char* simPin, const size_t retries)
+{
+    for (size_t attempt = 0; attempt <= retries; ++attempt)
+    {
+        fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
+
+        powerOn(); // BOARD_POWERON_PIN HIGH
+
+        // If the modem was already running, turnOff() ensures a clean start.
+        // If it was already off, this pulse might be ignored or act as a toggle.
+        turnOff();
+        delay(1000);
+        turnOn(); // Pulse PWRKEY to boot
+
+        // The SIM7000 takes ~4.5s to start its serial interface.
+        // We use autoBaud with a 10-second timeout to catch it as it wakes up.
+        auto [success, detectedBaud] = autoBaud(10000);
+
+        if (success)
+            return finishInit(simPin, detectedBaud);
+
+        fileLog.errorln("Modem failed to boot. Hard cycling power rail...");
+
+        // Physical recovery: Cut VCC rail to the modem
+        forcePowerCycle();
+    }
+    return false;
+}
+
+std::tuple<bool, uint32_t> Modem::autoBaud(const uint32_t timeoutMs)
+{
+    fileLog.debugln("Baud rate scanning...");
+
+    // 1. Try the user-defined serialBaud first
+    serial.updateBaudRate(serialBaud);
+    if (gsmModem.testAT(timeoutMs))
+        return {true, serialBaud};
+
+    // 2. Scan fallback baud rates if the first check failed
+    constexpr uint32_t baudRates[] = {115200, 9600, 19200, 38400, 57600, 230400, 921600};
+
+    for (const uint32_t baud : baudRates)
+    {
+        if (baud == serialBaud) continue;
+
+        serial.updateBaudRate(baud);
+        delay(20); // Give the UART hardware a moment to stabilize
+
+        if (gsmModem.testAT(500))
+        {
+            fileLog.debugln("Baud rate " + String(baud) + " SUCCESS");
+            return {true, baud};
+        }
+        fileLog.debugln("Baud rate " + String(baud) + " failed");
+    }
+
+    return {false, 0};
+}
+
+bool Modem::finishInit(const char* simPin, const uint32_t detectedBaud)
+{
+    // If the modem is at a different baud than our target, move it.
+    if (detectedBaud != serialBaud)
+    {
+        fileLog.infoln("Switching modem baud from " + String(detectedBaud) + " to " + String(serialBaud));
+        gsmModem.setBaud(serialBaud);
+        delay(100);
+        serial.updateBaudRate(serialBaud);
+        delay(100);
+    }
+
+    if (!gsmModem.init(simPin))
+    {
+        fileLog.errorln("gsmModem.init() failed");
+        return false;
+    }
+
+    // Set standard LilyGo/SIM7000 configuration
+    gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
+    gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
+
+    fileLog.infoln("Modem successfully initialized.");
+    return true;
 }
 
 bool Modem::connectNetwork(const size_t retries)
