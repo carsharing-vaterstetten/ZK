@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <Stream.h>
+#include <vector>
 #include <WString.h>
 
 enum LoggingLevel
@@ -11,17 +14,26 @@ enum LoggingLevel
     CRITICAL
 };
 
+struct LogSink
+{
+    std::reference_wrapper<Stream> stream;
+    String name;
+    bool timestamps = true;
+    bool colorize = false;
+    LoggingLevel minLevel = DEBUG;
+    bool flushOnError = false;
+    bool flushOnEveryLine = false;
+};
+
 class Log
 {
 public:
-    void enableSerialLogging(bool colorize, LoggingLevel loggingLevel = DEBUG, const String& serialName = "");
-    bool enableFlashLogging(const String& flashLogFileName, LoggingLevel loggingLevel = INFO);
+    using SinkID = size_t;
 
-    void stopSerialLogging();
-    void stopFlashLogging();
+    SinkID addOutputStream(Stream& stream, const String& name, bool timestamps, bool colorize, LoggingLevel minLevel,
+                           bool flushOnError = false, bool flushOnEveryLine = false);
 
     void logMsgln(const String& msg, LoggingLevel level) const;
-    void appendMsgToSerial(uint64_t timestamp, LoggingLevel loggingLevel, const String& text) const;
 
     void debugln(const String& msg) const
     {
@@ -65,17 +77,12 @@ public:
         logInfoOrLevelln(success, ifSuccess, ifError, CRITICAL);
     }
 
-private:
-    String flashLogPath;
-    String serialLoggingName;
-    bool logToFlash = false;
-    bool logToSerial = false;
-    bool colorizeSerialLogging = true;
+    void flush() const;
 
-    LoggingLevel serialLoggingLevel = DEBUG;
-    LoggingLevel flashLoggingLevel = DEBUG;
+protected:
+    std::vector<LogSink> sinks;
 
-    void appendMsgToFile(uint64_t timestamp, LoggingLevel loggingLevel, const String& text) const;
+    static void appendMsgToStream(const LogSink& sink, const String& timestampStr, LoggingLevel level, const String& text);
 
     static String getLoggingLevelChar(LoggingLevel level);
     static String getLoggingLevelColor(LoggingLevel level);

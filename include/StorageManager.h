@@ -78,4 +78,6 @@ namespace StorageManager
     void logFilesystemTree(size_t maxDepth);
 
     void logFilesystemsInformation();
+
+    void saveLog();
 }

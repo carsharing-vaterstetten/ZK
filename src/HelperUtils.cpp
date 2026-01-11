@@ -10,6 +10,7 @@
 
 #include "Modem.h"
 #include "LocalConfig.h"
+#include "StorageManager.h"
 
 
 std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)
@@ -280,11 +281,11 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
 
 void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const size_t retries)
 {
-    File f = LittleFS.open(LOG_FILE_PATH, FILE_READ);
-    const size_t fileSize = f.size();
-    f.close();
+    const size_t fileSize = logFile.size();
     fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
+    logFile.close();
     Modem::uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
+    logFile = StorageManager::openLog(FILE_APPEND);
 }
 
 void HelperUtils::performConnectionSpeedTest(const size_t fileSize)

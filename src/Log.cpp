@@ -1,7 +1,5 @@
 #include "Log.h"
 
-#include <LittleFS.h>
-
 #include "HelperUtils.h"
 #include "Modem.h"
 
@@ -13,52 +11,20 @@
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
-void Log::enableSerialLogging(const bool colorize, const LoggingLevel loggingLevel, const String& serialName)
+Log::SinkID Log::addOutputStream(Stream& stream, const String& name, const bool timestamps, const bool colorize,
+                                 const LoggingLevel minLevel, const bool flushOnError, const bool flushOnEveryLine)
 {
-    logToSerial = true;
-    colorizeSerialLogging = colorize;
-    serialLoggingLevel = loggingLevel;
-    serialLoggingName = serialName;
+    sinks.push_back({stream, name, timestamps, colorize, minLevel, flushOnError, flushOnEveryLine});
+    return sinks.size() - 1;
 }
-
-bool Log::enableFlashLogging(const String& flashLogFileName, const LoggingLevel loggingLevel)
-{
-    if (!LittleFS.exists(flashLogFileName))
-    {
-        // Let's ignore directories for now
-        File file = LittleFS.open(flashLogFileName, FILE_WRITE, true);
-        if (!file) return false;
-        file.close();
-    }
-
-    flashLogPath = flashLogFileName;
-    logToFlash = true;
-    flashLoggingLevel = loggingLevel;
-    return true;
-}
-
-void Log::stopSerialLogging()
-{
-    logToSerial = false;
-}
-
-void Log::stopFlashLogging()
-{
-    logToFlash = false;
-}
-
 
 void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const String& ifError,
                            const LoggingLevel level) const
 {
     if (success)
-    {
         infoln(ifSuccess);
-    }
     else
-    {
         logMsgln(ifError, level);
-    }
 }
 
 void Log::logMsgln(const String& msg, const LoggingLevel level) const
@@ -66,65 +32,48 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
     // = millis() if modem is not initialized
     const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
 
-    if (logToSerial && level >= serialLoggingLevel)
-        appendMsgToSerial(timestampMs, level, msg);
-
-    if (logToFlash && level >= flashLoggingLevel)
-        appendMsgToFile(timestampMs, level, msg);
+    for (const LogSink& s : sinks)
+    {
+        if (level >= s.minLevel)
+        {
+            const String timestampStr = s.timestamps ? "[" + HelperUtils::millisToIsoString(timestampMs) + "]" : "";
+            appendMsgToStream(s, timestampStr, level, msg);
+        }
+    }
 }
 
-void Log::appendMsgToSerial(const uint64_t timestamp, const LoggingLevel loggingLevel, const String& text) const
+void Log::flush() const
 {
-    Serial.print("[");
-    Serial.print(HelperUtils::millisToIsoString(timestamp));
-    Serial.print("][");
-
-    if (colorizeSerialLogging)
-        Serial.print(getLoggingLevelColor(loggingLevel));
-
-    Serial.print(getLoggingLevelChar(loggingLevel));
-
-    if (colorizeSerialLogging)
-        Serial.print(COLOR_RESET);
-
-    Serial.print("]");
-
-    if (serialLoggingName.isEmpty())
-    {
-        Serial.print(" ");
-    }
-    else
-    {
-        Serial.print("[");
-        Serial.print(serialLoggingName);
-        Serial.print("] ");
-    }
-
-
-    if (colorizeSerialLogging && loggingLevel >= ERROR)
-        Serial.print(BACKGROUND_COLOR_RED);
-
-    Serial.print(text);
-
-    if (colorizeSerialLogging && loggingLevel >= ERROR)
-        Serial.print(COLOR_RESET);
-
-    Serial.println();
+    for (const LogSink& s : sinks)
+        s.stream.get().flush();
 }
 
-void Log::appendMsgToFile(const uint64_t timestamp, const LoggingLevel loggingLevel, const String& text) const
+uint64_t mst = 0;
+
+void Log::appendMsgToStream(const LogSink& sink, const String& timestampStr, const LoggingLevel level,
+                            const String& text)
 {
-    File file = LittleFS.open(flashLogPath, FILE_APPEND);
-    if (!file) return;
+    Stream& stream = sink.stream.get();
+    String line;
 
-    file.print("[");
-    file.print(HelperUtils::millisToIsoString(timestamp));
-    file.print("][");
-    file.print(getLoggingLevelChar(loggingLevel));
-    file.print("] ");
-    file.println(text);
+    if (sink.timestamps) line += timestampStr;
 
-    file.close();
+    line += "[";
+    if (sink.colorize) line += getLoggingLevelColor(level);
+    line += getLoggingLevelChar(level);
+    if (sink.colorize) line += COLOR_RESET;
+    line += "]";
+
+    if (sink.name && sink.name[0] != '\0') line += "[" + String(sink.name) + "] ";
+    else line += " ";
+
+    if (sink.colorize && level >= ERROR) line += BACKGROUND_COLOR_RED;
+    line += text;
+    if (sink.colorize && level >= ERROR) line += COLOR_RESET;
+
+    stream.println(line);
+
+    if (sink.flushOnEveryLine || (sink.flushOnError && level >= ERROR)) stream.flush();
 }
 
 String Log::getLoggingLevelChar(const LoggingLevel level)

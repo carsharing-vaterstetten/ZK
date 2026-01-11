@@ -1,5 +1,6 @@
 #pragma once
 
+#include <LittleFS.h>
 #include <WString.h>
 
 #include "Config.h"
@@ -34,3 +35,4 @@ inline Log fileLog{};
 inline SPIClass nfcSpi{NFC_SPI};
 inline NFCCardReader cardReader{nfcSpi, NFC_SS};
 inline WatchdogHandler watchdogHandler;
+inline File logFile;

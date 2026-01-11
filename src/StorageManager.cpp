@@ -117,3 +117,11 @@ void StorageManager::logFilesystemsInformation()
         fileLog.infoln("Flash usage: " + String(flashUtilized) + " B / " + String(flashTotal) + " B");
     }
 }
+
+void StorageManager::saveLog()
+{
+    if (logFile)
+        logFile.flush();
+    else
+        serialOnlyLog.errorln("Failed to save log");
+}
