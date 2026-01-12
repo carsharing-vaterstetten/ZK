@@ -78,7 +78,7 @@ void _logDirTree(const char* dirname, const uint8_t maxDepth, const uint8_t inde
 
     while (nextFile)
     {
-        for (size_t i = 0; i < indent; ++i) Serial.print("  ");
+        for (uint i = 0; i < indent; ++i) Serial.print("  ");
 
         if (nextFile.isDirectory())
         {
@@ -97,13 +97,13 @@ void _logDirTree(const char* dirname, const uint8_t maxDepth, const uint8_t inde
     nextFile.close();
 }
 
-void StorageManager::logFilesystemTree(const size_t maxDepth)
+void StorageManager::logFilesystemTree(const uint maxDepth)
 {
     Serial.println("/");
     _logDirTree("/", maxDepth, 1);
 }
 
-void StorageManager::logDirTree(const char* dirname, const size_t maxDepth)
+void StorageManager::logDirTree(const char* dirname, const uint maxDepth)
 {
     _logDirTree(dirname, maxDepth, 0);
 }

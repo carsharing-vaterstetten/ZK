@@ -18,7 +18,7 @@ class LocalConfig;
 
 namespace HelperUtils
 {
-    static constexpr size_t dateTimeStrLength = 32;
+    static constexpr uint dateTimeStrLength = 32;
 
     std::optional<LocalConfig> parseConfigString(const String& inputString);
     LocalConfig requestConfig();
@@ -34,7 +34,7 @@ namespace HelperUtils
     String getResetReasonHumanReadable(int reset_reason);
     String toBase64(const uint8_t* data, size_t len);
     void logRAMUsage(const Log& log, LoggingLevel level);
-    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, size_t retries);
+    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
     void performConnectionSpeedTest(size_t fileSize);
-    bool syncTimeWithModem(size_t maxRetries);
+    bool syncTimeWithModem(uint maxRetries);
 }

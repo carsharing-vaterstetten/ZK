@@ -34,7 +34,7 @@ bool RFIDs::load()
         return false;
     }
 
-    constexpr size_t uidSize = sizeof(uint32_t);
+    constexpr uint uidSize = sizeof(uint32_t);
     const size_t uidsCount = f.size() / uidSize;
 
     rfids.clear();

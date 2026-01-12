@@ -21,5 +21,5 @@ public:
 
     void begin(const String& server, uint16_t port, const String& username, const String& password);
     [[nodiscard]] ApiResponse makeRequest(const HttpRequest& request, bool ignoreResponseHeaders = false) const;
-    size_t fetch(const ApiResponse& resp, Stream& destination) const;
+    uint fetch(const ApiResponse& resp, Stream& destination) const;
 };

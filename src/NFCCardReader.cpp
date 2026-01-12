@@ -2,7 +2,7 @@
 
 #include "Globals.h"
 
-NFCCardReader::NFCCardReader(SPIClass& spi, const uint8_t cs, const unsigned long cooldownMs) : Adafruit_PN532(cs, &spi),
+NFCCardReader::NFCCardReader(SPIClass& spi, const uint8_t cs, const ulong cooldownMs) : Adafruit_PN532(cs, &spi),
     _cooldownMs(cooldownMs)
 {
 }
@@ -55,7 +55,7 @@ ScanResult NFCCardReader::scan()
         return {ScanStatus::NoCard, 0};
     }
 
-    const unsigned long now = millis();
+    const ulong now = millis();
     bool isDuplicate = false;
 
     if (_lastUid.has_value() && *_lastUid == *currentUid && now - _lastSeenTime < _cooldownMs)

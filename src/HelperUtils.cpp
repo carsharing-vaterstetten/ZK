@@ -96,7 +96,7 @@ LocalConfig HelperUtils::requestConfig()
 
     String inputString = "";
 
-    const unsigned long oldTimeout = Serial.getTimeout();
+    const ulong oldTimeout = Serial.getTimeout();
     Serial.setTimeout(100000000ULL);
 
     while (true)
@@ -279,7 +279,7 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
     );
 }
 
-void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const size_t retries)
+void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
 {
     const size_t fileSize = logFile.size();
     fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
@@ -312,18 +312,18 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
     const uint32_t estimatedUploadSpeed = fileSize * 1000 / resp.uploadTimeMs;
     fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
 
-    const uint64_t downloadStartMs = millis();
+    const ulong downloadStartMs = millis();
     api.fetch(resp, emptyStream);
-    const size_t downloadTimeMs = millis() - downloadStartMs;
+    const uint downloadTimeMs = millis() - downloadStartMs;
 
-    const size_t estimatedDownloadSpeed = resp.bodyLength * 1000 / downloadTimeMs;
+    const uint estimatedDownloadSpeed = resp.bodyLength * 1000 / downloadTimeMs;
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 
-bool HelperUtils::syncTimeWithModem(const size_t maxRetries)
+bool HelperUtils::syncTimeWithModem(const uint maxRetries)
 {
     fileLog.infoln("Syncing time");
-    size_t syncAttempt = 0;
+    uint syncAttempt = 0;
 
     for (; syncAttempt <= maxRetries; ++syncAttempt)
     {

@@ -6,7 +6,7 @@
 #include "Globals.h"
 #include "StorageManager.h"
 
-Modem::Modem(HardwareSerial& hwSerial, const uint32_t serialBaud, const int8_t rxPin, const int8_t txPin) :
+Modem::Modem(HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin, const int8_t txPin) :
     serialBaud(serialBaud),
     rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem)
 {
@@ -171,7 +171,7 @@ bool Modem::disableGPS()
     return success;
 }
 
-bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const size_t retries)
+bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
 {
     gprsUser = user;
     gprsPassword = password;
@@ -209,9 +209,9 @@ bool Modem::beginHot(const char* simPin)
     return false;
 }
 
-bool Modem::beginCold(const char* simPin, const size_t retries)
+bool Modem::beginCold(const char* simPin, const uint retries)
 {
-    for (size_t attempt = 0; attempt <= retries; ++attempt)
+    for (uint attempt = 0; attempt <= retries; ++attempt)
     {
         fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
 
@@ -238,7 +238,7 @@ bool Modem::beginCold(const char* simPin, const size_t retries)
     return false;
 }
 
-std::tuple<bool, uint32_t> Modem::autoBaud(const uint32_t timeoutMs)
+std::tuple<bool, ulong> Modem::autoBaud(const uint32_t timeoutMs)
 {
     fileLog.debugln("Baud rate scanning...");
 
@@ -248,9 +248,9 @@ std::tuple<bool, uint32_t> Modem::autoBaud(const uint32_t timeoutMs)
         return {true, serialBaud};
 
     // 2. Scan fallback baud rates if the first check failed
-    constexpr uint32_t baudRates[] = {115200, 9600, 19200, 38400, 57600, 230400, 921600};
+    constexpr ulong baudRates[] = {115200, 9600, 19200, 38400, 57600, 230400, 921600};
 
-    for (const uint32_t baud : baudRates)
+    for (const ulong baud : baudRates)
     {
         if (baud == serialBaud) continue;
 
@@ -268,7 +268,7 @@ std::tuple<bool, uint32_t> Modem::autoBaud(const uint32_t timeoutMs)
     return {false, 0};
 }
 
-bool Modem::finishInit(const char* simPin, const uint32_t detectedBaud)
+bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
 {
     // If the modem is at a different baud than our target, move it.
     if (detectedBaud != serialBaud)
@@ -294,7 +294,7 @@ bool Modem::finishInit(const char* simPin, const uint32_t detectedBaud)
     return true;
 }
 
-bool Modem::connectNetwork(const size_t retries)
+bool Modem::connectNetwork(const uint retries)
 {
     fileLog.infoln("Connecting modem to network");
 
@@ -304,7 +304,7 @@ bool Modem::connectNetwork(const size_t retries)
         return true;
     }
 
-    for (size_t attempt = 0; attempt <= retries; ++attempt)
+    for (uint attempt = 0; attempt <= retries; ++attempt)
     {
         fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
@@ -323,7 +323,7 @@ bool Modem::connectNetwork(const size_t retries)
 }
 
 
-bool Modem::connectGPRS(const size_t retries)
+bool Modem::connectGPRS(const uint retries)
 {
     fileLog.infoln("Connecting GPRS...");
 
@@ -333,7 +333,7 @@ bool Modem::connectGPRS(const size_t retries)
         return true;
     }
 
-    for (size_t attempt = 0; attempt <= retries; ++attempt)
+    for (uint attempt = 0; attempt <= retries; ++attempt)
     {
         fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
@@ -349,7 +349,7 @@ bool Modem::connectGPRS(const size_t retries)
     return false;
 }
 
-bool Modem::ensureNetworkConnection(const size_t maxRetries, const bool connectNetworkFirst)
+bool Modem::ensureNetworkConnection(const uint maxRetries, const bool connectNetworkFirst)
 {
     // yes connecting GPRS first and network later is very important. Otherwise, reconnecting doesn't work!
 
@@ -395,7 +395,7 @@ bool Modem::disconnectNetwork()
     return success;
 }
 
-ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32_t streamLen)
+ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const size_t streamLen)
 {
     const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {
                                                   {"Content-Type", "application/octet-stream"}
@@ -404,9 +404,9 @@ ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const uint32
 }
 
 UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const size_t streamLen,
-                                               const size_t retries)
+                                               const uint retries)
 {
-    uint32_t attemptNo = 0;
+    uint attemptNo = 0;
 
     do
     {
@@ -429,7 +429,7 @@ UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& str
 }
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& f, const bool deleteIfSuccess,
-                                                    const bool deleteAfterRetrying, const size_t retries)
+                                                    const bool deleteAfterRetrying, const uint retries)
 {
     if (!f)
     {
@@ -486,7 +486,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& 
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const char* filePath,
                                                     const bool deleteIfSuccess, const bool deleteAfterRetrying,
-                                                    const size_t retries)
+                                                    const uint retries)
 {
     if (!LittleFS.exists(filePath))
     {

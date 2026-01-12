@@ -73,9 +73,9 @@ namespace StorageManager
         return exists(RFID_FILE_PATH);
     }
 
-    void logDirTree(const char* dirname, size_t maxDepth);
+    void logDirTree(const char* dirname, uint maxDepth);
 
-    void logFilesystemTree(size_t maxDepth);
+    void logFilesystemTree(uint maxDepth);
 
     void logFilesystemsInformation();
 

@@ -28,7 +28,7 @@ struct LogSink
 class Log
 {
 public:
-    using SinkID = size_t;
+    using SinkID = uint;
 
     SinkID addOutputStream(Stream& stream, const String& name, bool timestamps, bool colorize, LoggingLevel minLevel,
                            bool flushOnError = false, bool flushOnEveryLine = false);

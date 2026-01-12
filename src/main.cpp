@@ -18,11 +18,11 @@
 
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
-unsigned long nextWatchdogResetMs;
-unsigned long nextGPSUpdate;
-unsigned long restartTargetMs;
+ulong nextWatchdogResetMs;
+ulong nextGPSUpdate;
+ulong restartTargetMs;
 
-unsigned long lastLogin, lastLogout; // These are volatile
+ulong lastLogin, lastLogout; // These are volatile
 
 void checkNFCTag()
 {
@@ -37,7 +37,7 @@ void checkNFCTag()
         break;
     }
 
-    const unsigned long firstScanMs = millis();
+    const ulong firstScanMs = millis();
 
     if (RFIDs::isRegisteredRFID(rfidUid))
     {
@@ -65,12 +65,12 @@ void checkNFCTag()
     }
 
     // Wait for 2 seconds for the card to be removed
-    constexpr size_t waitForRemovalMs = 2000;
+    constexpr uint waitForRemovalMs = 2000;
     while (millis() - firstScanMs < waitForRemovalMs)
         delay(10);
 
     // Then check again for two 1 second if a card is present
-    constexpr size_t waitForScanMs = 1000;
+    constexpr uint waitForScanMs = 1000;
     bool scannedDuplicate = false;
     while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs)
     {
@@ -86,12 +86,12 @@ void checkNFCTag()
     // If it scanned the same card twice wait another 3 seconds for it to be removed
     // and indicate a cooldown via the LED. The LED starts full brightness cyan and fades out
 
-    constexpr size_t showLedMs = 3000;
-    const unsigned long s = millis();
+    constexpr uint showLedMs = 3000;
+    const ulong s = millis();
 
     while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs + showLedMs)
     {
-        const unsigned long t = millis() - s;
+        const ulong t = millis() - s;
         const uint8_t gb = t >= showLedMs ? 0 : 255 - t * 255 / showLedMs;
         statusLed.setColor((gb << 8) | gb);
     }
@@ -108,7 +108,7 @@ void calculateNextRestartTime()
     modem.getNetworkTime(nullptr, nullptr, nullptr, &hour, &minute, &second, nullptr);
 
     // Calculate milliseconds since midnight
-    const unsigned long timeOfDayInMs = (hour * 3600 + minute * 60 + second) * 1000;
+    const ulong timeOfDayInMs = (hour * 3600 + minute * 60 + second) * 1000;
 
     if (timeOfDayInMs < TARGET_TIME_FOR_ESP_RESTART)
     {

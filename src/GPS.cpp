@@ -19,7 +19,7 @@ bool GPS::getGpsDataAndWriteToFile()
     return success;
 }
 
-void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const size_t retries) const
+void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries) const
 {
     fileLog.infoln("Uploading GPS log " + String(fileUploadEndpoint));
     Modem::uploadFileAndDelete(fileUploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);

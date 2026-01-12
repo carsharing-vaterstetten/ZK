@@ -56,9 +56,9 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     uint8_t buffer[writeBufferSize];
 
-    const uint64_t uploadStartMs = millis();
+    const ulong uploadStartMs = millis();
 
-    uint32_t totalBytesRead = 0;
+    size_t totalBytesRead = 0;
 
     while (request.body.available() && totalBytesRead < request.bodyLength)
     {
@@ -67,8 +67,8 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
         size_t wrote = httpClient->write(buffer, bytesRead);
 
-        constexpr size_t maxWriteRetries = 100;
-        size_t retry = 0;
+        constexpr uint maxWriteRetries = 100;
+        uint retry = 0;
 
         for (; retry < maxWriteRetries && wrote == 0; ++retry)
         {
@@ -82,7 +82,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         }
     }
 
-    const uint32_t uploadTimeMs = millis() - uploadStartMs;
+    const uint uploadTimeMs = millis() - uploadStartMs;
 
     httpClient->endRequest();
 
@@ -112,13 +112,13 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-size_t ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
+uint ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
 {
     WdClient& downloadStream = resp.body;
 
     uint8_t buf[readBufferSize];
 
-    size_t downloaded = 0;
+    uint downloaded = 0;
 
     while (downloadStream.connected() || downloadStream.available() > 0)
     {

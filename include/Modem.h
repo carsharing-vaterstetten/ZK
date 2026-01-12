@@ -41,7 +41,7 @@ class Modem
 {
 protected:
     bool modemIsAwake = false, gpsIsEnabled = false;
-    unsigned long serialBaud;
+    ulong serialBaud;
     int8_t rxPin, txPin;
 
     TinyGsmSim7000 gsmModem;
@@ -49,18 +49,18 @@ protected:
     HardwareSerial& serial;
 
     bool beginSleep();
-    std::tuple<bool, uint32_t> autoBaud(uint32_t timeoutMs);
-    bool connectNetwork(size_t retries);
-    bool connectGPRS(size_t retries);
+    std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
+    bool connectNetwork(uint retries);
+    bool connectGPRS(uint retries);
     bool beginHot(const char* simPin);
-    bool beginCold(const char* simPin, size_t retries);
-    bool finishInit(const char* simPin, uint32_t detectedBaud);
+    bool beginCold(const char* simPin, uint retries);
+    bool finishInit(const char* simPin, ulong detectedBaud);
     static void forcePowerCycle();
 
 public:
     TinyGsmSim7000::GsmClientSim7000 gsmClient;
 
-    Modem(HardwareSerial& hwSerial, uint32_t serialBaud, int8_t rxPin, int8_t txPin);
+    Modem(HardwareSerial& hwSerial, ulong serialBaud, int8_t rxPin, int8_t txPin);
 
     bool powerOff();
     static void powerOn();
@@ -68,18 +68,18 @@ public:
     static void turnOff();
     bool requestSleep();
 
-    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, size_t retries = 2);
-    bool ensureNetworkConnection(size_t maxRetries = 2, bool connectNetworkFirst = true);
+    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
+    bool ensureNetworkConnection(uint maxRetries = 2, bool connectNetworkFirst = true);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
-    static ApiResponse uploadData(const char* endpoint, Stream& stream, uint32_t streamLen);
+    static ApiResponse uploadData(const char* endpoint, Stream& stream, size_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
-                                                   size_t retries);
+                                                   uint retries);
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, File& f, bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, size_t retries);
+                                                        bool deleteAfterRetrying, uint retries);
     static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath,
                                                         bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, size_t retries);
+                                                        bool deleteAfterRetrying, uint retries);
 
     bool disconnectNetwork();
     bool enableGPS();

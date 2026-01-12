@@ -4,14 +4,14 @@
 
 #include "Globals.h"
 
-size_t WatchdogHandler::getCurrentTimeout() const
+uint WatchdogHandler::getCurrentTimeout() const
 {
     return currentTimeout;
 }
 
 /// This function configures and initializes the TWDT. If the TWDT is already initialized when this function is called, this function will update the TWDT's timeout period
 /// @param timeout Timeout period of TWDT in seconds
-esp_err_t WatchdogHandler::setTimeout(const size_t timeout)
+esp_err_t WatchdogHandler::setTimeout(const uint timeout)
 {
     esp_task_wdt_reset(); // Reset watchdog to ensure it does not immediately trigger when setting to a lower timeout
     const esp_err_t watchdog_init_err = esp_task_wdt_init(timeout, true);

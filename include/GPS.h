@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <cstddef>
+#include <sys/types.h>
 
 #pragma pack(push, 1)
 struct GPS_DATA_t
@@ -33,7 +33,7 @@ class GPS
 public:
     explicit GPS(const char* filePath, const char* endpoint);
 
-    void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, size_t retries) const;
+    void uploadFileAndDelete(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries) const;
     static bool getGpsDataAndWriteToFile();
     bool flush();
 };
