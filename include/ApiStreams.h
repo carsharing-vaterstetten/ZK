@@ -80,7 +80,7 @@ public:
 
     size_t write(const uint8_t* buf, const size_t size) override
     {
-        if (!valid) return 0;
+        if (!valid || size == 0) return 0;
         WatchdogHandler::taskWDTReset();
         return HttpClient::write(buf, size);
     }
@@ -88,20 +88,21 @@ public:
     int read() override
     {
         if (!valid) return -1;
-        WatchdogHandler::taskWDTReset();
-        return HttpClient::read();
+        const int read = HttpClient::read();
+        if (read > -1) WatchdogHandler::taskWDTReset();
+        return read;
     }
 
     int read(uint8_t* buf, const size_t size) override
     {
-        if (!valid) return -1;
+        if (!valid || size == 0) return -1;
         WatchdogHandler::taskWDTReset();
         return HttpClient::read(buf, size);
     }
 
     unsigned int readBytes(char* buf, const size_t size) override
     {
-        if (!valid) return 0;
+        if (!valid || size == 0) return 0;
         WatchdogHandler::taskWDTReset();
         return HttpClient::readBytes(buf, size);
     }
