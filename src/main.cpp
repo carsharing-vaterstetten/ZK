@@ -203,14 +203,13 @@ void setup()
 {
     // Start serial communication
     Serial.begin(USB_SERIAL_BAUD);
-    while (!Serial)
-    {
-    }
+    while (!Serial) {}
 
-#if ENABLE_SERIAL_LOGGING
-    fileLog.addOutputStream(Serial, "", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
-    serialOnlyLog.addOutputStream(Serial, "Serial", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
-#endif
+    if constexpr (ENABLE_SERIAL_LOGGING)
+    {
+        fileLog.addOutputStream(Serial, "", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
+        serialOnlyLog.addOutputStream(Serial, "Serial", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
+    }
 
     // Start watchdog
     watchdogHandler.setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
@@ -244,11 +243,11 @@ void setup()
     Serial1.setRxBufferSize(2048);
     Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
 
-#if USE_DEFAULT_CONFIG
-    fileLog.infoln("Using default config");
-#else
-    loadConfig(); // We need the config for the Modem
-#endif
+    if constexpr (USE_DEFAULT_CONFIG)
+        fileLog.infoln("Using default config");
+    else
+        loadConfig(); // We need the config for the Modem
+
     fileLog.infoln("Loaded config: " + config->toString());
 
 
@@ -276,17 +275,17 @@ void setup()
     api.begin(config->server, config->serverPort, modemIMEI, config->serverPassword);
 
     // Do the connection speed test before any up-/downloads
-#if GIVE_CONNECTION_SPEED_ESTIMATE
-    HelperUtils::performConnectionSpeedTest(CONNECTION_SPEED_TEST_FILE_SIZE);
-#endif
+    if constexpr (GIVE_CONNECTION_SPEED_ESTIMATE)
+        HelperUtils::performConnectionSpeedTest(CONNECTION_SPEED_TEST_FILE_SIZE);
 
     // Now we are ready to check for a firmware update
-#if CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT
-    statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
-    FirmwareUpdater::doUpdateIfAvailable();
-#else
-    fileLog.infoln("Skipped firmware update check");
-#endif
+    if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
+    {
+        statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
+        FirmwareUpdater::doUpdateIfAvailable();
+    }
+    else
+        fileLog.infoln("Skipped firmware update check");
 
     cardReader.begin();
 
@@ -336,20 +335,20 @@ void loop()
         else
         {
             nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_STANDING;
-#if RECORD_GPS_WHILE_STANDING
-            checkGPS();
-#endif
+            if constexpr (RECORD_GPS_WHILE_STANDING)
+                checkGPS();
         }
     }
 
     if (millis() - lastLogin > 20000 && millis() - lastLogout > 20000)
     {
-#if !RECORD_GPS_WHILE_STANDING
-        if (modem.isGPSEnabled() && !(accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
+        if constexpr (!RECORD_GPS_WHILE_STANDING)
         {
-            modem.disableGPS();
+            if (modem.isGPSEnabled() && !(accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
+            {
+                modem.disableGPS();
+            }
         }
-#endif
 
         modem.requestSleep();
     }
