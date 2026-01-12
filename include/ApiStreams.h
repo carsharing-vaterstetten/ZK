@@ -2,7 +2,6 @@
 
 #include <map>
 #include <HttpClient.h>
-
 #include "WatchdogHandler.h"
 
 enum ApiHttpMethod { GET, POST, PUT, DELETE };
@@ -26,33 +25,51 @@ public:
     int available() override { return 1; }
     int read() override { return static_cast<int>(random(0, 256)); }
     int peek() override { return static_cast<int>(random(0, 256)); }
-
-    void flush() override
-    {
-    }
-
+    void flush() override {}
     size_t write(uint8_t) override { return 1; }
 };
 
 inline RandomStream randomStream{};
+
+class NullClient final : public Client
+{
+public:
+    // Client API
+    int connect(IPAddress, uint16_t) override { return 0; }
+    int connect(const char*, uint16_t) override { return 0; }
+
+    void stop() override {}
+
+    uint8_t connected() override { return 0; }
+    explicit operator bool() override { return false; }
+
+    // Stream/Print API
+    size_t write(uint8_t) override { return 0; }
+    size_t write(const uint8_t*, size_t) override { return 0; }
+    int available() override { return 0; }
+    int read() override { return -1; }
+    int read(uint8_t*, size_t) override { return -1; }
+    int peek() override { return -1; }
+    void flush() override {}
+};
+
+// Accessor to ensure single instance exists before usage
+inline Client& getNullClientBase()
+{
+    static NullClient instance;
+    return instance;
+}
 
 class WdClient final : public HttpClient
 {
 public:
     bool valid;
 
-    WdClient(Client& client, const String& host, const uint16_t port) : HttpClient(client, host, port), valid(true)
-    {
-    }
+    WdClient(Client& client, const String& host, const uint16_t port) : HttpClient(client, host, port), valid(true) {}
 
-    explicit WdClient(const HttpClient& other) : HttpClient(other), valid(true)
-    {
-    }
+    explicit WdClient(const HttpClient& other) : HttpClient(other), valid(true) {}
 
-    // Safe “invalid client”
-    WdClient() : HttpClient(*(Client*)nullptr, "", 0), valid(false)
-    {
-    }
+    WdClient() : HttpClient(getNullClientBase(), "", 0), valid(false) {}
 
     size_t write(const uint8_t b) override
     {
@@ -99,9 +116,7 @@ public:
     size_t bodyLength;
 
     HttpBase(std::map<String, String> headers, const size_t bodyLength)
-        : headers(std::move(headers)), bodyLength(bodyLength)
-    {
-    }
+        : headers(std::move(headers)), bodyLength(bodyLength) {}
 };
 
 class HttpResponse : public HttpBase
@@ -111,14 +126,10 @@ public:
     const int responseCode;
 
     HttpResponse(const int responseCode, std::map<String, String> headers, WdClient& body, const size_t length)
-        : HttpBase(std::move(headers), length), body(body), responseCode(responseCode)
-    {
-    }
+        : HttpBase(std::move(headers), length), body(body), responseCode(responseCode) {}
 
     HttpResponse(const int responseCode, WdClient& body, const size_t length)
-        : HttpBase({}, length), body(body), responseCode(responseCode)
-    {
-    }
+        : HttpBase({}, length), body(body), responseCode(responseCode) {}
 };
 
 class HttpRequest : public HttpBase
@@ -154,15 +165,11 @@ public:
 
     ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
                 const uint32_t uploadTimeMs, const bool valid)
-        : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(valid)
-    {
-    }
+        : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(valid) {}
 
     ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
                 const uint32_t uploadTimeMs)
-        : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(true)
-    {
-    }
+        : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(true) {}
 
     static ApiResponse failed()
     {
