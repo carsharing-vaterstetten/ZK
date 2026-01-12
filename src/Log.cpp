@@ -67,28 +67,28 @@ void Log::appendMsgToStream(const LogSink& sink, const String& timestampStr, con
     if (sink.name && sink.name[0] != '\0') line += "[" + String(sink.name) + "] ";
     else line += " ";
 
-    if (sink.colorize && level >= ERROR) line += BACKGROUND_COLOR_RED;
+    if (sink.colorize && level >= LoggingLevel::ERROR) line += BACKGROUND_COLOR_RED;
     line += text;
-    if (sink.colorize && level >= ERROR) line += COLOR_RESET;
+    if (sink.colorize && level >= LoggingLevel::ERROR) line += COLOR_RESET;
 
     stream.println(line);
 
-    if (sink.flushOnEveryLine || (sink.flushOnError && level >= ERROR)) stream.flush();
+    if (sink.flushOnEveryLine || (sink.flushOnError && level >= LoggingLevel::ERROR)) stream.flush();
 }
 
 String Log::getLoggingLevelChar(const LoggingLevel level)
 {
     switch (level)
     {
-    case DEBUG:
+    case LoggingLevel::DEBUG:
         return "D";
-    case INFO:
+    case LoggingLevel::INFO:
         return "I";
-    case WARNING:
+    case LoggingLevel::WARNING:
         return "W";
-    case ERROR:
+    case LoggingLevel::ERROR:
         return "E";
-    case CRITICAL:
+    case LoggingLevel::CRITICAL:
         return "C";
     default:
         throw std::invalid_argument("Invalid logging level");
@@ -99,15 +99,15 @@ String Log::getLoggingLevelColor(const LoggingLevel level)
 {
     switch (level)
     {
-    case DEBUG:
+    case LoggingLevel::DEBUG:
         return COLOR_GREEN;
-    case INFO:
+    case LoggingLevel::INFO:
         return COLOR_BLUE;
-    case WARNING:
+    case LoggingLevel::WARNING:
         return COLOR_YELLOW;
-    case ERROR:
+    case LoggingLevel::ERROR:
         return COLOR_RED;
-    case CRITICAL:
+    case LoggingLevel::CRITICAL:
         return COLOR_MAGENTA;
     default:
         throw std::invalid_argument("Invalid logging level");

@@ -5,7 +5,7 @@
 #include <vector>
 #include <WString.h>
 
-enum LoggingLevel
+enum class LoggingLevel
 {
     DEBUG,
     INFO,
@@ -20,7 +20,7 @@ struct LogSink
     String name;
     bool timestamps = true;
     bool colorize = false;
-    LoggingLevel minLevel = DEBUG;
+    LoggingLevel minLevel = LoggingLevel::DEBUG;
     bool flushOnError = false;
     bool flushOnEveryLine = false;
 };
@@ -37,44 +37,44 @@ public:
 
     void debugln(const String& msg) const
     {
-        logMsgln(msg, DEBUG);
+        logMsgln(msg, LoggingLevel::DEBUG);
     }
 
     void infoln(const String& msg) const
     {
-        logMsgln(msg, INFO);
+        logMsgln(msg, LoggingLevel::INFO);
     }
 
     void warningln(const String& msg) const
     {
-        logMsgln(msg, WARNING);
+        logMsgln(msg, LoggingLevel::WARNING);
     }
 
     void errorln(const String& msg) const
     {
-        logMsgln(msg, ERROR);
+        logMsgln(msg, LoggingLevel::ERROR);
     }
 
     void criticalln(const String& msg) const
     {
-        logMsgln(msg, CRITICAL);
+        logMsgln(msg, LoggingLevel::CRITICAL);
     }
 
     void logInfoOrLevelln(bool success, const String& ifSuccess, const String& ifError, LoggingLevel level) const;
 
     void logInfoOrWarningln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, WARNING);
+        logInfoOrLevelln(success, ifSuccess, ifError, LoggingLevel::WARNING);
     }
 
     void logInfoOrErrorln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, ERROR);
+        logInfoOrLevelln(success, ifSuccess, ifError, LoggingLevel::ERROR);
     }
 
     void logInfoOrCriticalErrorln(const bool success, const String& ifSuccess, const String& ifError) const
     {
-        logInfoOrLevelln(success, ifSuccess, ifError, CRITICAL);
+        logInfoOrLevelln(success, ifSuccess, ifError, LoggingLevel::CRITICAL);
     }
 
     void flush() const;

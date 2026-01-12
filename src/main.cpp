@@ -296,7 +296,7 @@ void setup()
     RFIDs::downloadGPSTrackingConsentedRFIDs();
     RFIDs::load();
 
-    HelperUtils::logRAMUsage(fileLog, INFO);
+    HelperUtils::logRAMUsage(fileLog, LoggingLevel::INFO);
     StorageManager::logFilesystemsInformation();
 
     // Almost everything is done and the created log can be uploaded

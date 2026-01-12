@@ -4,7 +4,7 @@
 #include <HttpClient.h>
 #include "WatchdogHandler.h"
 
-enum ApiHttpMethod { GET, POST, PUT, DELETE };
+enum class ApiHttpMethod { GET, POST, PUT, DELETE };
 
 class EmptyStream final : public Stream
 {
@@ -148,12 +148,12 @@ public:
 
     static HttpRequest get(const char* path, std::map<String, String> headers = {})
     {
-        return HttpRequest{path, GET, std::move(headers), emptyStream, 0};
+        return HttpRequest{path, ApiHttpMethod::GET, std::move(headers), emptyStream, 0};
     }
 
     static HttpRequest post(const char* path, Stream& body, const size_t size, std::map<String, String> headers = {})
     {
-        return HttpRequest{path, POST, std::move(headers), body, size};
+        return HttpRequest{path, ApiHttpMethod::POST, std::move(headers), body, size};
     }
 };
 

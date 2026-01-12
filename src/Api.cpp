@@ -26,16 +26,16 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     switch (request.method)
     {
-    case GET:
+    case ApiHttpMethod::GET:
         err = httpClient->get(request.path);
         break;
-    case POST:
+    case ApiHttpMethod::POST:
         err = httpClient->post(request.path);
         break;
-    case PUT:
+    case ApiHttpMethod::PUT:
         err = httpClient->put(request.path);
         break;
-    case DELETE:
+    case ApiHttpMethod::DELETE:
         err = httpClient->del(request.path);
         break;
     }
