@@ -49,7 +49,6 @@ protected:
     HardwareSerial& serial;
 
     bool beginSleep();
-    std::tuple<bool, uint32_t> autoBaud();
     std::tuple<bool, uint32_t> autoBaud(uint32_t timeoutMs);
     bool connectNetwork(size_t retries);
     bool connectGPRS(size_t retries);

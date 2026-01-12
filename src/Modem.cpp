@@ -171,31 +171,6 @@ bool Modem::disableGPS()
     return success;
 }
 
-std::tuple<bool, uint32_t> Modem::autoBaud()
-{
-    fileLog.debugln("Baud rate scanning...");
-    serial.updateBaudRate(serialBaud);
-    if (gsmModem.testAT(20000))
-        return {true, serialBaud};
-
-    // Higher values are certainly unstable
-    constexpr uint32_t baudRates[] = {9600, 115200, 19200, 38400, 57600, 230400, 921600};
-
-    for (const uint32_t baudRate : baudRates)
-    {
-        serial.updateBaudRate(baudRate);
-        if (!gsmModem.testAT(1000))
-        {
-            fileLog.debugln("Baud rate " + String(baudRate) + " failed");
-            continue;
-        }
-
-        return {true, baudRate};
-    }
-
-    return {false, 0};
-}
-
 bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const size_t retries)
 {
     gprsUser = user;
