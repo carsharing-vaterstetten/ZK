@@ -167,7 +167,9 @@ void checkGPS()
         return;
     }
 
-    GPS::getGpsDataAndWriteToFile();
+    GPS_DATA_t gpsData;
+    modem.getGPS(gpsData);
+    gps.writeData(gpsData);
 }
 
 void restartRoutine()
@@ -181,7 +183,7 @@ void restartRoutine()
 
     if (StorageManager::exists(GPS_FILE_PATH))
     {
-        gps.uploadFileAndDelete(true, true, 2);
+        gps.uploadFileAndBeginNew(true, true, 2);
     }
     else
     {
@@ -240,6 +242,7 @@ void setup()
     statusLed.setStatusColor(StatusColor::InitializationPhase);
     nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     accessControl.begin();
+    gps.begin();
     Serial1.setRxBufferSize(2048);
     Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
 

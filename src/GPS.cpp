@@ -4,59 +4,53 @@
 
 #include "Globals.h"
 
-GPS::GPS(const char* filePath, const char* endpoint) : localFilePath(filePath), fileUploadEndpoint(endpoint)
+GPS::GPS(const char* localFilePath, const char* uploadEndpoint) : localFilePath(localFilePath),
+                                                                  uploadEndpoint(uploadEndpoint) {}
+
+bool GPS::begin()
 {
+    if (gpsFile) return true;
+    gpsFile = LittleFS.open(localFilePath, FILE_APPEND, true);
+    return gpsFile;
 }
 
-bool GPS::getGpsDataAndWriteToFile()
+bool GPS::uploadFileAndBeginNew(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
 {
-    GPS_DATA_t data;
-    const bool success = modem.getGPS(data);
+    fileLog.infoln("Uploading GPS log (" + String(fileSize()) + " B)");
 
-    if (success)
-        gps.logDataBuffered(data);
+    if (gpsFile) gpsFile.close();
 
-    return success;
+    const UploadFileAndRetryResult uploadResult = Modem::uploadFileAndDelete(
+        uploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
+
+    gpsFile = LittleFS.open(localFilePath, FILE_APPEND, true);
+
+    return gpsFile && (uploadResult == UploadFileAndRetryResult::SUCCESS || uploadResult ==
+        UploadFileAndRetryResult::SUCCESS_AFTER_RETRYING);
 }
 
-void GPS::uploadFileAndDelete(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries) const
+bool GPS::writeData(const GPS_DATA_t& data)
 {
-    fileLog.infoln("Uploading GPS log " + String(fileUploadEndpoint));
-    Modem::uploadFileAndDelete(fileUploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
-}
-
-bool GPS::writeLogBufferToFile() const
-{
-    const auto dataBytes = reinterpret_cast<const uint8_t*>(&logBuffer);
-    File f = LittleFS.open(localFilePath, FILE_APPEND, true);
-    if (!f)
-    {
-        fileLog.errorln("Failed to open GPS log file for appending");
-        return false;
-    }
-    f.write(dataBytes, GPS_DATA_SIZE * logBufferIndex);
-    f.close();
-    return true;
-}
-
-void GPS::logDataBuffered(const GPS_DATA_t& data)
-{
-    logBuffer[logBufferIndex] = data;
-    ++logBufferIndex;
-
-    if (logBufferIndex >= GPS_LOG_BUFFER_SIZE)
-    {
-        writeLogBufferToFile();
-        logBufferIndex = 0;
-    }
+    if (!gpsFile) return false;
+    const auto dataBytes = reinterpret_cast<const uint8_t*>(&data);
+    const size_t dataWritten = gpsFile.write(dataBytes, sizeof(GPS_DATA_t));
+    return dataWritten == sizeof(GPS_DATA_t);
 }
 
 bool GPS::flush()
 {
-    const bool success = writeLogBufferToFile();
-    if (success)
-    {
-        logBufferIndex = 0;
-    }
-    return success;
+    if (!gpsFile) return false;
+    gpsFile.flush();
+    return true;
+}
+
+void GPS::end()
+{
+    if (!gpsFile) return;
+    gpsFile.close();
+}
+
+size_t GPS::fileSize() const
+{
+    return gpsFile ? gpsFile.size() : 0;
 }
