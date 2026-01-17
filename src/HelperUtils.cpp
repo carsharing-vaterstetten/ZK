@@ -313,10 +313,10 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
     fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
 
     const ulong downloadStartMs = millis();
-    api.fetch(resp, emptyStream);
+    const uint downloadedBytes = api.fetch(resp, emptyStream);
     const uint downloadTimeMs = millis() - downloadStartMs;
 
-    const uint estimatedDownloadSpeed = resp.bodyLength * 1000 / downloadTimeMs;
+    const uint estimatedDownloadSpeed = downloadedBytes * 1000 / downloadTimeMs;
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 

@@ -3,9 +3,7 @@
 #include "Globals.h"
 
 ApiClient::ApiClient(const size_t writeBufferSize, const size_t readBufferSize) : writeBufferSize(writeBufferSize),
-    readBufferSize(readBufferSize)
-{
-}
+    readBufferSize(readBufferSize) {}
 
 void ApiClient::begin(const String& server, const uint16_t port, const String& username, const String& password)
 {
@@ -16,9 +14,18 @@ void ApiClient::begin(const String& server, const uint16_t port, const String& u
     isReady = true;
 }
 
-ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders) const
+ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders,
+                                   const ulong timeout) const
 {
     if (!isReady || httpClient == nullptr) return ApiResponse::failed();
+
+    const ulong requestStart = millis();
+
+    // Helper lambda to check timeout
+    auto hasTimedOut = [&]() -> bool
+    {
+        return (millis() - requestStart) > timeout * 1000;
+    };
 
     httpClient->beginRequest();
 
@@ -62,6 +69,12 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     while (request.body.available() && totalBytesRead < request.bodyLength)
     {
+        if (hasTimedOut())
+        {
+            serialOnlyLog.errorln("Timeout during body upload");
+            return ApiResponse::failed();
+        }
+
         const size_t bytesRead = request.body.readBytes(buffer, writeBufferSize);
         totalBytesRead += bytesRead;
 
@@ -72,6 +85,12 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
         for (; retry < maxWriteRetries && wrote == 0; ++retry)
         {
+            if (hasTimedOut())
+            {
+                serialOnlyLog.errorln("Timeout during write retry");
+                return ApiResponse::failed();
+            }
+
             yield();
             wrote = httpClient->write(buffer, bytesRead);
         }
@@ -84,7 +103,11 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     const uint uploadTimeMs = millis() - uploadStartMs;
 
+    if (hasTimedOut()) return ApiResponse::failed();
+
     httpClient->endRequest();
+
+    if (hasTimedOut()) return ApiResponse::failed();
 
     const int responseCode = httpClient->responseStatusCode();
 
@@ -97,7 +120,10 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     std::map<String, String> headers{};
 
     while (!ignoreResponseHeaders && httpClient->headerAvailable())
+    {
+        if (hasTimedOut()) return ApiResponse::failed();
         headers[httpClient->readHeaderName()] = httpClient->readHeaderValue();
+    }
 
     const int contentLength = httpClient->contentLength();
 
@@ -112,7 +138,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-uint ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
+uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout) const
 {
     WdClient& downloadStream = resp.body;
 
@@ -120,8 +146,16 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
 
     uint downloaded = 0;
 
+    const ulong start = millis();
+
     while (downloadStream.connected() || downloadStream.available() > 0)
     {
+        if (millis() - start > timeout * 1000)
+        {
+            serialOnlyLog.errorln("Timeout during fetch");
+            break;
+        }
+
         int len = downloadStream.read(buf, readBufferSize);
         if (len > 0)
         {
@@ -131,5 +165,6 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination) const
         else
             yield(); // Prevent CPU spinning if the modem is mid-packet
     }
+
     return downloaded;
 }
