@@ -361,10 +361,18 @@ void loop()
 
         if (contiguousFailedSleepAttempts < 10)
         {
-            if (modem.requestSleep())
-                contiguousFailedSleepAttempts = 0;
-            else
+            switch (modem.requestSleep())
+            {
+            case SleepRequestResult::FailedBecauseModemIsStillInUse:
+            case SleepRequestResult::AlreadySleeping:
+                break;
+            case SleepRequestResult::Failed:
                 ++contiguousFailedSleepAttempts;
+                break;
+            case SleepRequestResult::Success:
+                contiguousFailedSleepAttempts = 0;
+                break;
+            }
         }
     }
 }

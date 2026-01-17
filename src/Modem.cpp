@@ -8,9 +8,7 @@
 
 Modem::Modem(HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin, const int8_t txPin) :
     serialBaud(serialBaud),
-    rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem)
-{
-}
+    rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem) {}
 
 void Modem::powerOn()
 {
@@ -102,12 +100,15 @@ bool Modem::beginSleep()
 
 /// Only sends the modem to sleep if no functions are needed
 /// Returns true if the modem was sent to sleep. Returns false if it cannot sleep or already sleeps.
-bool Modem::requestSleep()
+SleepRequestResult Modem::requestSleep()
 {
-    if (gpsIsEnabled || !modemIsAwake)
-        return false;
+    if (!modemIsAwake)
+        return SleepRequestResult::AlreadySleeping;
 
-    return beginSleep();
+    if (gpsIsEnabled)
+        return SleepRequestResult::FailedBecauseModemIsStillInUse;
+
+    return beginSleep() ? SleepRequestResult::Success : SleepRequestResult::Failed;
 }
 
 bool Modem::enableGPS()

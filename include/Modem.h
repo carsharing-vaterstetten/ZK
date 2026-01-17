@@ -37,6 +37,14 @@ enum class UploadFileAndRetryResult
     SUCCESS_AFTER_RETRYING,
 };
 
+enum class SleepRequestResult
+{
+    FailedBecauseModemIsStillInUse,
+    Failed,
+    Success,
+    AlreadySleeping,
+};
+
 class Modem
 {
 protected:
@@ -66,7 +74,7 @@ public:
     static void powerOn();
     static void turnOn();
     static void turnOff();
-    bool requestSleep();
+    SleepRequestResult requestSleep();
 
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
     bool ensureNetworkConnection(uint maxRetries = 2, bool connectNetworkFirst = true);
