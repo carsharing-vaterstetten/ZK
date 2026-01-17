@@ -21,6 +21,8 @@
 ulong nextWatchdogResetMs;
 ulong nextGPSUpdate;
 ulong restartTargetMs;
+uint contiguousFailedSleepAttempts = 0;
+uint contiguousFailedDisableGPSAttempts = 0;
 
 ulong lastLogin, lastLogout; // These are volatile
 
@@ -347,12 +349,22 @@ void loop()
     {
         if constexpr (!RECORD_GPS_WHILE_STANDING)
         {
-            if (modem.isGPSEnabled() && !(accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
+            if (contiguousFailedDisableGPSAttempts < 2 && modem.isGPSEnabled() && !(accessControl.isLoggedIn() &&
+                accessControl.hasPermissionForGPSTracking()))
             {
-                modem.disableGPS();
+                if (modem.disableGPS())
+                    contiguousFailedDisableGPSAttempts = 0;
+                else
+                    ++contiguousFailedDisableGPSAttempts;
             }
         }
 
-        modem.requestSleep();
+        if (contiguousFailedSleepAttempts < 10)
+        {
+            if (modem.requestSleep())
+                contiguousFailedSleepAttempts = 0;
+            else
+                ++contiguousFailedSleepAttempts;
+        }
     }
 }

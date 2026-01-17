@@ -154,9 +154,10 @@ bool Modem::disableGPS()
 
     gsmModem.sendAT("+CGPIO=0,48,1,0");
 
-    if (gsmModem.waitResponse(10000L) != 1)
+    if (gsmModem.waitResponse(5000L) != 1)
     {
         fileLog.errorln("Set GPS Power LOW failed");
+        return false;
     }
 
     const bool success = gsmModem.disableGPS();
