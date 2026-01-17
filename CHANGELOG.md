@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.1]
+
+- Kleinere Fehlerbehebungen, Log sollte nicht mehr ewig hochgeladen werden.
+
 ## [1.2.0]
 
 - Optimierter Cold- und Hot-Start: Das System fährt schneller hoch und stellt zuverlässiger eine Verbindung zum Modem
