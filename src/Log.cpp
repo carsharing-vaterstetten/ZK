@@ -48,8 +48,6 @@ void Log::flush() const
         s.print.get().flush();
 }
 
-uint64_t mst = 0;
-
 void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const LoggingLevel level,
                           const String& text)
 {
