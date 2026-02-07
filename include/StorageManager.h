@@ -12,16 +12,6 @@ namespace StorageManager
 
     bool mountLittleFS();
 
-    inline File openLog(const char* mode, const bool create = false)
-    {
-        return LittleFS.open(LOG_FILE_PATH, mode, create);
-    }
-
-    inline bool removeLog()
-    {
-        return LittleFS.remove(LOG_FILE_PATH);
-    }
-
     inline File openRFIDs(const char* mode, const bool create = false)
     {
         return LittleFS.open(RFID_FILE_PATH, mode, create);
@@ -78,6 +68,4 @@ namespace StorageManager
     void logFilesystemTree(uint maxDepth);
 
     void logFilesystemsInformation();
-
-    void saveLog();
 }

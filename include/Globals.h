@@ -1,6 +1,5 @@
 #pragma once
 
-#include <LittleFS.h>
 #include <WString.h>
 
 #include "Config.h"
@@ -14,6 +13,7 @@
 #include "LED.h"
 #include "Log.h"
 #include "NFCCardReader.h"
+#include "SwappableFile.h"
 
 inline String modemIMEI = "";
 inline Modem modem{Serial1, MODEM_SERIAL_BAUD, MODEM_RX_PIN, MODEM_TX_PIN};
@@ -35,4 +35,4 @@ inline Log fileLog{};
 inline SPIClass nfcSpi{NFC_SPI};
 inline NFCCardReader cardReader{nfcSpi, NFC_SS};
 inline WatchdogHandler watchdogHandler;
-inline File logFile;
+inline SwappableFile swLog{PRIMARY_LOG_FILE_PATH, SECONDARY_LOG_FILE_PATH};

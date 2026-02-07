@@ -198,7 +198,7 @@ void restartRoutine()
 
     // NO MORE FILE LOGGING FROM HERE
 
-    logFile.close();
+    swLog.end();
 
     ESP.restart();
 }
@@ -211,8 +211,8 @@ void setup()
 
     if constexpr (ENABLE_SERIAL_LOGGING)
     {
-        fileLog.addOutputStream(Serial, "", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
-        serialOnlyLog.addOutputStream(Serial, "Serial", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
+        fileLog.addOutputSink(Serial, "", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
+        serialOnlyLog.addOutputSink(Serial, "Serial", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
     }
 
     // Start watchdog
@@ -224,8 +224,8 @@ void setup()
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
 
-    logFile = StorageManager::openLog(FILE_APPEND, true);
-    fileLog.addOutputStream(logFile, "", true, false, FLASH_LOGGING_LEVEL, true, true);
+    swLog.begin(true);
+    fileLog.addOutputSink(swLog, "", true, false, FLASH_LOGGING_LEVEL, true, true);
 
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file

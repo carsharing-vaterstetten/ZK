@@ -10,7 +10,6 @@
 
 #include "Modem.h"
 #include "LocalConfig.h"
-#include "StorageManager.h"
 
 
 std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)
@@ -104,9 +103,7 @@ LocalConfig HelperUtils::requestConfig()
         Serial.println("Please enter config data in this format:");
         Serial.println(exampleConfigFormat);
 
-        while (!Serial.available())
-        {
-        }
+        while (!Serial.available()) {}
 
         inputString = Serial.readStringUntil('\n');
         inputString.trim();
@@ -281,11 +278,16 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
 
 void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
 {
-    const size_t fileSize = logFile.size();
-    fileLog.infoln("Uploading log file (" + String(fileSize) + " B)");
-    logFile.close();
-    Modem::uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying, retries);
-    logFile = StorageManager::openLog(FILE_APPEND);
+    const std::optional<FileInfo> fileInfo = swLog.getCurrentFileInfo();
+    if (!fileInfo.has_value()) return;
+
+    swLog.swapToB();
+
+    Modem::uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, PRIMARY_LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying,
+                               retries);
+
+    // Primary log is now deleted and the secondary log "becomes" the primary.
+    swLog.replaceAwithBAndSwapToA();
 }
 
 void HelperUtils::performConnectionSpeedTest(const size_t fileSize)

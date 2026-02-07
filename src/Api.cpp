@@ -24,7 +24,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     // Helper lambda to check timeout
     auto hasTimedOut = [&]() -> bool
     {
-        return (millis() - requestStart) > timeout * 1000;
+        return millis() - requestStart > timeout * 1000;
     };
 
     httpClient->beginRequest();
@@ -49,7 +49,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     if (err != 0)
     {
-        serialOnlyLog.errorln("Request failed with code " + String(err));
+        fileLog.errorln("Request failed with code " + String(err));
         return ApiResponse::failed();
     }
 
@@ -71,7 +71,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     {
         if (hasTimedOut())
         {
-            serialOnlyLog.errorln("Timeout during body upload");
+            fileLog.errorln("Timeout during body upload");
             return ApiResponse::failed();
         }
 
@@ -87,7 +87,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         {
             if (hasTimedOut())
             {
-                serialOnlyLog.errorln("Timeout during write retry");
+                fileLog.errorln("Timeout during write retry");
                 return ApiResponse::failed();
             }
 
@@ -113,7 +113,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     if (responseCode <= 0)
     {
-        serialOnlyLog.errorln("Response code " + String(responseCode));
+        fileLog.errorln("Response code " + String(responseCode));
         return ApiResponse::failed();
     }
 
@@ -152,7 +152,7 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
     {
         if (millis() - start > timeout * 1000)
         {
-            serialOnlyLog.errorln("Timeout during fetch");
+            fileLog.errorln("Timeout during fetch");
             break;
         }
 
