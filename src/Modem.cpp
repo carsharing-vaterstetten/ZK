@@ -440,33 +440,32 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& 
     }
 
     const size_t fileSize = f.size();
+    const String filePath = f.path();
 
     if (fileSize <= 0)
     {
-        fileLog.infoln("File is empty. Nothing to upload");
+        fileLog.infoln(filePath + " is empty. Nothing to upload");
         return UploadFileAndRetryResult::FILE_IS_EMPTY;
     }
 
-    const String filePath = f.path();
+    fileLog.infoln("Uploading " + filePath + " (" + String(fileSize) + " B)");
 
     const UploadAndRetryResult uploadResult = uploadDataAndRetry(endpoint, f, fileSize, retries);
 
-    f.close();
-
-    // Log to file
     switch (uploadResult)
     {
     case UploadAndRetryResult::FAILED:
-        fileLog.errorln("Failed to upload file");
+        fileLog.errorln("Failed to upload " + filePath);
         break;
     case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
     case UploadAndRetryResult::SUCCESS:
-        fileLog.infoln("File uploaded successfully");
+        fileLog.infoln(filePath + " uploaded successfully");
         break;
     }
 
     if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
     {
+        f.close();
         const bool removeSuccess = StorageManager::remove(filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
@@ -497,8 +496,9 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const 
     }
 
     File f = LittleFS.open(filePath, FILE_READ);
-
-    return uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
+    const auto res = uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
+    f.close(); // it is possible that file may not have been closed
+    return res;
 }
 
 time_t Modem::getUnixTimestamp()
