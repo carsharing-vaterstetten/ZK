@@ -9,6 +9,7 @@
 #define COLOR_YELLOW  "\033[33m"
 #define COLOR_BLUE    "\033[34m"
 #define COLOR_MAGENTA "\033[35m"
+#define COLOR_GRAY    "\033[37m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
 Log::SinkID Log::addOutputSink(Print& p, const String& name, const bool timestamps, const bool colorize,
@@ -74,7 +75,7 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
 
     if (written - 1 != line.length())
     {
-        Serial.println("Failed to write '" + line + "' to sink '" + sink.name + "'");
+        Serial.println(COLOR_GRAY "Failed to write '" + line + "' to sink '" + sink.name + "'" COLOR_RESET);
     }
 
     if (sink.flushOnEveryLine || (sink.flushOnError && level >= LoggingLevel::ERROR)) p.flush();
