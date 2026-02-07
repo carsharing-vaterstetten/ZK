@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <Stream.h>
+#include <Print.h>
 #include <vector>
 #include <WString.h>
 
@@ -16,7 +16,7 @@ enum class LoggingLevel
 
 struct LogSink
 {
-    std::reference_wrapper<Stream> stream;
+    std::reference_wrapper<Print> print;
     String name;
     bool timestamps = true;
     bool colorize = false;
@@ -30,7 +30,7 @@ class Log
 public:
     using SinkID = uint;
 
-    SinkID addOutputStream(Stream& stream, const String& name, bool timestamps, bool colorize, LoggingLevel minLevel,
+    SinkID addOutputSink(Print& p, const String& name, bool timestamps, bool colorize, LoggingLevel minLevel,
                            bool flushOnError = false, bool flushOnEveryLine = false);
 
     void logMsgln(const String& msg, LoggingLevel level) const;
@@ -82,7 +82,7 @@ public:
 protected:
     std::vector<LogSink> sinks;
 
-    static void appendMsgToStream(const LogSink& sink, const String& timestampStr, LoggingLevel level, const String& text);
+    static void appendMsgToSink(const LogSink& sink, const String& timestampStr, LoggingLevel level, const String& text);
 
     static String getLoggingLevelChar(LoggingLevel level);
     static String getLoggingLevelColor(LoggingLevel level);

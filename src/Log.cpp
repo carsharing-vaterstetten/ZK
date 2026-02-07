@@ -11,10 +11,10 @@
 #define COLOR_MAGENTA "\033[35m"
 #define BACKGROUND_COLOR_RED "\033[41m"
 
-Log::SinkID Log::addOutputStream(Stream& stream, const String& name, const bool timestamps, const bool colorize,
-                                 const LoggingLevel minLevel, const bool flushOnError, const bool flushOnEveryLine)
+Log::SinkID Log::addOutputSink(Print& p, const String& name, const bool timestamps, const bool colorize,
+                               const LoggingLevel minLevel, const bool flushOnError, const bool flushOnEveryLine)
 {
-    sinks.push_back({stream, name, timestamps, colorize, minLevel, flushOnError, flushOnEveryLine});
+    sinks.push_back({p, name, timestamps, colorize, minLevel, flushOnError, flushOnEveryLine});
     return sinks.size() - 1;
 }
 
@@ -37,7 +37,7 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
         if (level >= s.minLevel)
         {
             const String timestampStr = s.timestamps ? "[" + HelperUtils::millisToIsoString(timestampMs) + "]" : "";
-            appendMsgToStream(s, timestampStr, level, msg);
+            appendMsgToSink(s, timestampStr, level, msg);
         }
     }
 }
@@ -45,15 +45,16 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
 void Log::flush() const
 {
     for (const LogSink& s : sinks)
-        s.stream.get().flush();
+        s.print.get().flush();
 }
 
 uint64_t mst = 0;
 
-void Log::appendMsgToStream(const LogSink& sink, const String& timestampStr, const LoggingLevel level,
-                            const String& text)
+void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const LoggingLevel level,
+                          const String& text)
 {
-    Stream& stream = sink.stream.get();
+    Print& p = sink.print.get();
+
     String line;
 
     if (sink.timestamps) line += timestampStr;
@@ -71,9 +72,14 @@ void Log::appendMsgToStream(const LogSink& sink, const String& timestampStr, con
     line += text;
     if (sink.colorize && level >= LoggingLevel::ERROR) line += COLOR_RESET;
 
-    stream.println(line);
+    const size_t written = p.print(line + "\n");
 
-    if (sink.flushOnEveryLine || (sink.flushOnError && level >= LoggingLevel::ERROR)) stream.flush();
+    if (written - 1 != line.length())
+    {
+        Serial.println("Failed to write '" + line + "' to sink '" + sink.name + "'");
+    }
+
+    if (sink.flushOnEveryLine || (sink.flushOnError && level >= LoggingLevel::ERROR)) p.flush();
 }
 
 String Log::getLoggingLevelChar(const LoggingLevel level)
