@@ -58,8 +58,7 @@ protected:
 
     bool beginSleep();
     std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
-    bool connectNetwork(uint retries);
-    bool connectGPRS(uint retries);
+    bool connectGPRSAndNetwork(uint retries);
     bool beginHot(const char* simPin);
     bool beginCold(const char* simPin, uint retries);
     bool finishInit(const char* simPin, ulong detectedBaud);
@@ -77,7 +76,7 @@ public:
     SleepRequestResult requestSleep();
 
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
-    bool ensureNetworkConnection(uint maxRetries = 2, bool connectNetworkFirst = true);
+    bool ensureNetworkConnection(uint maxRetries = 2);
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const char* endpoint, Stream& stream, size_t streamLen);

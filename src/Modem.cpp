@@ -179,6 +179,8 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
     gprsPassword = password;
     apn = netApn;
 
+    wakeup();
+
     const esp_reset_reason_t reason = esp_reset_reason();
 
     // Check if we are coming from a soft restart or a hard power-up
@@ -296,13 +298,15 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
     return true;
 }
 
-bool Modem::connectNetwork(const uint retries)
+bool Modem::connectGPRSAndNetwork(const uint retries)
 {
-    fileLog.infoln("Connecting modem to network");
+    fileLog.infoln("Connecting GPRS and network...");
 
-    if (gsmModem.isNetworkConnected())
+    bool gprsSuccess = gsmModem.isGprsConnected(), networkSuccess = gsmModem.isNetworkConnected();
+
+    if (gprsSuccess && networkSuccess)
     {
-        fileLog.infoln("Network already connected");
+        fileLog.infoln("GPRS and network are already connected");
         return true;
     }
 
@@ -310,54 +314,29 @@ bool Modem::connectNetwork(const uint retries)
     {
         fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
+        if (!gprsSuccess)
+        {
+            fileLog.infoln("Connecting GPRS...");
+            gprsSuccess = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
+            fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
+        }
 
-        fileLog.infoln("Waiting for network...");
+        if (!networkSuccess)
+        {
+            fileLog.infoln("Connecting network...");
+            networkSuccess = gsmModem.waitForNetwork();
+            fileLog.logInfoOrWarningln(networkSuccess, "Network connected successfully", "Failed to connect GPRS");
+        }
 
-        const bool connectSuccess = gsmModem.waitForNetwork();
-
-        fileLog.logInfoOrWarningln(connectSuccess, "The modem is now connected to the network",
-                                   "The modem did not connect to the network even after waiting");
-
-        if (connectSuccess) return true;
+        if (gprsSuccess && networkSuccess) return true;
     }
 
     return false;
 }
 
-
-bool Modem::connectGPRS(const uint retries)
+bool Modem::ensureNetworkConnection(const uint maxRetries)
 {
-    fileLog.infoln("Connecting GPRS...");
-
-    if (gsmModem.isGprsConnected())
-    {
-        fileLog.infoln("GPRS already connected");
-        return true;
-    }
-
-    for (uint attempt = 0; attempt <= retries; ++attempt)
-    {
-        fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
-
-        const bool gprsSuccess = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
-
-        String msgPrefix = "Try " + String(attempt + 1) + " of " + String(retries + 1) + ": ";
-        fileLog.logInfoOrWarningln(gprsSuccess, msgPrefix + "GPRS connected successfully",
-                                   msgPrefix + "Failed to connect GPRS");
-
-        if (gprsSuccess) return true;
-    }
-
-    return false;
-}
-
-bool Modem::ensureNetworkConnection(const uint maxRetries, const bool connectNetworkFirst)
-{
-    // yes connecting GPRS first and network later is very important. Otherwise, reconnecting doesn't work!
-
-    if (connectNetworkFirst) connectNetwork(maxRetries);
-    connectGPRS(maxRetries);
-    if (!connectNetworkFirst) connectNetwork(maxRetries);
+    connectGPRSAndNetwork(maxRetries);
 
     // Wait for signal
     int16_t signalQuality = gsmModem.getSignalQuality();
