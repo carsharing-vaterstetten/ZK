@@ -287,7 +287,14 @@ void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRe
                                retries);
 
     // Primary log is now deleted and the secondary log "becomes" the primary.
-    swLog.replaceAwithBAndSwapToA();
+    swLog.appendBToAAndSwapToA();
+}
+
+void HelperUtils::uploadLogAndDeleteAfterRetryingIfStorageIsFull(const uint retries, const size_t freeStorageMin,
+                                                                 const bool deleteIfSuccess)
+{
+    const size_t freeBytes = LittleFS.totalBytes() - LittleFS.usedBytes();
+    uploadLog(deleteIfSuccess, freeBytes < freeStorageMin, retries);
 }
 
 void HelperUtils::performConnectionSpeedTest(const size_t fileSize)

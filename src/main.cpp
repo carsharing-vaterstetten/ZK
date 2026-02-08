@@ -192,7 +192,7 @@ void restartRoutine()
         fileLog.infoln("No GPS data recorded. Nothing to upload");
     }
 
-    HelperUtils::uploadLog(true, false, 10); // Log will be deleted at next startup anyway
+    HelperUtils::uploadLogAndDeleteAfterRetryingIfStorageIsFull();
 
     fileLog.infoln("Restarting now");
 
@@ -305,7 +305,7 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    HelperUtils::uploadLog(true, true, 1);
+    HelperUtils::uploadLogAndDeleteAfterRetryingIfStorageIsFull();
     statusLed.clear();
 
     // Power saving
