@@ -5,6 +5,7 @@
 #include <FS.h>
 #include <optional>
 #include <WString.h>
+#include <rom/rtc.h>
 
 #include "Log.h"
 #include "TinyGsmGPRS.tpp"
@@ -31,7 +32,7 @@ namespace HelperUtils
     bool isSuccessfulResponse(int statusCode);
     String simStatusToString(SimStatus status);
     String millisToIsoString(uint64_t ms);
-    String getResetReasonHumanReadable(int reset_reason);
+    String getResetReasonHumanReadable(RESET_REASON reset_reason);
     String toBase64(const uint8_t* data, size_t len);
     void logRAMUsage(const Log& log, LoggingLevel level);
     void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
