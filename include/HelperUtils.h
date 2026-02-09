@@ -36,7 +36,7 @@ namespace HelperUtils
     String toBase64(const uint8_t* data, size_t len);
     void logRAMUsage(const Log& log, LoggingLevel level);
     void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
-    void uploadLogAndDeleteAfterRetryingIfStorageIsFull(uint retries = 2, size_t freeStorageMin = 128 * 1024,
+    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(uint retries = 2,
                                                         bool deleteIfSuccess = true);
     void performConnectionSpeedTest(size_t fileSize);
     bool syncTimeWithModem(uint maxRetries);

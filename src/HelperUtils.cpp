@@ -291,11 +291,21 @@ void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRe
     swLog.appendBToAAndSwapToA();
 }
 
-void HelperUtils::uploadLogAndDeleteAfterRetryingIfStorageIsFull(const uint retries, const size_t freeStorageMin,
-                                                                 const bool deleteIfSuccess)
+void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const uint retries, const bool deleteIfSuccess)
 {
-    const size_t freeBytes = LittleFS.totalBytes() - LittleFS.usedBytes();
-    uploadLog(deleteIfSuccess, freeBytes < freeStorageMin, retries);
+    const size_t total = LittleFS.totalBytes();
+    const size_t freeBytes = total - LittleFS.usedBytes();
+
+    const bool storageIsTight = freeBytes < total / 10; // <10% free
+    bool deletePressure = storageIsTight;
+
+    if (const std::optional<FileInfo> logInfo = swLog.getCurrentFileInfo())
+    {
+        const bool logIsLarge = logInfo->size > total / 5; // >20% of fs
+        deletePressure = deletePressure && logIsLarge;
+    }
+
+    uploadLog(deleteIfSuccess, deletePressure, retries);
 }
 
 void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
