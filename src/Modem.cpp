@@ -298,7 +298,7 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
     return true;
 }
 
-bool Modem::connectGPRSAndNetwork(const uint retries)
+bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries)
 {
     fileLog.infoln("Connecting GPRS and network...");
 
@@ -310,23 +310,34 @@ bool Modem::connectGPRSAndNetwork(const uint retries)
         return true;
     }
 
+    auto gprs = [this]()-> bool
+    {
+        fileLog.infoln("Connecting GPRS...");
+        const bool success = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
+        fileLog.logInfoOrWarningln(success, "GPRS connected successfully", "Failed to connect GPRS");
+        return success;
+    };
+
+    auto network = [this]()-> bool
+    {
+        fileLog.infoln("Connecting network...");
+        const bool success = gsmModem.waitForNetwork();
+        fileLog.logInfoOrWarningln(success, "Network connected successfully", "Failed to connect network");
+        return success;
+    };
+
     for (uint attempt = 0; attempt <= retries; ++attempt)
     {
         fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
-        if (!gprsSuccess)
-        {
-            fileLog.infoln("Connecting GPRS...");
-            gprsSuccess = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
-            fileLog.logInfoOrWarningln(gprsSuccess, "GPRS connected successfully", "Failed to connect GPRS");
-        }
+        if (tryGprsFirst && !gprsSuccess)
+            gprsSuccess = gprs();
 
         if (!networkSuccess)
-        {
-            fileLog.infoln("Connecting network...");
-            networkSuccess = gsmModem.waitForNetwork();
-            fileLog.logInfoOrWarningln(networkSuccess, "Network connected successfully", "Failed to connect GPRS");
-        }
+            networkSuccess = network();
+
+        if (!tryGprsFirst && !gprsSuccess)
+            gprsSuccess = gprs();
 
         if (gprsSuccess && networkSuccess) return true;
     }
@@ -334,9 +345,9 @@ bool Modem::connectGPRSAndNetwork(const uint retries)
     return false;
 }
 
-bool Modem::ensureNetworkConnection(const uint maxRetries)
+bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetries)
 {
-    connectGPRSAndNetwork(maxRetries);
+    connectGPRSAndNetwork(tryGprsFirst, maxRetries);
 
     // Wait for signal
     int16_t signalQuality = gsmModem.getSignalQuality();

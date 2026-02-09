@@ -230,7 +230,8 @@ void setup()
     // Logging to files is now possible
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
     fileLog.infoln("Running firmware version " FIRMWARE_VERSION);
-    fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(0)));
+    const RESET_REASON cpu0ResetReason = rtc_get_reset_reason(0);
+    fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(cpu0ResetReason));
     fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
 
     // Cleanup
@@ -258,7 +259,8 @@ void setup()
 
     modem.begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
                 config->apn.c_str());
-    modem.ensureNetworkConnection();
+    // In my tests connecting network first, then gprs is best after a hard reset (e.g. code upload). The other order after a ESP.restart().
+    modem.ensureNetworkConnection(cpu0ResetReason != POWERON_RESET);
     HelperUtils::syncTimeWithModem(20);
 
 
