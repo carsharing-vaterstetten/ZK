@@ -13,7 +13,7 @@
 - Modem baut die Netzwerkverbindung nun zuverlässig auf.
 - Diverse Bugfixes und Code-Refactoring.
 
-> [!INFO]
+> [!IMPORTANT]
 > Wenn diese Firmware später (z. B. per OTA) zurückgerollt wird, muss die Modem-Baudrate in dieser Version auf 115200
 > gesetzt werden, damit die Kommunikation korrekt funktioniert.
 
