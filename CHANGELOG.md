@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0]
+
+- Gleichzeitiges Lesen und Schreiben ins Log ist jetzt möglich.
+- Schlägt das Hochladen des Logs fehl, wird es nicht gelöscht – außer wenn das Log sehr groß ist und der verfügbare
+  Speicher knapp wird.
+- Zuverlässigerer Verbindungsaufbau zum Netzwerk.
+- Log-Schreibfehler werden jetzt über die serielle Schnittstelle ausgegeben.
+
+> [!IMPORTANT]
+> Statt `log.log` gibt es jetzt `primary.log` und `secondary.log`. Ein veraltetes `log.log` wird nicht hochgeladen!
+
 ## [1.2.1]
 
 - Kleinere Fehlerbehebungen, Log sollte nicht mehr ewig hochgeladen werden.
