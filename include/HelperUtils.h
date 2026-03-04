@@ -1,26 +1,43 @@
-// HelperUtils.h
-#ifndef HELPERUTILS_H
-#define HELPERUTILS_H
+#pragma once
 
-#include <Arduino.h>
-#include <Config.h>
-#include <Intern.h>
-#include <WiFi.h>
-#include <EEPROM.h>
+// ReSharper disable once CppUnusedIncludeDirective
+#include <cstdint>
+#include <FS.h>
+#include <optional>
+#include <WString.h>
+#include <rom/rtc.h>
 
-class HelperUtils
+#include "Log.h"
+#include "TinyGsmGPRS.tpp"
+
+#define STR_HELPER(s) #s
+#define STR(s) STR_HELPER(s)
+
+
+class Log;
+class LocalConfig;
+
+namespace HelperUtils
 {
-public:
-    static String getMacAddress();
-    static String toUpperCase(const String &str);
-    static void initEEPROM(Config &config);
-    static void saveConfigToEEPROM(Config &config);
-    static bool loadConfigFromEEPROM(Config &config);
-    static void parseConfigString(String &inputString, Config &config);
-    static void resetEEPROM();
-    static String getResetReasonHumanReadable(esp_reset_reason_t reset_reason);
-    static esp_err_t setWatchdog(uint32_t watchdog_timeout);
-    static esp_err_t subscribeTaskToWatchdog();
-};
+    static constexpr uint dateTimeStrLength = 32;
 
-#endif
+    std::optional<LocalConfig> parseConfigString(const String& inputString);
+    LocalConfig requestConfig();
+    bool md5File(File file, uint8_t out[16]);
+    String md5ToHex(const uint8_t md5[16]);
+    time_t dateTimeToUnixTimestamp(int year, int month, int day, int hour, int minute, int second,
+                                   float timezone);
+    void dateTimeToString(char* buf, int year, int month, int day, int hour, int minute, int second);
+    uint64_t systemTimeMillisecondsSinceEpoche();
+    bool isSuccessfulResponse(int statusCode);
+    String simStatusToString(SimStatus status);
+    String millisToIsoString(uint64_t ms);
+    String getResetReasonHumanReadable(RESET_REASON reset_reason);
+    String toBase64(const uint8_t* data, size_t len);
+    void logRAMUsage(const Log& log, LoggingLevel level);
+    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(uint retries = 2,
+                                                        bool deleteIfSuccess = true);
+    void performConnectionSpeedTest(size_t fileSize);
+    bool syncTimeWithModem(uint maxRetries);
+}

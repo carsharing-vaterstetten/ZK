@@ -1,28 +1,14 @@
+#pragma once
 
-#ifndef Intern_H
-#define Intern_H
+#define FIRMWARE_VERSION "1.3.0-main"
 
-#define FIRMWARE_VERSION "0.5.1"
-#define RFID_FILE_NAME "/rfids.txt"
-#define FIRMWARE_FILE_NAME "/firmware.bin"
-#define LOG_FILE_NAME "/logs.json"
+// Local paths
+#define RFID_FILE_PATH "/rfids.bin"
+#define TMP_RFID_FILE_PATH "/tmp_rfids.bin"
+#define PRIMARY_LOG_FILE_PATH "/primary.log"
+#define SECONDARY_LOG_FILE_PATH "/secondary.log"
+#define GPS_FILE_PATH "/gps.bin"
+#define GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH "/rfids_gps_consent.bin"
 
-extern String MAC_ADDRESS;
-
-#define CONFIG_START_ADDRESS 0
-#define CONFIG_VERSION 1
-
-struct Config
-{
-  uint8_t version; // Wird verwendet, um eine Versionsnummer oder Signatur zu speichern
-  char apn[32];
-  char gprsUser[32];
-  char gprsPass[32];
-  char GSM_PIN[16];
-  char server[64];
-  int port;
-  char username[32];
-  char password[64];
-};
-
-#endif
+#define CONFIG_VERSION "1"
+#define CONFIG_PREFS_NAME "Config v" CONFIG_VERSION

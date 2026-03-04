@@ -1,399 +1,514 @@
-// Modem.cpp
+#include <esp_system.h>
 
+#include "HelperUtils.h"
 #include "Modem.h"
+#include "Api.h"
+#include "Globals.h"
+#include "StorageManager.h"
 
-#define SerialMon Serial
-#define SerialAT Serial1
+Modem::Modem(HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin, const int8_t txPin) :
+    serialBaud(serialBaud),
+    rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem) {}
 
-HttpClient *Modem::http = nullptr;
-
-extern Config config;
-
-Modem::Modem() : modem(SerialAT), client(modem) {}
-
-bool Modem::init(bool secoundTry)
+void Modem::powerOn()
 {
-    SerialMon.println("Initializing modem...");
+    pinMode(BOARD_POWERON_PIN, OUTPUT);
+    digitalWrite(BOARD_POWERON_PIN, HIGH);
+    fileLog.infoln("Modem power on");
+}
 
-#ifdef TINY_GSM_T_PCIE
-    pinMode(POWER_PIN, OUTPUT);
-    digitalWrite(POWER_PIN, HIGH);
-    SerialMon.println("Set POWER_PIN HIGH");
-#endif
+void Modem::turnOn()
+{
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    fileLog.infoln("Modem turned on");
+}
 
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, LOW);
-    SerialMon.println("Set PWR_PIN LOW");
-    delay(1000);
-    digitalWrite(PWR_PIN, HIGH);
-    SerialMon.println("Set PWR_PIN HIGH");
+void Modem::turnOff()
+{
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    fileLog.infoln("Modem turned off");
+}
 
-    SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-    SerialMon.println("SerialAT started");
-    sleep(1);
+bool Modem::powerOff()
+{
+    fileLog.debugln("Powering off modem...");
+    const bool success = gsmModem.poweroff();
+    fileLog.logInfoOrErrorln(success, "Modem powered off successfully", "Failed to power off modem");
+    return success;
+}
 
-    modem.restart();
-    SerialMon.println("Modem restarted");
-    sleep(1);
 
-    String modemInfo = modem.getModemInfo();
-    SerialMon.println("Modem Info: " + modemInfo);
+void Modem::forcePowerCycle()
+{
+    fileLog.warningln("Forcing Modem Power Cycle...");
 
-    if (config.GSM_PIN && modem.getSimStatus() != 3)
+    digitalWrite(BOARD_POWERON_PIN, LOW); // Cut power completely (Mimic Hard Reset)
+    delay(2000); // Wait for capacitors to discharge
+    digitalWrite(BOARD_POWERON_PIN, HIGH); // Restore power
+    delay(500); // Wait for voltage to stabilize
+
+    fileLog.infoln("Modem power restored");
+}
+
+void Modem::wakeup()
+{
+    fileLog.debugln("Waking up modem");
+
+    if (modemIsAwake)
     {
-        modem.simUnlock(config.GSM_PIN);
+        fileLog.infoln("Modem already awake");
+        return;
     }
 
-    modem.gprsConnect(config.apn, config.gprsUser, config.gprsPass);
+    pinMode(MODEM_DTR_PIN, OUTPUT);
+    digitalWrite(MODEM_DTR_PIN, LOW);
+    // delay(2000);
+    gsmModem.sleepEnable(false);
+    modemIsAwake = true;
+    fileLog.debugln("Modem wakeup sent");
+}
 
-    SerialMon.print("Network status: ");
-    if (!modem.waitForNetwork())
+void Modem::wakeupAndWait(const uint32_t timeoutMs)
+{
+    wakeup();
+    gsmModem.testAT(timeoutMs);
+    fileLog.infoln("Modem awake and responsive");
+}
+
+bool Modem::beginSleep()
+{
+    pinMode(MODEM_DTR_PIN, OUTPUT);
+    digitalWrite(MODEM_DTR_PIN, HIGH);
+    const bool success = gsmModem.sleepEnable(true);
+    fileLog.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
+    if (success)
     {
-        SerialMon.println(" fail");
+        modemIsAwake = false;
     }
+    return success;
+}
 
-    if (modem.isNetworkConnected())
+/// Only sends the modem to sleep if no functions are needed
+/// Returns true if the modem was sent to sleep. Returns false if it cannot sleep or already sleeps.
+SleepRequestResult Modem::requestSleep()
+{
+    if (!modemIsAwake)
+        return SleepRequestResult::AlreadySleeping;
+
+    if (gpsIsEnabled)
+        return SleepRequestResult::FailedBecauseModemIsStillInUse;
+
+    return beginSleep() ? SleepRequestResult::Success : SleepRequestResult::Failed;
+}
+
+bool Modem::enableGPS()
+{
+    fileLog.debugln("Enabling GPS...");
+
+    if (gsmModem.isEnableGPS())
     {
-        SerialMon.println("Network connected");
+        gpsIsEnabled = true;
+        fileLog.debugln("GPS already enabled");
         return true;
+    }
+
+    gsmModem.sendAT("+CGPIO=0,48,1,1");
+
+    if (gsmModem.waitResponse(10000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power HIGH failed");
+    }
+
+    const bool success = gsmModem.enableGPS();
+
+    fileLog.logInfoOrCriticalErrorln(success, "Enabled GPS", "Failed to enable GPS");
+
+    if (success)
+    {
+        gpsIsEnabled = true;
+    }
+
+    return success;
+}
+
+
+bool Modem::disableGPS()
+{
+    fileLog.debugln("Disabling GPS...");
+
+    if (!gsmModem.isEnableGPS())
+    {
+        gpsIsEnabled = false;
+        fileLog.debugln("GPS already disabled");
+        return true;
+    }
+
+    gsmModem.sendAT("+CGPIO=0,48,1,0");
+
+    if (gsmModem.waitResponse(5000L) != 1)
+    {
+        fileLog.errorln("Set GPS Power LOW failed");
+        return false;
+    }
+
+    const bool success = gsmModem.disableGPS();
+
+    fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
+
+    if (success)
+    {
+        gpsIsEnabled = false;
+    }
+
+    return success;
+}
+
+bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
+{
+    gprsUser = user;
+    gprsPassword = password;
+    apn = netApn;
+
+    wakeup();
+
+    const esp_reset_reason_t reason = esp_reset_reason();
+
+    // Check if we are coming from a soft restart or a hard power-up
+    if (reason == ESP_RST_SW)
+    {
+        fileLog.infoln("Modem Hot Start");
+        if (beginHot(simPin)) return true;
+
+        fileLog.warningln("Hot Start failed, attempting Cold Start fallback...");
     }
     else
     {
-        if (!secoundTry)
-        {
-            return init(true);
-        }
+        fileLog.infoln("Modem Cold Start");
+    }
+
+    return beginCold(simPin, retries);
+}
+
+bool Modem::beginHot(const char* simPin)
+{
+    // Try the target baud rate immediately
+    auto [success, detectedBaud] = autoBaud(500);
+
+    if (success)
+    {
+        fileLog.infoln("Modem already active at " + String(detectedBaud) + " baud.");
+        return finishInit(simPin, detectedBaud);
+    }
+
+    return false;
+}
+
+bool Modem::beginCold(const char* simPin, const uint retries)
+{
+    for (uint attempt = 0; attempt <= retries; ++attempt)
+    {
+        fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
+
+        powerOn(); // BOARD_POWERON_PIN HIGH
+
+        // If the modem was already running, turnOff() ensures a clean start.
+        // If it was already off, this pulse might be ignored or act as a toggle.
+        turnOff();
+        delay(1000);
+        turnOn(); // Pulse PWRKEY to boot
+
+        // The SIM7000 takes ~4.5s to start its serial interface.
+        // We use autoBaud with a 10-second timeout to catch it as it wakes up.
+        auto [success, detectedBaud] = autoBaud(10000);
+
+        if (success)
+            return finishInit(simPin, detectedBaud);
+
+        fileLog.errorln("Modem failed to boot. Hard cycling power rail...");
+
+        // Physical recovery: Cut VCC rail to the modem
+        forcePowerCycle();
     }
     return false;
 }
 
-void Modem::end()
+std::tuple<bool, ulong> Modem::autoBaud(const uint32_t timeoutMs)
 {
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, LOW);
-    http->stop();
-    modem.gprsDisconnect();
-    SerialMon.println("Modem disconnected");
+    fileLog.debugln("Baud rate scanning...");
+
+    // 1. Try the user-defined serialBaud first
+    serial.updateBaudRate(serialBaud);
+    if (gsmModem.testAT(timeoutMs))
+        return {true, serialBaud};
+
+    // 2. Scan fallback baud rates if the first check failed
+    constexpr ulong baudRates[] = {115200, 9600, 19200, 38400, 57600, 230400, 921600};
+
+    for (const ulong baud : baudRates)
+    {
+        if (baud == serialBaud) continue;
+
+        serial.updateBaudRate(baud);
+        delay(20); // Give the UART hardware a moment to stabilize
+
+        if (gsmModem.testAT(500))
+        {
+            fileLog.debugln("Baud rate " + String(baud) + " SUCCESS");
+            return {true, baud};
+        }
+        fileLog.debugln("Baud rate " + String(baud) + " failed");
+    }
+
+    return {false, 0};
 }
 
-int Modem::sendRequest(String path, String method, String body)
+bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
 {
-    int err = 0;
-    if (http == nullptr)
+    // If the modem is at a different baud than our target, move it.
+    if (detectedBaud != serialBaud)
     {
-        http = new HttpClient(client, config.server, config.port);
+        fileLog.infoln("Switching modem baud from " + String(detectedBaud) + " to " + String(serialBaud));
+        gsmModem.setBaud(serialBaud);
+        delay(100);
+        serial.updateBaudRate(serialBaud);
+        delay(100);
     }
-    http->connectionKeepAlive();
-    http->beginRequest();
 
-    if (method == "GET")
+    if (!gsmModem.init(simPin))
     {
-        err = http->get(path);
-        http->sendBasicAuth(config.username, config.password);
+        fileLog.errorln("gsmModem.init() failed");
+        return false;
     }
-    else if (method == "POST")
-    {
-        err = http->post(path);
-        http->sendBasicAuth(config.username, config.password);
-        http->sendHeader("Content-Type", "application/json");
-        http->sendHeader("Content-Length", body.length());
-        http->beginBody();
 
-        const size_t chunkSize = 512;
-        size_t bodyLength = body.length();
-        for (size_t i = 0; i < bodyLength; i += chunkSize)
-        {
-            String chunk = body.substring(i, min(i + chunkSize, bodyLength));
-            http->print(chunk);
-        }
-    }
-    http->endRequest();
-    return err;
+    // Set standard LilyGo/SIM7000 configuration
+    gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
+    gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
+
+    fileLog.infoln("Modem successfully initialized.");
+    return true;
 }
 
-// Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
-// @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-String Modem::getLocalTime()
+bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries)
 {
-    String time = modem.getGSMDateTime(DATE_FULL);
-    return time;
-}
+    fileLog.infoln("Connecting GPRS and network...");
 
-String *Modem::getRfids(int &arraySize)
-{
-    SerialMon.print(F("Performing HTTPS GET request... "));
-    int err = sendRequest("/rfids/", "GET");
-    if (err != 0)
+    bool gprsSuccess = gsmModem.isGprsConnected(), networkSuccess = gsmModem.isNetworkConnected();
+
+    if (gprsSuccess && networkSuccess)
     {
-        SerialMon.println(F("failed to connect"));
-        SerialMon.println(err);
-        delay(10000);
-        return nullptr;
-    }
-
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-    if (!status)
-    {
-        SerialMon.println(F("no response"));
-        delay(10000);
-        http->stop();
-        return nullptr;
-    }
-
-    if (status != 200)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return nullptr;
-    }
-
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
-    {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
-    }
-    int contentLength = http->contentLength();
-    String responseBody = "";
-    if (contentLength > 0)
-    {
-        int readBytes = 0;
-        char buffer[128];
-        while (readBytes < contentLength)
-        {
-            int bytesToRead = http->readBytes(buffer, sizeof(buffer) - 1);
-            readBytes += bytesToRead;
-            buffer[bytesToRead] = '\0';
-            responseBody += buffer;
-        }
-    }
-
-    SerialMon.println(F("Response Body:"));
-    SerialMon.println(responseBody);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, responseBody);
-    if (error)
-    {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.f_str());
-        return nullptr;
-    }
-    JsonArray array = doc.as<JsonArray>();
-
-    arraySize = array.size();
-    String *rfidArray = new String[arraySize];
-
-    for (int i = 0; i < arraySize; i++)
-    {
-        rfidArray[i] = HelperUtils::toUpperCase(array[i]["rfid"].as<String>());
-    }
-
-    return rfidArray;
-}
-
-void printPercent(uint32_t readLength, uint32_t contentLength)
-{
-    if (contentLength != (uint32_t)-1)
-    {
-        SerialMon.print("\r ");
-        SerialMon.print((100.0 * readLength) / contentLength);
-        SerialMon.print('%');
-    }
-    else
-    {
-        SerialMon.println(readLength);
-    }
-}
-
-/// Make sure to increase the HW Watchdog timeout before calling this function or use `handleFirmwareUpdateWithWatchdog()`
-void Modem::firmwareCheckAndUpdateIfNeeded()
-{
-    JsonDocument body;
-    body["mac_address"] = MAC_ADDRESS;
-    body["firmware_version"] = FIRMWARE_VERSION;
-    serializeJsonPretty(body, SerialMon);
-
-    SerialMon.println("");
-
-    int err = sendRequest("/firmware/", "POST", body.as<String>());
-    if (err != 0)
-    {
-        SerialMon.println(F("failed to connect 'firmware'"));
-        SerialMon.println(err);
-        return;
-    }
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
-
-    if (!status)
-    {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return;
-    }
-    if (status == 200)
-    {
-        SerialMon.println("kein Update notwendig");
-        http->stop();
-        return;
-    }
-    if (status != 210)
-    {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return;
-    }
-    else
-    {
-        SerialMon.println(F("Response Headers:"));
-        while (http->headerAvailable())
-        {
-            String headerName = http->readHeaderName();
-            String headerValue = http->readHeaderValue();
-            SerialMon.println("    " + headerName + " : " + headerValue);
-        }
-
-        if (!SPIFFS.begin(true))
-        {
-            Serial.println("SPIFFS Mount Failed");
-            return;
-        }
-        if (SPIFFS.exists(FIRMWARE_FILE_NAME))
-        {
-            SPIFFS.remove(FIRMWARE_FILE_NAME);
-        }
-        File file = SPIFFS.open(FIRMWARE_FILE_NAME, FILE_WRITE);
-        if (!file)
-        {
-            Serial.println("Failed to open file for writing");
-            return;
-        }
-
-        SerialMon.println("Getting Firmware data starting ...");
-        int contentLength = http->contentLength();
-        const size_t bufferSize = 2048;
-        uint8_t buffer[bufferSize];
-        size_t totalBytesRead = 0;
-        unsigned long startTime = millis();
-        while (http->connected() || http->available())
-        {
-            if (http->available())
-            {
-                size_t bytesRead = http->readBytes(buffer, bufferSize);
-                file.write(buffer, bytesRead);
-                totalBytesRead += bytesRead;
-                float percentage = ((float)totalBytesRead * 100) / contentLength;
-                unsigned long elapsedTime = millis() - startTime;
-                SerialMon.printf("\rProgress: %.2f%% Speed: %.2fKB/s Elapsed Time: %lu ms", percentage, (float)totalBytesRead / elapsedTime, elapsedTime);
-                if (totalBytesRead >= contentLength)
-                {
-                    break;
-                }                
-            }
-        }
-        SerialMon.println("Total Bytes Read: " + String(totalBytesRead));
-        SerialMon.printf("\rProgress: %.2f%%", (float)totalBytesRead / contentLength * 100);
-        file.close();
-        http->stop();
-        SerialMon.println("File saved successfully");
-        SPIFFSUtils::performOTAUpdateFromSPIFFS();
-    }
-}
-
-void Modem::handleFirmwareUpdateWithWatchdog() {
-
-    // Increase the HW Watchdog timeout to allow for longer OTA updates
-
-    esp_err_t hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_OTA_UPDATE_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to set HW Watchdog for OTA update. OTA update will not be performed!");
-        return;
-    }
-
-    firmwareCheckAndUpdateIfNeeded();
-
-    // Reset the HW Watchdog timeout to the default value regardless of whether an update was performed or not
-    hwd_err = HelperUtils::setWatchdog(HW_WATCHDOG_DEFAULT_TIMEOUT);
-    if (hwd_err != ESP_OK) {
-        SerialMon.println("Failed to reset HW Watchdog timeout after OTA update.");
-    }
-}
-
-// liefert immer true zurück
-// rückgabe ist nur dafür da, damit der loop auf die funktion warten kann
-bool Modem::uploadLogs()
-{
-    if (!SPIFFS.begin())
-    {
-        SerialMon.println("SPIFFS Mount Failed.");
+        fileLog.infoln("GPRS and network are already connected");
         return true;
     }
 
-    File file = SPIFFS.open(LOG_FILE_NAME, FILE_READ);
-    if (!file)
+    auto gprs = [this]()-> bool
     {
-        SerialMon.println("File doesn't exist. Creating a new one.");
+        fileLog.infoln("Connecting GPRS...");
+        const bool success = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
+        fileLog.logInfoOrWarningln(success, "GPRS connected successfully", "Failed to connect GPRS");
+        return success;
+    };
+
+    auto network = [this]()-> bool
+    {
+        fileLog.infoln("Connecting network...");
+        const bool success = gsmModem.waitForNetwork();
+        fileLog.logInfoOrWarningln(success, "Network connected successfully", "Failed to connect network");
+        return success;
+    };
+
+    for (uint attempt = 0; attempt <= retries; ++attempt)
+    {
+        fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
+
+        if (tryGprsFirst && !gprsSuccess)
+            gprsSuccess = gprs();
+
+        if (!networkSuccess)
+            networkSuccess = network();
+
+        if (!tryGprsFirst && !gprsSuccess)
+            gprsSuccess = gprs();
+
+        if (gprsSuccess && networkSuccess) return true;
+    }
+
+    return false;
+}
+
+bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetries)
+{
+    connectGPRSAndNetwork(tryGprsFirst, maxRetries);
+
+    // Wait for signal
+    int16_t signalQuality = gsmModem.getSignalQuality();
+    int signalTry = 0;
+    for (; signalTry <= maxRetries && signalQuality == 99; ++signalTry)
+    {
+        fileLog.debugln("Waiting for signal...");
+        delay(2000);
+        signalQuality = gsmModem.getSignalQuality();
+    }
+
+    if (signalTry >= maxRetries)
+    {
+        fileLog.errorln("Could not get signal");
+        return false;
+    }
+
+    fileLog.debugln("Got signal");
+
+    return true;
+}
+
+bool Modem::disconnectNetwork()
+{
+    fileLog.debugln("Disconnecting GPRS...");
+
+    if (!gsmModem.isGprsConnected())
+    {
+        fileLog.infoln("GPRS already disconnected");
         return true;
     }
 
-    int contentLength = file.size();
-    if (contentLength == 0)
+    const bool success = gsmModem.gprsDisconnect();
+
+    fileLog.logInfoOrErrorln(success, "GPRS disconnected successfully", "GPRS failed to disconnect");
+
+    return success;
+}
+
+ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const size_t streamLen)
+{
+    const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {
+                                                  {"Content-Type", "application/octet-stream"}
+                                              });
+    return api.makeRequest(req, true);
+}
+
+UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const size_t streamLen,
+                                               const uint retries)
+{
+    uint attemptNo = 0;
+
+    do
     {
-        SerialMon.println("File is empty");
-        return true;
-    }
-    SerialMon.print("File size: ");
-    SerialMon.println(contentLength);
+        ApiResponse resp = uploadData(endpoint, stream, streamLen);
 
-    SerialMon.println("Uploading logs to server...");
-    int err = sendRequest("/logs/", "POST", file.readString());
-    if (err != 0)
+        if (resp.valid && resp.responseCode == 200)
+        {
+            return attemptNo == 0 ? UploadAndRetryResult::SUCCESS : UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
+        }
+
+        fileLog.errorln(
+            "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
+            " failed at uploading to " + endpoint);
+
+        ++attemptNo;
+    }
+    while (attemptNo <= retries);
+
+    return UploadAndRetryResult::FAILED;
+}
+
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& f, const bool deleteIfSuccess,
+                                                    const bool deleteAfterRetrying, const uint retries)
+{
+    if (!f)
     {
-        SerialMon.println(F("failed to connect 'logs'"));
-        SerialMon.println(err);
-        return true;
+        fileLog.errorln("Failed to open file");
+        return UploadFileAndRetryResult::FAILED_TO_OPEN_FILE;
     }
 
-    int status = http->responseStatusCode();
-    SerialMon.print(F("Response status code: "));
-    SerialMon.println(status);
+    const size_t fileSize = f.size();
+    const String filePath = f.path();
 
-    if (!status)
+    if (fileSize <= 0)
     {
-        SerialMon.println(F("no response"));
-        http->stop();
-        return true;
+        fileLog.infoln(filePath + " is empty. Nothing to upload");
+        return UploadFileAndRetryResult::FILE_IS_EMPTY;
     }
 
-    if (status != 201)
+    fileLog.infoln("Uploading " + filePath + " (" + String(fileSize) + " B)");
+
+    const UploadAndRetryResult uploadResult = uploadDataAndRetry(endpoint, f, fileSize, retries);
+
+    switch (uploadResult)
     {
-        SerialMon.println("unerwartete Antwort");
-        http->stop();
-        return true;
+    case UploadAndRetryResult::FAILED:
+        fileLog.errorln("Failed to upload " + filePath);
+        break;
+    case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
+    case UploadAndRetryResult::SUCCESS:
+        fileLog.infoln(filePath + " uploaded successfully");
+        break;
     }
 
-    SerialMon.println(F("Response Headers:"));
-    while (http->headerAvailable())
+    if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
     {
-        String headerName = http->readHeaderName();
-        String headerValue = http->readHeaderValue();
-        SerialMon.println("    " + headerName + " : " + headerValue);
+        f.close();
+        const bool removeSuccess = StorageManager::remove(filePath);
+        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
+                                 "Failed to delete " + filePath);
     }
 
-    SerialMon.println(F("Response Body:"));
-    while (http->available())
+    switch (uploadResult)
     {
-        SerialMon.write(http->read());
+    case UploadAndRetryResult::FAILED:
+        return UploadFileAndRetryResult::FAILED;
+    case UploadAndRetryResult::SUCCESS:
+        return UploadFileAndRetryResult::SUCCESS;
+    case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
+        return UploadFileAndRetryResult::SUCCESS_AFTER_RETRYING;
     }
 
-    http->stop();
-    file.close();
-    SPIFFS.remove(LOG_FILE_NAME);
-    SerialMon.println("Logs uploaded successfully");
+    // ReSharper disable once CppDFAUnreachableCode
+    throw std::invalid_argument("Invalid result");
+}
+
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const char* filePath,
+                                                    const bool deleteIfSuccess, const bool deleteAfterRetrying,
+                                                    const uint retries)
+{
+    if (!LittleFS.exists(filePath))
+    {
+        fileLog.errorln(String(filePath) + " does not exist");
+        return UploadFileAndRetryResult::FILE_DOES_NOT_EXIST;
+    }
+
+    File f = LittleFS.open(filePath, FILE_READ);
+    const auto res = uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
+    f.close(); // it is possible that file may not have been closed
+    return res;
+}
+
+time_t Modem::getUnixTimestamp()
+{
+    int year, month, day, hour, minute, second;
+    float timezone;
+    gsmModem.getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
+    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
+}
+
+bool Modem::getGPS(GPS_DATA_t& out)
+{
+    uint8_t status;
+    int year, month, day, hour, minute, second;
+    const bool success = gsmModem.getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
+                                         reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
+                                         &out.accuracy, &year, &month, &day, &hour, &minute, &second);
+    if (!success) return false;
+
+    out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
+
     return true;
 }

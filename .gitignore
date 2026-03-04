@@ -1,5 +1,9 @@
 .pio
 .vscode/**
 include/Config.h
+configs
 .DS_Store
 .idea
+/data/*
+/prebuilt_firmwares/*
+/configs.txt
