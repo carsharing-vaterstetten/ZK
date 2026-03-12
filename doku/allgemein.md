@@ -1,4 +1,4 @@
-# Brainstroming 2026-02-25
+# Brainstroming 2026-02-25 + 2026-03-12
 
 ## Datenmodell
 
@@ -51,3 +51,7 @@ flowchart TD
 - Die globale Whitelist wird täglich inkrementell aktualisiert.
 - Die globale Whitelist umfasst alle Karten-IDs aller Vereine.
 - Eine Blacklist wird nicht umgesetzt, da gelöschte Karten aus der Whitelist verschwinden.
+- RFID-Karten ohne BErechntigung für Autos -> wenn beim Nutzer ein Füherscheinbild hinterlegt ist, gilt er automatisch als Fahrberechtigt
+- in der Globalen und der Termin Whitelist werden nur Karten von Nutzern aufgenommen welche eine Füherscheinfoto haben
+- zum Start von Sharepad und ZK (also noch ohne Terminkontrolle) beim EnAT ist noch keine Nutzerverwaltung nötig, da ein Mitglied nur eine RFID Karte hat
+- RFID-Karten für Juristissche Personen -> einfach ein "dummy" Nutzer je Karte anlegen und dummyführerscheinbbild hochladen
