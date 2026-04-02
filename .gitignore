@@ -3,3 +3,4 @@
 include/Config.h
 .DS_Store
 .idea
+*.vtt
