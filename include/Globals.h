@@ -8,6 +8,7 @@
 #include "GPS.h"
 #include "Api.h"
 #include "Backend.h"
+#include "GPSAlg.h"
 #include "Intern.h"
 #include "LocalConfig.h"
 #include "LED.h"
@@ -36,3 +37,4 @@ inline SPIClass nfcSpi{NFC_SPI};
 inline NFCCardReader cardReader{nfcSpi, NFC_SS};
 inline WatchdogHandler watchdogHandler;
 inline SwappableFile swLog{PRIMARY_LOG_FILE_PATH, SECONDARY_LOG_FILE_PATH};
+inline GPSAlg gpsAlg{};

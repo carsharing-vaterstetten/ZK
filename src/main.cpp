@@ -26,6 +26,8 @@ uint contiguousFailedDisableGPSAttempts = 0;
 
 ulong lastLogin, lastLogout; // These are volatile
 
+GPSAlgPrediction lastGpsState;
+
 void checkNFCTag()
 {
     const auto [status, rfidUid] = cardReader.scan();
@@ -48,16 +50,29 @@ void checkNFCTag()
         {
             lastLogin = millis();
             statusLed.unlockFlash();
+
             if (accessControl.hasPermissionForGPSTracking())
             {
                 modem.wakeupAndWait();
                 modem.enableGPS();
+
+                if (!gpsAlg.isTripActive())
+                {
+                    gpsAlg.startTrip();
+                    fileLog.infoln("Trip started");
+                }
             }
         }
         else
         {
             lastLogout = millis();
             statusLed.lockFlash();
+
+            if (gpsAlg.isTripActive())
+            {
+                const float traveledDistance = gpsAlg.endTrip();
+                fileLog.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
+            }
         }
     }
     else
@@ -172,6 +187,12 @@ void checkGPS()
     GPS_DATA_t gpsData;
     modem.getGPS(gpsData);
     gps.writeData(gpsData);
+    const GPSAlgPrediction gpsState = gpsAlg.pushData(gpsData);
+    if (gpsState != lastGpsState)
+    {
+        fileLog.infoln("Car state changed to " + GPSAlg::gpsAlgPredictionToStr(gpsState));
+        lastGpsState = gpsState;
+    }
 }
 
 void restartRoutine()
