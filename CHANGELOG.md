@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.0]
+
+- Erste Tests der gefahrenen Distanz Berechnung
+
 ## [1.3.0]
 
 - Gleichzeitiges Lesen und Schreiben ins Log ist jetzt möglich.
