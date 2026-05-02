@@ -17,7 +17,7 @@ protected:
     // --- Thresholds ---
     static constexpr float SPEED_THRESHOLD_KMH     = 2.0f;
     static constexpr float DISPLACEMENT_THRESHOLD_M = 0.1f;
-    static constexpr float MAX_ACCEPTABLE_ACCURACY  = 5.0f;
+    static constexpr float MAX_ACCEPTABLE_ACCURACY  = 3.0f;
 
     // --- Timing ---
     float    eval_window_secs;  // e.g. 10.0f seconds

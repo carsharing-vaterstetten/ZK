@@ -88,10 +88,12 @@ GPSAlgPrediction GPSAlg::evaluateWindow() const
         prev = &sample;
     }
 
-    if (movingVotes + standingVotes == 0.0f)
+    float total = movingVotes + standingVotes;
+
+    if (total == 0.0f)
         return last_prediction;
 
-    const float movingRatio = movingVotes / (movingVotes + standingVotes);
+    const float movingRatio = movingVotes / total;
 
     if (movingRatio >= MOVING_VOTE_THRESHOLD)
         return GPSAlgPrediction::Moving;
