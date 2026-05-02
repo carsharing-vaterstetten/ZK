@@ -16,7 +16,7 @@ protected:
 
     // --- Thresholds ---
     static constexpr float SPEED_THRESHOLD_KMH     = 2.0f;
-    static constexpr float DISPLACEMENT_THRESHOLD_M = 2.0f;
+    static constexpr float DISPLACEMENT_THRESHOLD_M = 0.1f;
     static constexpr float MAX_ACCEPTABLE_ACCURACY  = 5.0f;
 
     // --- Timing ---
@@ -26,6 +26,12 @@ protected:
     bool                      trip_active     = false;
     float                     trip_distance_m = 0.0f;
     std::optional<GPS_DATA_t> last_trip_sample;
+
+    // Minimum fraction of votes needed to flip state (0.5 = simple majority)
+    static constexpr float MOVING_VOTE_THRESHOLD  = 0.4f;
+    static constexpr float STANDING_VOTE_THRESHOLD = 0.7f;
+
+    GPSAlgPrediction last_prediction = GPSAlgPrediction::Standing;
 
     static float haversineDistance(float lat1, float lon1, float lat2, float lon2);
     GPSAlgPrediction evaluateWindow() const;
