@@ -1,0 +1,65 @@
+{
+  "typen": [
+    {
+      "id": "sonstiges",
+      "name": "Sonstiges",
+      "ordner": "sonstiges",
+      "farbe": "#78909c",
+      "beschreibung": "Themen, die nicht in die anderen Kategorien passen",
+      "default_abschnitte": [
+        "zusammenfassung"
+      ],
+      "kategorien": [
+        {
+          "name": "Usecases",
+          "themen": [
+            {
+              "name": "Usecases ZK_sharepad",
+              "typ": "sonstiges",
+              "kategorie": "Usecases",
+              "beschreibung": "Welche usescases existieren, wann und wie oft tritt der Usecase ein, wer startet ihn und wer ist beteiligt am Usecase wie läuft es ab und gibt es Sonderfälle, ...",
+              "abschnitte": [
+                "use_cases"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Schnittstellen",
+          "themen": [
+            {
+              "name": "Zugangskontrolle-Sharepad",
+              "typ": "sonstiges",
+              "kategorie": "Schnittstellen",
+              "beschreibung": "Hier sollen die Schnittstellen zwischen der Zugangskontrolle zum Auto (Arduino) und der Verwaltungssoftware sharepad definiert werden",
+              "abschnitte": [
+                "schnittstellen"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Hintergründe",
+          "themen": [
+            {
+              "name": "Prozesse",
+              "typ": "sonstiges",
+              "kategorie": "Hintergründe",
+              "beschreibung": "Welche Prozesse gibt es rund um die zugangskontrolle (ZK) und der Mitglieder und Buchungsverwaltungssoftware (Sharepad).",
+              "abschnitte": [
+                "prozessbeschreibung"
+              ]
+            },
+            {
+              "name": "Datenmodell",
+              "beschreibung": "Wie ist das Datenmodell zumindest im besprochenen skizziert worden? Welche Felder gibt es? Wie sind diese Felder definiert, für was werden Sie verwendet? Welche Tabellen gibt es? Wir hängen diese zusammen.",
+              "abschnitte": [
+                "datenmodell"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

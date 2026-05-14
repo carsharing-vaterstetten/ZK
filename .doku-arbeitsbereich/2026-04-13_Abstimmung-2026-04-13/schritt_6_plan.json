@@ -1,0 +1,86 @@
+{
+  "themen": [
+    {
+      "thema_id": "c64d8778-d693-4ad4-9a63-e6213dbcabf8",
+      "thema_name": "Usecases ZK_sharepad",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "use_cases",
+          "label": "Use Cases",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    },
+    {
+      "thema_id": "fb1f09d8-e17c-4aac-b7df-e3718e3e7a5a",
+      "thema_name": "Zugangskontrolle-Sharepad",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "schnittstellen",
+          "label": "Schnittstellendokumentation",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    },
+    {
+      "thema_id": "8ad21074-99ab-43ae-9466-c35ef7eb3785",
+      "thema_name": "Prozesse",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "prozessbeschreibung",
+          "label": "Prozessbeschreibung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "mermaid",
+          "label": "Mermaid-Diagramm",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    },
+    {
+      "thema_id": "7152a28a-c955-4c7e-9f35-01198ffd7014",
+      "thema_name": "Datenmodell",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "datenmodell",
+          "label": "datenmodell",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    }
+  ],
+  "tagesseite_basis_status": "erfolgreich"
+}

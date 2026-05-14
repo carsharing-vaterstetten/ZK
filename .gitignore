@@ -4,3 +4,8 @@ include/Config.h
 .DS_Store
 .idea
 *.vtt
+
+# ConsultingAssistant – große Binärdateien ausschließen
+.doku-arbeitsbereich/*/input/
+.doku-arbeitsbereich/*/audio/
+.doku-arbeitsbereich/*/keyframes/
