@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "erstellt_am": "2026-05-14T10:12:41",
-  "zuletzt_gespeichert": "2026-05-14T14:25:10",
+  "zuletzt_gespeichert": "2026-05-14T16:21:12",
   "datum": "2026-04-02",
   "eingabe_modus": "nur_transkript",
   "video_pfad": null,
@@ -95,39 +95,48 @@
       "abschnitte_auswahl": [
         {
           "id": "gespraechsprotokoll",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "prozessbeschreibung",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "mermaid",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "schulung",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "use_cases",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "schnittstellen",
-          "aktiv": true
+          "aktiv": true,
+          "neu_generieren": true
         },
         {
           "id": "datenuebername",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "datenmodell",
-          "aktiv": false
+          "aktiv": false,
+          "neu_generieren": true
         },
         {
           "id": "benutzerdefiniert",
           "aktiv": false,
+          "neu_generieren": true,
           "ueberschrift": "",
           "prompt": ""
         }
