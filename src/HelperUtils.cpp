@@ -5,11 +5,14 @@
 #include <iomanip>
 #include <LittleFS.h>
 
+#include "Backend.h"
 #include "Globals.h"
+#include "Intern.h"
 #include "mbedtls/base64.h"
 
 #include "Modem.h"
 #include "LocalConfig.h"
+#include "SwappableFile.h"
 
 
 std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)
@@ -277,21 +280,21 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
     );
 }
 
-void HelperUtils::uploadLog(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
+void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
 {
     const std::optional<FileInfo> fileInfo = swLog.getCurrentFileInfo();
     if (!fileInfo.has_value()) return;
 
     swLog.swapToB();
 
-    Modem::uploadFileAndDelete(LOG_FILE_UPLOAD_ENDPOINT, PRIMARY_LOG_FILE_PATH, deleteIfSuccess, deleteAfterRetrying,
-                               retries);
+    Modem::uploadFileAndDelete(api, LOG_FILE_UPLOAD_ENDPOINT, PRIMARY_LOG_FILE_PATH, deleteIfSuccess,
+                               deleteAfterRetrying, retries);
 
     // Primary log is now deleted and the secondary log "becomes" the primary.
     swLog.appendBToAAndSwapToA();
 }
 
-void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const uint retries, const bool deleteIfSuccess)
+void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api, SwappableFile& swLog, const uint retries, const bool deleteIfSuccess)
 {
     const size_t total = LittleFS.totalBytes();
     const size_t freeBytes = total - LittleFS.usedBytes();
@@ -305,10 +308,10 @@ void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const uint retr
         deletePressure = deletePressure && logIsLarge;
     }
 
-    uploadLog(deleteIfSuccess, deletePressure, retries);
+    uploadLog(api, swLog, deleteIfSuccess, deletePressure, retries);
 }
 
-void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
+void HelperUtils::performConnectionSpeedTest(const ApiClient& api, const size_t fileSize)
 {
     fileLog.infoln("Performing connection speed test");
 
@@ -340,7 +343,7 @@ void HelperUtils::performConnectionSpeedTest(const size_t fileSize)
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 
-bool HelperUtils::syncTimeWithModem(const uint maxRetries)
+bool HelperUtils::syncTimeWithModem(Modem& modem, const uint maxRetries)
 {
     fileLog.infoln("Syncing time");
     uint syncAttempt = 0;

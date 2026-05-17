@@ -3,23 +3,33 @@
 #include <HelperUtils.h>
 #include <LED.h>
 #include <esp32-hal.h>
+#include <esp_task_wdt.h>
+
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Api.h"
+#include "Backend.h"
 #include "FirmwareUpdater.h"
 #include "Globals.h"
 #include "GPS.h"
 #include "Config.h"
+#include "GPSAlg.h"
 #include "LocalConfig.h"
 #include "RFIDs.h"
+#include "SwappableFile.h"
 #include "StorageManager.h"
-#include "WatchdogHandler.h"
 #include "esp32/rom/rtc.h"
 
 #define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
 
-ulong nextWatchdogResetMs;
-ulong nextGPSUpdate;
+enum class TaskStatus
+{
+    NotStarted,
+    Running,
+    StopRequested,
+    Stopped,
+};
+
 ulong restartTargetMs;
 uint contiguousFailedSleepAttempts = 0;
 uint contiguousFailedDisableGPSAttempts = 0;
@@ -28,9 +38,33 @@ ulong lastLogin, lastLogout; // These are volatile
 
 GPSAlgPrediction lastGpsState;
 
+volatile TaskStatus nfcScanningTaskStatus = TaskStatus::NotStarted, gpsDataTaskStatus = TaskStatus::NotStarted;
+
+TinyGsmSim7000 gsmModem{Serial1};
+Modem modem{
+    gsmModem, Serial1, MODEM_SERIAL_BAUD, MODEM_RX_PIN, MODEM_TX_PIN, BOARD_POWERON_PIN, BOARD_PWRKEY_PIN,
+    MODEM_DTR_PIN,MODEM_POWERON_PULSE_WIDTH_MS, MODEM_POWEROFF_PULSE_WIDTH_MS
+};
+AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};
+GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
+ApiClient* api = nullptr;
+ThreadSafeCardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
+auto config = new LocalConfig{
+    DEFAULT_CONFIG_APN,
+    DEFAULT_CONFIG_GPRS_USER,
+    DEFAULT_CONFIG_GPRS_PASSWORD,
+    DEFAULT_CONFIG_SERVER,
+    DEFAULT_CONFIG_PORT,
+    DEFAULT_CONFIG_PASSWORD,
+    DEFAULT_SIM_PIN
+};
+
+SwappableFile swLog{PRIMARY_LOG_FILE_PATH, SECONDARY_LOG_FILE_PATH};
+GPSAlg gpsAlg{};
+
 volatile bool nfcIrqFlag = false;
 
-void checkNFCTag(const bool detected)
+void checkNFCTag(NFCCardReader& cardReader, bool detected)
 {
     const auto [status, rfidUid] = cardReader.scan(detected);
 
@@ -85,8 +119,7 @@ void checkNFCTag(const bool detected)
 
     // Wait for 2 seconds for the card to be removed
     constexpr uint waitForRemovalMs = 2000;
-    while (millis() - firstScanMs < waitForRemovalMs)
-        delay(10);
+    delay(waitForRemovalMs);
 
     // Then check again for two 1 second if a card is present
     constexpr uint waitForScanMs = 1000;
@@ -118,6 +151,46 @@ void checkNFCTag(const bool detected)
     // From the first card scan to here it should be 6 seconds
 
     statusLed.clear();
+}
+
+[[noreturn]] void restartRoutine()
+{
+    fileLog.infoln("Time reached to upload log and restart ESP32");
+
+    statusLed.setStatusColor(StatusColor::UploadingLogs);
+
+    // Stop other tasks
+    nfcScanningTaskStatus = TaskStatus::StopRequested;
+    gpsDataTaskStatus = TaskStatus::StopRequested;
+
+    fileLog.debugln("Waiting for tasks to stop");
+
+    while (nfcScanningTaskStatus == TaskStatus::StopRequested || gpsDataTaskStatus == TaskStatus::Stopped)
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+    modem.wakeupAndWait();
+    modem.ensureNetworkConnection();
+
+    if (StorageManager::exists(GPS_FILE_PATH))
+    {
+        gps.uploadFileAndBeginNew(*api, true, true, 2);
+    }
+    else
+    {
+        fileLog.infoln("No GPS data recorded. Nothing to upload");
+    }
+
+    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(*api, swLog);
+
+    fileLog.infoln("Restarting now");
+
+    // NO MORE FILE LOGGING FROM HERE
+
+    swLog.end();
+
+    ESP.restart();
+
+    while (true); // to disable no return warning
 }
 
 void calculateNextRestartTime()
@@ -164,10 +237,12 @@ void loadConfig()
     else
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
+        esp_task_wdt_delete(nullptr); // remove wdt while waiting for config
         newConfig = new LocalConfig{HelperUtils::requestConfig()};
+        esp_task_wdt_add(nullptr);
+        esp_task_wdt_reset();
         const bool configSaveSuccess = StorableConfig{*newConfig, CONFIG_PREFS_NAME}.save();
         fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
-        WatchdogHandler::taskWDTReset(); // Reset in case the user took long to enter data
     }
 
     delete config;
@@ -182,7 +257,6 @@ void checkGPS()
     {
         // GPS is logging to flash and storage is low
         serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
-        nextGPSUpdate = millis() + 5 * 60 * 1000;
         return;
     }
 
@@ -197,33 +271,91 @@ void checkGPS()
     }
 }
 
-void restartRoutine()
+void cardScanTask(void*)
 {
-    fileLog.infoln("Time reached to upload log and restart ESP32");
+    esp_task_wdt_add(nullptr);
+    nfcScanningTaskStatus = TaskStatus::Running;
 
-    statusLed.setStatusColor(StatusColor::UploadingLogs);
+    fileLog.debugln("Card scanner task started");
 
-    modem.wakeupAndWait();
-    modem.ensureNetworkConnection();
+    SPIClass nfcSpi{NFC_SPI};
+    NFCCardReader cardReader{nfcSpi, NFC_SS};
 
-    if (StorageManager::exists(GPS_FILE_PATH))
+    pinMode(NFC_IRQ, INPUT_PULLUP);
+    nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
+    cardReader.begin();
+    cardReader.begin();
+    attachInterrupt(digitalPinToInterrupt(NFC_IRQ), nfcISR, FALLING);
+    cardReader.startPassiveDetect();
+
+    while (nfcScanningTaskStatus != TaskStatus::StopRequested)
     {
-        gps.uploadFileAndBeginNew(true, true, 2);
+        while (!nfcIrqFlag)
+        {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        checkNFCTag(cardReader, true);
+        nfcIrqFlag = false;
+        cardReader.startPassiveDetect();
+        esp_task_wdt_reset();
     }
-    else
+
+    nfcScanningTaskStatus = TaskStatus::Stopped;
+    fileLog.debugln("Card scanner task ended");
+
+    esp_task_wdt_delete(nullptr);
+    vTaskDelete(nullptr);
+}
+
+[[noreturn]] void restartTask(void*)
+{
+    fileLog.debugln("Restart task started");
+    while (true)
     {
-        fileLog.infoln("No GPS data recorded. Nothing to upload");
+        if (millis() >= restartTargetMs)
+        {
+            esp_task_wdt_add(nullptr);
+            restartRoutine();
+        }
+
+        vTaskDelay(500);
+    }
+}
+
+void gpsDataTask(void*)
+{
+    esp_task_wdt_add(nullptr);
+
+    gpsDataTaskStatus = TaskStatus::Running;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    fileLog.debugln("GPS data task started");
+
+    while (gpsDataTaskStatus != TaskStatus::Stopped)
+    {
+        TickType_t xFrequency;
+
+        if (accessControl.isLoggedIn())
+        {
+            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_DRIVING);
+            checkGPS();
+        }
+        else
+        {
+            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_STANDING);
+            if constexpr (RECORD_GPS_WHILE_STANDING)
+                checkGPS();
+        }
+
+        esp_task_wdt_reset();
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 
-    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge();
+    fileLog.debugln("GPS data task ended");
+    gpsDataTaskStatus = TaskStatus::Stopped;
 
-    fileLog.infoln("Restarting now");
-
-    // NO MORE FILE LOGGING FROM HERE
-
-    swLog.end();
-
-    ESP.restart();
+    esp_task_wdt_delete(nullptr);
+    vTaskDelete(nullptr);
 }
 
 void IRAM_ATTR nfcISR()
@@ -244,8 +376,8 @@ void setup()
     }
 
     // Start watchdog
-    watchdogHandler.setTimeout(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT);
-    watchdogHandler.subscribeTask();
+    esp_task_wdt_init(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT, true);
+    esp_task_wdt_add(nullptr);
 
     // Mount filesystems
     const bool flashInitSuccess = StorageManager::mountLittleFS();
@@ -271,7 +403,6 @@ void setup()
 
     // Now let's start the modem and set the system time fetched by the Modem network
     statusLed.setStatusColor(StatusColor::InitializationPhase);
-    nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     accessControl.begin();
     gps.begin();
     Serial1.setRxBufferSize(2048);
@@ -289,7 +420,7 @@ void setup()
                 config->apn.c_str());
     // In my tests connecting network first, then gprs is best after a hard reset (e.g. code upload). The other order after a ESP.restart().
     modem.ensureNetworkConnection(cpu0ResetReason != POWERON_RESET);
-    HelperUtils::syncTimeWithModem(20);
+    HelperUtils::syncTimeWithModem(modem, 20);
 
 
     if (RECORD_GPS_WHILE_STANDING || (accessControl.isLoggedIn() && accessControl.hasPermissionForGPSTracking()))
@@ -304,33 +435,30 @@ void setup()
     calculateNextRestartTime();
 
     // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
-    modemIMEI = modem.getIMEI();
+    String modemIMEI = modem.getIMEI();
     fileLog.infoln("Modem IMEI: " + modemIMEI);
 
-    api.begin(config->server, config->serverPort, modemIMEI, config->serverPassword);
+    auto* gsmClient = new TinyGsmSim7000::GsmClientSim7000{gsmModem};
+    auto* modemClient = new WdClient{*gsmClient, config->server, config->serverPort};
+    api = new ApiClient(*modemClient, modemIMEI, config->serverPassword);
 
     // Do the connection speed test before any up-/downloads
     if constexpr (GIVE_CONNECTION_SPEED_ESTIMATE)
-        HelperUtils::performConnectionSpeedTest(CONNECTION_SPEED_TEST_FILE_SIZE);
+        HelperUtils::performConnectionSpeedTest(*api,CONNECTION_SPEED_TEST_FILE_SIZE);
 
     // Now we are ready to check for a firmware update
     if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
     {
         statusLed.setStatusColor(StatusColor::PerformingOTAUpdate);
-        FirmwareUpdater::doUpdateIfAvailable();
+        FirmwareUpdater::doUpdateIfAvailable(*api);
     }
     else
         fileLog.infoln("Skipped firmware update check");
 
-    pinMode(NFC_IRQ, INPUT_PULLUP);
-    cardReader.begin();
-    attachInterrupt(digitalPinToInterrupt(NFC_IRQ), nfcISR, FALLING);
-    cardReader.startPassiveDetect();
-
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
-    RFIDs::downloadRfidsIfChanged();
-    RFIDs::downloadGPSTrackingConsentedRFIDs();
+    RFIDs::downloadRfidsIfChanged(*api);
+    RFIDs::downloadGPSTrackingConsentedRFIDs(*api);
     RFIDs::load();
 
     HelperUtils::logRAMUsage(fileLog, LoggingLevel::INFO);
@@ -338,79 +466,26 @@ void setup()
 
     // Almost everything is done and the created log can be uploaded
     statusLed.setStatusColor(StatusColor::UploadingLogs);
-    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge();
+    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(*api, swLog);
     statusLed.clear();
 
     // Power saving
     modem.disconnectNetwork();
     modem.requestSleep();
 
+    // Start tasks
+    esp_task_wdt_deinit();
+    esp_task_wdt_init(HW_WATCHDOG_DEFAULT_TIMEOUT, true); // update timeout
+    xTaskCreatePinnedToCore(cardScanTask, "NFC", 4096, nullptr, 3, nullptr, 1);
+    xTaskCreatePinnedToCore(gpsDataTask, "GPS", 4096, nullptr, 2, nullptr, 1);
+    xTaskCreatePinnedToCore(restartTask, "RST", 4096, nullptr, 1, nullptr, 1);
+
     // Set the watchdog to a shorter timeout for the main loop
-    watchdogHandler.resetTimeout();
     fileLog.infoln("Setup done");
+    esp_task_wdt_delete(nullptr);
 }
 
 void loop()
 {
-    if (millis() >= nextWatchdogResetMs)
-    {
-        WatchdogHandler::taskWDTReset();
-        nextWatchdogResetMs = millis() + HW_WATCHDOG_RESET_DELAY_MS;
-    }
-
-    if (millis() >= restartTargetMs)
-        restartRoutine();
-
-    if (millis() >= nextGPSUpdate)
-    {
-        if (accessControl.isLoggedIn())
-        {
-            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_DRIVING;
-            checkGPS();
-        }
-        else
-        {
-            nextGPSUpdate = millis() + GPS_UPDATE_INTERVAL_WHILE_STANDING;
-            if constexpr (RECORD_GPS_WHILE_STANDING)
-                checkGPS();
-        }
-    }
-
-    if (millis() - lastLogin > 20000 && millis() - lastLogout > 20000)
-    {
-        if constexpr (!RECORD_GPS_WHILE_STANDING)
-        {
-            if (contiguousFailedDisableGPSAttempts < 2 && modem.isGPSEnabled() && !(accessControl.isLoggedIn() &&
-                accessControl.hasPermissionForGPSTracking()))
-            {
-                if (modem.disableGPS())
-                    contiguousFailedDisableGPSAttempts = 0;
-                else
-                    ++contiguousFailedDisableGPSAttempts;
-            }
-        }
-
-        if (contiguousFailedSleepAttempts < 10)
-        {
-            switch (modem.requestSleep())
-            {
-            case SleepRequestResult::FailedBecauseModemIsStillInUse:
-            case SleepRequestResult::AlreadySleeping:
-                break;
-            case SleepRequestResult::Failed:
-                ++contiguousFailedSleepAttempts;
-                break;
-            case SleepRequestResult::Success:
-                contiguousFailedSleepAttempts = 0;
-                break;
-            }
-        }
-    }
-
-    if (nfcIrqFlag)
-    {
-        checkNFCTag(true);
-        nfcIrqFlag = false;
-        cardReader.startPassiveDetect();
-    }
+    vTaskDelay(portMAX_DELAY);
 }

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <esp_task_wdt.h>
 #include <map>
 #include <HttpClient.h>
-#include "WatchdogHandler.h"
 
 enum class ApiHttpMethod { GET, POST, PUT, DELETE };
 
@@ -60,7 +60,7 @@ inline Client& getNullClientBase()
     return instance;
 }
 
-class WdClient final : public HttpClient
+class WdClient : public HttpClient
 {
 public:
     bool valid;
@@ -74,14 +74,14 @@ public:
     size_t write(const uint8_t b) override
     {
         if (!valid) return 0;
-        WatchdogHandler::taskWDTReset();
+        esp_task_wdt_reset();
         return HttpClient::write(b);
     }
 
     size_t write(const uint8_t* buf, const size_t size) override
     {
         if (!valid || size == 0) return 0;
-        WatchdogHandler::taskWDTReset();
+        esp_task_wdt_reset();
         return HttpClient::write(buf, size);
     }
 
@@ -89,21 +89,21 @@ public:
     {
         if (!valid) return -1;
         const int read = HttpClient::read();
-        if (read > -1) WatchdogHandler::taskWDTReset();
+        if (read > -1) esp_task_wdt_reset();
         return read;
     }
 
     int read(uint8_t* buf, const size_t size) override
     {
         if (!valid || size == 0) return -1;
-        WatchdogHandler::taskWDTReset();
+        esp_task_wdt_reset();
         return HttpClient::read(buf, size);
     }
 
     unsigned int readBytes(char* buf, const size_t size) override
     {
         if (!valid || size == 0) return 0;
-        WatchdogHandler::taskWDTReset();
+        esp_task_wdt_reset();
         return HttpClient::readBytes(buf, size);
     }
 };
@@ -123,13 +123,13 @@ public:
 class HttpResponse : public HttpBase
 {
 public:
-    WdClient& body;
+    HttpClient& body;
     const int responseCode;
 
-    HttpResponse(const int responseCode, std::map<String, String> headers, WdClient& body, const size_t length)
+    HttpResponse(const int responseCode, std::map<String, String> headers, HttpClient& body, const size_t length)
         : HttpBase(std::move(headers), length), body(body), responseCode(responseCode) {}
 
-    HttpResponse(const int responseCode, WdClient& body, const size_t length)
+    HttpResponse(const int responseCode, HttpClient& body, const size_t length)
         : HttpBase({}, length), body(body), responseCode(responseCode) {}
 };
 
@@ -164,11 +164,11 @@ public:
     uint32_t uploadTimeMs;
     const bool valid;
 
-    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
+    ApiResponse(const int code, std::map<String, String> headers, HttpClient& body, const size_t length,
                 const uint32_t uploadTimeMs, const bool valid)
         : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(valid) {}
 
-    ApiResponse(const int code, std::map<String, String> headers, WdClient& body, const size_t length,
+    ApiResponse(const int code, std::map<String, String> headers, HttpClient& body, const size_t length,
                 const uint32_t uploadTimeMs)
         : HttpResponse(code, std::move(headers), body, length), uploadTimeMs(uploadTimeMs), valid(true) {}
 

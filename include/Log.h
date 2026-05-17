@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
 #include <Print.h>
 #include <vector>
 #include <WString.h>
@@ -80,6 +81,7 @@ public:
     void flush() const;
 
 protected:
+    mutable std::mutex mtx;
     std::vector<LogSink> sinks;
 
     static void appendMsgToSink(const LogSink& sink, const String& timestampStr, LoggingLevel level, const String& text);

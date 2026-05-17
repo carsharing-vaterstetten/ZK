@@ -2,11 +2,9 @@
 
 #include "mbedtls/md5.h"
 #include <ArduinoJson.h>
-#include "Api.h"
 #include "Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
-#include "Modem.h"
 #include "StorageManager.h"
 
 std::vector<uint32_t> rfids;
@@ -71,7 +69,7 @@ void generateChecksum(uint8_t out[16])
     f.close();
 }
 
-void RFIDs::downloadRfidsIfChanged()
+void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs JSON");
 
@@ -142,7 +140,7 @@ void RFIDs::downloadRfidsIfChanged()
     StorageManager::replaceRFIDsFileWithTmpRFIDs();
 }
 
-bool RFIDs::downloadGPSTrackingConsentedRFIDs()
+bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
 

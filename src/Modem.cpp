@@ -6,40 +6,44 @@
 #include "Globals.h"
 #include "StorageManager.h"
 
-Modem::Modem(HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin, const int8_t txPin) :
-    serialBaud(serialBaud),
-    rxPin(rxPin), txPin(txPin), gsmModem(hwSerial), serial(hwSerial), gsmClient(gsmModem) {}
+Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin,
+             const int8_t txPin, const uint8_t boardPowerOnPin, const uint8_t boardPWRKeyPin, const uint8_t modemDTRPin,
+             const uint32_t modemPowerOnPulseWidthMs, const uint32_t modemPowerOffPulseWidthMs
 
-void Modem::powerOn()
+) : serialBaud(serialBaud), rxPin(rxPin), txPin(txPin), serial(hwSerial), gsmModem(gsmModem),
+    boardPowerOnPin(boardPowerOnPin), boardPWRKeyPin(boardPWRKeyPin), modemDTRPin(modemDTRPin),
+    modemPowerOnPulseWidthMs(modemPowerOnPulseWidthMs), modemPowerOffPulseWidthMs(modemPowerOffPulseWidthMs) {}
+
+void Modem::powerOn() const
 {
-    pinMode(BOARD_POWERON_PIN, OUTPUT);
-    digitalWrite(BOARD_POWERON_PIN, HIGH);
+    pinMode(boardPowerOnPin, OUTPUT);
+    digitalWrite(boardPowerOnPin, HIGH);
     fileLog.infoln("Modem power on");
 }
 
-void Modem::turnOn()
+void Modem::turnOn() const
 {
-    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    pinMode(boardPWRKeyPin, OUTPUT);
+    digitalWrite(boardPWRKeyPin, LOW);
     delay(100);
-    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
-    delay(MODEM_POWERON_PULSE_WIDTH_MS);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    digitalWrite(boardPWRKeyPin, HIGH);
+    delay(modemPowerOnPulseWidthMs);
+    digitalWrite(boardPWRKeyPin, LOW);
     fileLog.infoln("Modem turned on");
 }
 
-void Modem::turnOff()
+void Modem::turnOff() const
 {
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    digitalWrite(boardPWRKeyPin, LOW);
     delay(100);
-    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
-    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
-    delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    pinMode(boardPWRKeyPin, OUTPUT);
+    digitalWrite(boardPWRKeyPin, HIGH);
+    delay(modemPowerOffPulseWidthMs);
+    digitalWrite(boardPWRKeyPin, LOW);
     fileLog.infoln("Modem turned off");
 }
 
-bool Modem::powerOff()
+bool Modem::powerOff() const
 {
     fileLog.debugln("Powering off modem...");
     const bool success = gsmModem.poweroff();
@@ -48,13 +52,13 @@ bool Modem::powerOff()
 }
 
 
-void Modem::forcePowerCycle()
+void Modem::forcePowerCycle() const
 {
     fileLog.warningln("Forcing Modem Power Cycle...");
 
-    digitalWrite(BOARD_POWERON_PIN, LOW); // Cut power completely (Mimic Hard Reset)
+    digitalWrite(boardPowerOnPin, LOW); // Cut power completely (Mimic Hard Reset)
     delay(2000); // Wait for capacitors to discharge
-    digitalWrite(BOARD_POWERON_PIN, HIGH); // Restore power
+    digitalWrite(boardPowerOnPin, HIGH); // Restore power
     delay(500); // Wait for voltage to stabilize
 
     fileLog.infoln("Modem power restored");
@@ -70,8 +74,8 @@ void Modem::wakeup()
         return;
     }
 
-    pinMode(MODEM_DTR_PIN, OUTPUT);
-    digitalWrite(MODEM_DTR_PIN, LOW);
+    pinMode(modemDTRPin, OUTPUT);
+    digitalWrite(modemDTRPin, LOW);
     // delay(2000);
     gsmModem.sleepEnable(false);
     modemIsAwake = true;
@@ -87,8 +91,8 @@ void Modem::wakeupAndWait(const uint32_t timeoutMs)
 
 bool Modem::beginSleep()
 {
-    pinMode(MODEM_DTR_PIN, OUTPUT);
-    digitalWrite(MODEM_DTR_PIN, HIGH);
+    pinMode(modemDTRPin, OUTPUT);
+    digitalWrite(modemDTRPin, HIGH);
     const bool success = gsmModem.sleepEnable(true);
     fileLog.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
     if (success)
@@ -219,7 +223,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
     {
         fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
 
-        powerOn(); // BOARD_POWERON_PIN HIGH
+        powerOn(); // boardPowerOnPin HIGH
 
         // If the modem was already running, turnOff() ensures a clean start.
         // If it was already off, this pulse might be ignored or act as a toggle.
@@ -272,7 +276,7 @@ std::tuple<bool, ulong> Modem::autoBaud(const uint32_t timeoutMs)
     return {false, 0};
 }
 
-bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
+bool Modem::finishInit(const char* simPin, const ulong detectedBaud) const
 {
     // If the modem is at a different baud than our target, move it.
     if (detectedBaud != serialBaud)
@@ -298,7 +302,7 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud)
     return true;
 }
 
-bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries)
+bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries) const
 {
     fileLog.infoln("Connecting GPRS and network...");
 
@@ -345,9 +349,9 @@ bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries)
     return false;
 }
 
-bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetries)
+bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetries) const
 {
-    connectGPRSAndNetwork(tryGprsFirst, maxRetries);
+    if (!connectGPRSAndNetwork(tryGprsFirst, maxRetries)) return false;
 
     // Wait for signal
     int16_t signalQuality = gsmModem.getSignalQuality();
@@ -370,7 +374,7 @@ bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetri
     return true;
 }
 
-bool Modem::disconnectNetwork()
+bool Modem::disconnectNetwork() const
 {
     fileLog.debugln("Disconnecting GPRS...");
 
@@ -387,7 +391,7 @@ bool Modem::disconnectNetwork()
     return success;
 }
 
-ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const size_t streamLen)
+ApiResponse Modem::uploadData(const ApiClient& api, const char* endpoint, Stream& stream, const size_t streamLen)
 {
     const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {
                                                   {"Content-Type", "application/octet-stream"}
@@ -395,14 +399,15 @@ ApiResponse Modem::uploadData(const char* endpoint, Stream& stream, const size_t
     return api.makeRequest(req, true);
 }
 
-UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& stream, const size_t streamLen,
+UploadAndRetryResult Modem::uploadDataAndRetry(const ApiClient& api, const char* endpoint, Stream& stream,
+                                               const size_t streamLen,
                                                const uint retries)
 {
     uint attemptNo = 0;
 
     do
     {
-        ApiResponse resp = uploadData(endpoint, stream, streamLen);
+        ApiResponse resp = uploadData(api, endpoint, stream, streamLen);
 
         if (resp.valid && resp.responseCode == 200)
         {
@@ -420,7 +425,8 @@ UploadAndRetryResult Modem::uploadDataAndRetry(const char* endpoint, Stream& str
     return UploadAndRetryResult::FAILED;
 }
 
-UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& f, const bool deleteIfSuccess,
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const char* endpoint, File& f,
+                                                    const bool deleteIfSuccess,
                                                     const bool deleteAfterRetrying, const uint retries)
 {
     if (!f)
@@ -440,7 +446,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& 
 
     fileLog.infoln("Uploading " + filePath + " (" + String(fileSize) + " B)");
 
-    const UploadAndRetryResult uploadResult = uploadDataAndRetry(endpoint, f, fileSize, retries);
+    const UploadAndRetryResult uploadResult = uploadDataAndRetry(api, endpoint, f, fileSize, retries);
 
     switch (uploadResult)
     {
@@ -475,7 +481,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, File& 
     throw std::invalid_argument("Invalid result");
 }
 
-UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const char* filePath,
+UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const char* endpoint, const char* filePath,
                                                     const bool deleteIfSuccess, const bool deleteAfterRetrying,
                                                     const uint retries)
 {
@@ -486,12 +492,12 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const char* endpoint, const 
     }
 
     File f = LittleFS.open(filePath, FILE_READ);
-    const auto res = uploadFileAndDelete(endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
+    const auto res = uploadFileAndDelete(api, endpoint, f, deleteIfSuccess, deleteAfterRetrying, retries);
     f.close(); // it is possible that file may not have been closed
     return res;
 }
 
-time_t Modem::getUnixTimestamp()
+time_t Modem::getUnixTimestamp() const
 {
     int year, month, day, hour, minute, second;
     float timezone;
@@ -499,7 +505,7 @@ time_t Modem::getUnixTimestamp()
     return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
-bool Modem::getGPS(GPS_DATA_t& out)
+bool Modem::getGPS(GPS_DATA_t& out) const
 {
     uint8_t status;
     int year, month, day, hour, minute, second;

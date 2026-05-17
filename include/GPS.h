@@ -4,6 +4,8 @@
 #include <FS.h>
 #include <sys/types.h>
 
+#include "Api.h"
+
 #pragma pack(push, 1)
 struct GPS_DATA_t
 {
@@ -24,7 +26,7 @@ public:
     GPS(const char* localFilePath, const char* uploadEndpoint);
 
     bool writeData(const GPS_DATA_t& data);
-    bool uploadFileAndBeginNew(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    bool uploadFileAndBeginNew(const ApiClient& api, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
     bool begin();
     bool flush();
     void end();

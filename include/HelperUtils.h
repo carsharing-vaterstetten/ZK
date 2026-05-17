@@ -7,6 +7,7 @@
 #include <WString.h>
 #include <rom/rtc.h>
 
+#include "Api.h"
 #include "Log.h"
 #include "TinyGsmGPRS.tpp"
 
@@ -14,6 +15,7 @@
 #define STR(s) STR_HELPER(s)
 
 
+class SwappableFile;
 class Log;
 class LocalConfig;
 
@@ -35,9 +37,9 @@ namespace HelperUtils
     String getResetReasonHumanReadable(RESET_REASON reset_reason);
     String toBase64(const uint8_t* data, size_t len);
     void logRAMUsage(const Log& log, LoggingLevel level);
-    void uploadLog(bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
-    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(uint retries = 2,
-                                                        bool deleteIfSuccess = true);
-    void performConnectionSpeedTest(size_t fileSize);
-    bool syncTimeWithModem(uint maxRetries);
+    void uploadLog(const ApiClient& api, SwappableFile& swLog, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api,
+                                                        SwappableFile& swLog, uint retries = 2, bool deleteIfSuccess = true);
+    void performConnectionSpeedTest(const ApiClient& api, size_t fileSize);
+    bool syncTimeWithModem(Modem& modem, uint maxRetries);
 }

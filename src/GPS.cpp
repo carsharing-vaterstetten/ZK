@@ -3,6 +3,7 @@
 #include <LittleFS.h>
 
 #include "Globals.h"
+#include "Modem.h"
 
 GPS::GPS(const char* localFilePath, const char* uploadEndpoint) : localFilePath(localFilePath),
                                                                   uploadEndpoint(uploadEndpoint) {}
@@ -14,14 +15,14 @@ bool GPS::begin()
     return gpsFile;
 }
 
-bool GPS::uploadFileAndBeginNew(const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
+bool GPS::uploadFileAndBeginNew(const ApiClient& api, const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
 {
     fileLog.infoln("Uploading GPS log (" + String(fileSize()) + " B)");
 
     if (gpsFile) gpsFile.close();
 
     const UploadFileAndRetryResult uploadResult = Modem::uploadFileAndDelete(
-        uploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
+        api, uploadEndpoint, localFilePath, deleteIfSuccess, deleteAfterRetrying, retries);
 
     gpsFile = LittleFS.open(localFilePath, FILE_APPEND, true);
 
