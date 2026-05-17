@@ -44,6 +44,15 @@ void AccessControl::lockCar() const
     fileLog.infoln("Car locked");
 }
 
+void AccessControl::turnOnKey() const
+{
+    digitalWrite(keyPowerPin, HIGH);
+}
+
+void AccessControl::turnOffKey() const
+{
+    digitalWrite(keyPowerPin, LOW);
+}
 
 void AccessControl::unlockCar() const
 {
@@ -56,7 +65,9 @@ void AccessControl::unlockCar() const
 void AccessControl::login(const uint32_t rfid)
 {
     cachedLoggedInRfid = rfid;
+    turnOnKey();
     unlockCar();
+    turnOffKey();
     loggedInRfidConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfid);
     fileLog.infoln(loggedInRfidConsentsToGPSTracking.value()
                        ? "Logged in RFID consents to GPS tracking"
@@ -68,7 +79,9 @@ void AccessControl::logout()
 {
     cachedLoggedInRfid = std::nullopt;
     loggedInRfidConsentsToGPSTracking = std::nullopt;
+    turnOnKey();
     lockCar();
+    turnOffKey();
     persistentStorage.remove(loggedInRfidKey);
 }
 

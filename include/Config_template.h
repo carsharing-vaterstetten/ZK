@@ -31,6 +31,7 @@
 // Car key pins
 #define OPEN_KEY 15
 #define CLOSE_KEY 14
+#define KEY_POWER 32
 
 // NFC modul Pins
 #define NFC_MOSI 23
