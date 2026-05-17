@@ -26,11 +26,12 @@ class NFCCardReader : protected Adafruit_PN532
     const ulong _cooldownMs;
 
     // Helper to handle hardware reading
-    [[nodiscard]] std::optional<uint32_t> readRawTag();
+    [[nodiscard]] std::optional<uint32_t> readRawTag(bool detected);
 
 public:
     NFCCardReader(SPIClass& spi, uint8_t cs, ulong cooldownMs = 7000);
     bool begin();
 
-    [[nodiscard]] ScanResult scan();
+    [[nodiscard]] ScanResult scan(bool detected);
+    void startPassiveDetect();
 };

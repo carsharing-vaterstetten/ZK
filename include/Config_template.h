@@ -38,6 +38,7 @@
 #define NFC_MISO 19
 #define NFC_SCLK 18
 #define NFC_SS 5
+#define NFC_IRQ 13
 #define NFC_SPI HSPI
 
 // Restart the esp at this time

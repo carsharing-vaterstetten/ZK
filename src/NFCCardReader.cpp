@@ -3,9 +3,7 @@
 #include "Globals.h"
 
 NFCCardReader::NFCCardReader(SPIClass& spi, const uint8_t cs, const ulong cooldownMs) : Adafruit_PN532(cs, &spi),
-    _cooldownMs(cooldownMs)
-{
-}
+    _cooldownMs(cooldownMs) {}
 
 bool NFCCardReader::begin()
 {
@@ -30,13 +28,21 @@ bool NFCCardReader::begin()
     return true;
 }
 
-std::optional<uint32_t> NFCCardReader::readRawTag()
+std::optional<uint32_t> NFCCardReader::readRawTag(const bool detected)
 {
     uint8_t uidArr[7] = {};
     uint8_t uidLen = 0;
 
-    if (!readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
-        return std::nullopt;
+    if (detected)
+    {
+        if (!readDetectedPassiveTargetID(uidArr, &uidLen))
+            return std::nullopt;
+    }
+    else
+    {
+        if (!readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
+            return std::nullopt;
+    }
 
     if (uidLen != 4) return std::nullopt;
 
@@ -46,9 +52,9 @@ std::optional<uint32_t> NFCCardReader::readRawTag()
         static_cast<uint32_t>(uidArr[3]);
 }
 
-ScanResult NFCCardReader::scan()
+ScanResult NFCCardReader::scan(const bool detected)
 {
-    const std::optional<uint32_t> currentUid = readRawTag();
+    const std::optional<uint32_t> currentUid = readRawTag(detected);
 
     if (!currentUid)
     {
@@ -66,4 +72,9 @@ ScanResult NFCCardReader::scan()
     _lastSeenTime = now;
 
     return {isDuplicate ? ScanStatus::Duplicate : ScanStatus::NewCard, *currentUid};
+}
+
+void NFCCardReader::startPassiveDetect()
+{
+    startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
 }

@@ -28,9 +28,11 @@ ulong lastLogin, lastLogout; // These are volatile
 
 GPSAlgPrediction lastGpsState;
 
-void checkNFCTag()
+volatile bool nfcIrqFlag = false;
+
+void checkNFCTag(const bool detected)
 {
-    const auto [status, rfidUid] = cardReader.scan();
+    const auto [status, rfidUid] = cardReader.scan(detected);
 
     switch (status)
     {
@@ -91,7 +93,7 @@ void checkNFCTag()
     bool scannedDuplicate = false;
     while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs)
     {
-        if (cardReader.scan().status == ScanStatus::Duplicate)
+        if (cardReader.scan(false).status == ScanStatus::Duplicate)
         {
             scannedDuplicate = true;
             break;
@@ -224,6 +226,11 @@ void restartRoutine()
     ESP.restart();
 }
 
+void IRAM_ATTR nfcISR()
+{
+    nfcIrqFlag = true;
+}
+
 void setup()
 {
     // Start serial communication
@@ -315,7 +322,10 @@ void setup()
     else
         fileLog.infoln("Skipped firmware update check");
 
+    pinMode(NFC_IRQ, INPUT_PULLUP);
     cardReader.begin();
+    attachInterrupt(digitalPinToInterrupt(NFC_IRQ), nfcISR, FALLING);
+    cardReader.startPassiveDetect();
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
     statusLed.setStatusColor(StatusColor::UpdatingRFIDs);
@@ -350,8 +360,6 @@ void loop()
 
     if (millis() >= restartTargetMs)
         restartRoutine();
-
-    checkNFCTag();
 
     if (millis() >= nextGPSUpdate)
     {
@@ -397,5 +405,12 @@ void loop()
                 break;
             }
         }
+    }
+
+    if (nfcIrqFlag)
+    {
+        checkNFCTag(true);
+        nfcIrqFlag = false;
+        cardReader.startPassiveDetect();
     }
 }

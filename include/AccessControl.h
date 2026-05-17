@@ -9,17 +9,19 @@ class AccessControl
     std::optional<uint32_t> cachedLoggedInRfid = std::nullopt;
     std::optional<bool> loggedInRfidConsentsToGPSTracking = std::nullopt;
 
-    uint8_t keyOpenPin, keyClosePin;
+    uint8_t keyOpenPin, keyClosePin, keyPowerPin;
     const char* storageName;
 
     void unlockCar() const;
     void lockCar() const;
+    void turnOnKey() const;
+    void turnOffKey() const;
 
 public:
-    AccessControl(const uint8_t keyOpenPin, const uint8_t keyClosePin, const char* storageNameIdentifier) :
-        keyOpenPin(keyOpenPin), keyClosePin(keyClosePin), storageName(storageNameIdentifier)
-    {
-    }
+    AccessControl(const uint8_t keyOpenPin, const uint8_t keyClosePin, const uint8_t keyPowerPin,
+                  const char* storageNameIdentifier) :
+        keyOpenPin(keyOpenPin), keyClosePin(keyClosePin), keyPowerPin(keyPowerPin),
+        storageName(storageNameIdentifier) {}
 
     bool begin();
     void end();
@@ -30,4 +32,3 @@ public:
     [[nodiscard]] std::optional<uint32_t> loggedInRfid() const;
     [[nodiscard]] bool hasPermissionForGPSTracking() const;
 };
-
