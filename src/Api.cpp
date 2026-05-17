@@ -1,24 +1,19 @@
 #include "Api.h"
 
+#include <utility>
+
 #include "Globals.h"
 
-ApiClient::ApiClient(const size_t writeBufferSize, const size_t readBufferSize) : writeBufferSize(writeBufferSize),
+ApiClient::ApiClient(HttpClient& httpClient, String defaultBasicAuthUsername,
+                     String defaultBasicAuthPassword, const size_t writeBufferSize,
+                     const size_t readBufferSize) :
+    httpClient(httpClient), defaultBasicAuthUsername(std::move(defaultBasicAuthUsername)),
+    defaultBasicAuthPassword(std::move(defaultBasicAuthPassword)), writeBufferSize(writeBufferSize),
     readBufferSize(readBufferSize) {}
-
-void ApiClient::begin(const String& server, const uint16_t port, const String& username, const String& password)
-{
-    delete httpClient;
-    httpClient = new WdClient{modem.gsmClient, server, port};
-    defaultBasicAuthUsername.emplace(username);
-    defaultBasicAuthPassword.emplace(password);
-    isReady = true;
-}
 
 ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders,
                                    const ulong timeout) const
 {
-    if (!isReady || httpClient == nullptr) return ApiResponse::failed();
-
     const ulong requestStart = millis();
 
     // Helper lambda to check timeout
@@ -27,23 +22,23 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         return millis() - requestStart > timeout * 1000;
     };
 
-    httpClient->beginRequest();
+    httpClient.beginRequest();
 
     int err = 0;
 
     switch (request.method)
     {
     case ApiHttpMethod::GET:
-        err = httpClient->get(request.path);
+        err = httpClient.get(request.path);
         break;
     case ApiHttpMethod::POST:
-        err = httpClient->post(request.path);
+        err = httpClient.post(request.path);
         break;
     case ApiHttpMethod::PUT:
-        err = httpClient->put(request.path);
+        err = httpClient.put(request.path);
         break;
     case ApiHttpMethod::DELETE:
-        err = httpClient->del(request.path);
+        err = httpClient.del(request.path);
         break;
     }
 
@@ -53,13 +48,13 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         return ApiResponse::failed();
     }
 
-    if (defaultBasicAuthUsername.has_value() && defaultBasicAuthPassword.has_value())
-        httpClient->sendBasicAuth(defaultBasicAuthUsername.value(), defaultBasicAuthPassword.value());
+    if (!defaultBasicAuthUsername.isEmpty() && !defaultBasicAuthPassword.isEmpty())
+        httpClient.sendBasicAuth(defaultBasicAuthUsername, defaultBasicAuthPassword);
 
     for (const auto& [key, value] : request.headers)
-        httpClient->sendHeader(key, value);
+        httpClient.sendHeader(key, value);
 
-    httpClient->beginBody();
+    httpClient.beginBody();
 
     uint8_t buffer[writeBufferSize];
 
@@ -78,7 +73,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         const size_t bytesRead = request.body.readBytes(buffer, writeBufferSize);
         totalBytesRead += bytesRead;
 
-        size_t wrote = httpClient->write(buffer, bytesRead);
+        size_t wrote = httpClient.write(buffer, bytesRead);
 
         constexpr uint maxWriteRetries = 100;
         uint retry = 0;
@@ -92,7 +87,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
             }
 
             yield();
-            wrote = httpClient->write(buffer, bytesRead);
+            wrote = httpClient.write(buffer, bytesRead);
         }
 
         if (wrote == 0 && retry == maxWriteRetries)
@@ -105,11 +100,11 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     if (hasTimedOut()) return ApiResponse::failed();
 
-    httpClient->endRequest();
+    httpClient.endRequest();
 
     if (hasTimedOut()) return ApiResponse::failed();
 
-    const int responseCode = httpClient->responseStatusCode();
+    const int responseCode = httpClient.responseStatusCode();
 
     if (responseCode <= 0)
     {
@@ -119,28 +114,28 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     std::map<String, String> headers{};
 
-    while (!ignoreResponseHeaders && httpClient->headerAvailable())
+    while (!ignoreResponseHeaders && httpClient.headerAvailable())
     {
         if (hasTimedOut()) return ApiResponse::failed();
-        headers[httpClient->readHeaderName()] = httpClient->readHeaderValue();
+        headers[httpClient.readHeaderName()] = httpClient.readHeaderValue();
     }
 
-    const int contentLength = httpClient->contentLength();
+    const int contentLength = httpClient.contentLength();
 
     if (ignoreResponseHeaders)
-        httpClient->skipResponseHeaders();
+        httpClient.skipResponseHeaders();
 
     if (contentLength <= 0)
     {
         return ApiResponse::empty(responseCode, headers, uploadTimeMs);
     }
 
-    return ApiResponse{responseCode, headers, *httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
+    return ApiResponse{responseCode, headers, httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
 uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout) const
 {
-    WdClient& downloadStream = resp.body;
+    HttpClient& downloadStream = resp.body;
 
     uint8_t buf[readBufferSize];
 

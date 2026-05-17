@@ -15,6 +15,8 @@
 Log::SinkID Log::addOutputSink(Print& p, const String& name, const bool timestamps, const bool colorize,
                                const LoggingLevel minLevel, const bool flushOnError, const bool flushOnEveryLine)
 {
+    std::lock_guard lock(mtx); // mostly necessary but better safe than sorry
+
     sinks.push_back({p, name, timestamps, colorize, minLevel, flushOnError, flushOnEveryLine});
     return sinks.size() - 1;
 }
@@ -30,6 +32,8 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
 
 void Log::logMsgln(const String& msg, const LoggingLevel level) const
 {
+    std::lock_guard lock(mtx);
+
     // = millis() if modem is not initialized
     const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
 
@@ -45,6 +49,8 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
 
 void Log::flush() const
 {
+    std::lock_guard lock(mtx);
+
     for (const LogSink& s : sinks)
         s.print.get().flush();
 }

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+class ApiClient;
+
 enum class RfidsChecksumResult
 {
     FILES_ARE_EQUAL,
@@ -13,8 +15,8 @@ enum class RfidsChecksumResult
 namespace RFIDs
 {
     bool isRegisteredRFID(uint32_t rfid);
-    void downloadRfidsIfChanged();
-    bool downloadGPSTrackingConsentedRFIDs();
+    void downloadRfidsIfChanged(const ApiClient& api);
+    bool downloadGPSTrackingConsentedRFIDs(ApiClient& api);
     bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
     bool load();
 }

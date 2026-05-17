@@ -11,6 +11,8 @@
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
 
+class ApiClient;
+
 enum class UploadResult
 {
     BASE_UPLOAD_RESULTS,
@@ -52,67 +54,71 @@ protected:
     ulong serialBaud;
     int8_t rxPin, txPin;
 
-    TinyGsmSim7000 gsmModem;
-    const char *gprsUser = "", *gprsPassword = "", *apn = "";
     HardwareSerial& serial;
+    TinyGsmSim7000& gsmModem;
+
+    const char *gprsUser = "", *gprsPassword = "", *apn = "";
+
+    uint8_t boardPowerOnPin, boardPWRKeyPin, modemDTRPin;
+    uint32_t modemPowerOnPulseWidthMs, modemPowerOffPulseWidthMs;
 
     bool beginSleep();
     std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
-    bool connectGPRSAndNetwork(bool tryGprsFirst = true, uint retries = 2);
+    bool connectGPRSAndNetwork(bool tryGprsFirst = true, uint retries = 2) const;
     bool beginHot(const char* simPin);
     bool beginCold(const char* simPin, uint retries);
-    bool finishInit(const char* simPin, ulong detectedBaud);
-    static void forcePowerCycle();
+    bool finishInit(const char* simPin, ulong detectedBaud) const;
+    void forcePowerCycle() const;
 
 public:
-    TinyGsmSim7000::GsmClientSim7000 gsmClient;
+    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, int8_t rxPin, int8_t txPin,
+          uint8_t boardPowerOnPin, uint8_t boardPWRKeyPin, uint8_t modemDTRPin, uint32_t modemPowerOnPulseWidthMs,
+          uint32_t modemPowerOffPulseWidthMs);
 
-    Modem(HardwareSerial& hwSerial, ulong serialBaud, int8_t rxPin, int8_t txPin);
-
-    bool powerOff();
-    static void powerOn();
-    static void turnOn();
-    static void turnOff();
+    bool powerOff() const;
+    void powerOn() const;
+    void turnOn() const;
+    void turnOff() const;
     SleepRequestResult requestSleep();
 
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
-    bool ensureNetworkConnection(bool tryGprsFirst = true, uint maxRetries = 2);
+    bool ensureNetworkConnection(bool tryGprsFirst = true, uint maxRetries = 2) const;
     void wakeup();
     void wakeupAndWait(uint32_t timeoutMs = 10000);
-    static ApiResponse uploadData(const char* endpoint, Stream& stream, size_t streamLen);
-    static UploadAndRetryResult uploadDataAndRetry(const char* endpoint, Stream& stream, size_t streamLen,
-                                                   uint retries);
-    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, File& f, bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, uint retries);
-    static UploadFileAndRetryResult uploadFileAndDelete(const char* endpoint, const char* filePath,
-                                                        bool deleteIfSuccess,
-                                                        bool deleteAfterRetrying, uint retries);
+    static ApiResponse uploadData(const ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
+    static UploadAndRetryResult uploadDataAndRetry(const ApiClient& api, const char* endpoint, Stream& stream,
+                                                   size_t streamLen, uint retries);
+    static UploadFileAndRetryResult uploadFileAndDelete(const ApiClient& api, const char* endpoint, File& f,
+                                                        bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    static UploadFileAndRetryResult uploadFileAndDelete(const ApiClient& api, const char* endpoint,
+                                                        const char* filePath,
+                                                        bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
 
-    bool disconnectNetwork();
+    bool disconnectNetwork() const;
     bool enableGPS();
     bool disableGPS();
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-    String getGSMDateTime(const TinyGSMDateTimeFormat format = DATE_FULL)
+    [[nodiscard]] String getGSMDateTime(const TinyGSMDateTimeFormat format = DATE_FULL) const
     {
         return gsmModem.getGSMDateTime(format);
     }
 
-    bool getNetworkTime(int* year, int* month, int* day, int* hour, int* minute, int* second, float* timezone)
+    bool getNetworkTime(int* year, int* month, int* day, int* hour, int* minute, int* second, float* timezone) const
     {
         return gsmModem.getNetworkTime(year, month, day, hour, minute, second, timezone);
     }
 
-    [[nodiscard]] time_t getUnixTimestamp();
-    bool getGPS(GPS_DATA_t& out);
+    [[nodiscard]] time_t getUnixTimestamp() const;
+    bool getGPS(GPS_DATA_t& out) const;
 
-    String getIMEI()
+    [[nodiscard]] String getIMEI() const
     {
         return gsmModem.getIMEI();
     }
 
-    int16_t getSignalQuality()
+    [[nodiscard]] int16_t getSignalQuality() const
     {
         return gsmModem.getSignalQuality();
     }

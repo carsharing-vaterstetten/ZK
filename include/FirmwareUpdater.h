@@ -1,6 +1,7 @@
 #pragma once
+#include "Api.h"
 
 namespace FirmwareUpdater
 {
-    void doUpdateIfAvailable();
+    void doUpdateIfAvailable(const ApiClient& api);
 }

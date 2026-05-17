@@ -48,7 +48,6 @@
 // Hardware watchdog
 #define HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT 1200U // [s]
 #define HW_WATCHDOG_DEFAULT_TIMEOUT 300U // [s] If the watchdog doesn't get reset in this time, it will restart the esp
-#define HW_WATCHDOG_RESET_DELAY_MS 100U // [ms] reset the watchdog after this time
 
 // Connection speed test
 #define GIVE_CONNECTION_SPEED_ESTIMATE false

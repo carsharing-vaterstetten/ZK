@@ -22,7 +22,7 @@ void onDownloadProgress(const size_t progress, const size_t total)
     }
 }
 
-ApiResponse checkForUpdate()
+ApiResponse checkForUpdate(const ApiClient& api)
 {
     fileLog.infoln("Checking for firmware update");
     const HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
@@ -104,9 +104,9 @@ bool finalizeUpdate()
 }
 
 
-void FirmwareUpdater::doUpdateIfAvailable()
+void FirmwareUpdater::doUpdateIfAvailable(const ApiClient& api)
 {
-    const ApiResponse resp = checkForUpdate();
+    const ApiResponse resp = checkForUpdate(api);
     if (!resp.valid || !isUpdateAvailable(resp)) return;
     fileLog.infoln("Performing OTA update");
 
