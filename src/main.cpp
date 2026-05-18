@@ -5,6 +5,7 @@
 #include <esp32-hal.h>
 #include <esp_task_wdt.h>
 
+#include "esp_pm.h"
 #include "esp_log.h"
 #include "AccessControl.h"
 #include "Api.h"
@@ -45,10 +46,10 @@ Modem modem{
     gsmModem, Serial1, MODEM_SERIAL_BAUD, MODEM_RX_PIN, MODEM_TX_PIN, BOARD_POWERON_PIN, BOARD_PWRKEY_PIN,
     MODEM_DTR_PIN,MODEM_POWERON_PULSE_WIDTH_MS, MODEM_POWEROFF_PULSE_WIDTH_MS
 };
-AccessControl accessControl{OPEN_KEY, CLOSE_KEY, "AccCtrl v1"};
+AccessControl accessControl{OPEN_KEY, CLOSE_KEY, KEY_POWER, "AccCtrl v1"};
 GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
 ApiClient* api = nullptr;
-ThreadSafeCardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
+CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
 auto config = new LocalConfig{
     DEFAULT_CONFIG_APN,
     DEFAULT_CONFIG_GPRS_USER,
@@ -271,6 +272,11 @@ void checkGPS()
     }
 }
 
+void IRAM_ATTR nfcISR()
+{
+    nfcIrqFlag = true;
+}
+
 void cardScanTask(void*)
 {
     esp_task_wdt_add(nullptr);
@@ -318,7 +324,7 @@ void cardScanTask(void*)
             restartRoutine();
         }
 
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -331,7 +337,7 @@ void gpsDataTask(void*)
 
     fileLog.debugln("GPS data task started");
 
-    while (gpsDataTaskStatus != TaskStatus::Stopped)
+    while (gpsDataTaskStatus != TaskStatus::StopRequested)
     {
         TickType_t xFrequency;
 
@@ -356,11 +362,6 @@ void gpsDataTask(void*)
 
     esp_task_wdt_delete(nullptr);
     vTaskDelete(nullptr);
-}
-
-void IRAM_ATTR nfcISR()
-{
-    nfcIrqFlag = true;
 }
 
 void setup()
