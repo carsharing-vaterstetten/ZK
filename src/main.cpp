@@ -290,7 +290,6 @@ void cardScanTask(void*)
     pinMode(NFC_IRQ, INPUT_PULLUP);
     nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     cardReader.begin();
-    cardReader.begin();
     attachInterrupt(digitalPinToInterrupt(NFC_IRQ), nfcISR, FALLING);
     cardReader.startPassiveDetect();
 
@@ -299,11 +298,12 @@ void cardScanTask(void*)
         while (!nfcIrqFlag)
         {
             vTaskDelay(pdMS_TO_TICKS(100));
+            esp_task_wdt_reset();
         }
+
         checkNFCTag(cardReader, true);
         nfcIrqFlag = false;
         cardReader.startPassiveDetect();
-        esp_task_wdt_reset();
     }
 
     nfcScanningTaskStatus = TaskStatus::Stopped;
