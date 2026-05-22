@@ -290,7 +290,6 @@ void cardScanTask(void*)
     pinMode(NFC_IRQ, INPUT_PULLUP);
     nfcSpi.begin(NFC_SCLK, NFC_MISO, NFC_MOSI, NFC_SS);
     cardReader.begin();
-    cardReader.begin();
     attachInterrupt(digitalPinToInterrupt(NFC_IRQ), nfcISR, FALLING);
     cardReader.startPassiveDetect();
 
