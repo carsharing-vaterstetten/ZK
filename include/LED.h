@@ -51,30 +51,3 @@ public:
     void lockFlash();
     void cardDeclinedFlash();
 };
-
-class ThreadSafeCardReaderLED : private CardReaderLED
-{
-protected:
-    std::mutex mtx;
-
-public:
-    using CardReaderLED::CardReaderLED;
-
-    void unlockFlash()
-    {
-        std::lock_guard lock(mtx);
-        CardReaderLED::unlockFlash();
-    }
-
-    void lockFlash()
-    {
-        std::lock_guard lock(mtx);
-        CardReaderLED::lockFlash();
-    }
-
-    void cardDeclinedFlash()
-    {
-        std::lock_guard lock(mtx);
-        CardReaderLED::cardDeclinedFlash();
-    }
-};
