@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0]
+
+- NFC mit Interrupt auslesen.
+- FreeRTOS services
+- Stromversorgung vom Schlüssel über GPIO.
+
+> [!CAUTION]
+> Ab dieser Version ist die Firmware nur noch mit der HW Rev. 3 kompatibel!
+
 ## [1.4.0]
 
 - Erste Tests der gefahrenen Distanz Berechnung
