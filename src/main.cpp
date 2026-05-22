@@ -144,14 +144,14 @@ void checkNFCTag(NFCCardReader& cardReader, bool detected)
 
     while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs + showLedMs)
     {
-        const ulong t = millis() - s;
-        const uint8_t gb = t >= showLedMs ? 0 : 255 - t * 255 / showLedMs;
-        statusLed.setColor((gb << 8) | gb);
+        float progress = 1.0f - static_cast<float>(millis() - s) / static_cast<float>(showLedMs);
+        statusLed.progressIndicatorNext(StatusColor::WaitingForNFCCardToBeRemoved, std::clamp(progress, 0.0f, 1.0f));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 
     // From the first card scan to here it should be 6 seconds
 
-    statusLed.clear();
+    statusLed.progressIndicatorStop();
 }
 
 [[noreturn]] void restartRoutine()

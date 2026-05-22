@@ -50,4 +50,15 @@ public:
     void unlockFlash();
     void lockFlash();
     void cardDeclinedFlash();
+
+    void loadingCircleStart();
+    void loadingCircleNext(StatusColor color);
+    void loadingCircleStop();
+
+    void progressIndicatorNext(StatusColor color, float progress);
+    void progressIndicatorStop();
+
+protected:
+
+    uint16_t loadingCircleIndex = 0;
 };
