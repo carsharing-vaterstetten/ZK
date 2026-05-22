@@ -1,17 +1,9 @@
 ---
 thema: Usecases ZK_sharepad
 typ: sonstiges
-kategorie: allgemein
+kategorie: Usecases
 schlagworte: []
-letzte_aktualisierung: 2026-05-14
----
-
----
-thema: Usecases ZK_sharepad
-typ: sonstiges
-kategorie: allgemein
-schlagworte: []
-letzte_aktualisierung: 2026-05-14
+letzte_aktualisierung: 2026-05-22
 ---
 
 ## Themenüberblick
@@ -20,15 +12,38 @@ Die Usecases für ZK_sharepad umfassen die zentralen Funktionen der Zugangskontr
 
 **Schlagworte:** Zugangskontrolle, NFC-Authentifizierung, Carsharing, Reservierungssystem, Whitelist-Management, Pull-Architektur, Buchungsänderungen, Nutzerregistrierung, Kilometererfassung, Backend-Integration
 
-## Themenüberblick
-
-Das ZK_sharepad System behandelt verschiedene Use Cases für die Synchronisation und Verwaltung von Buchungsdaten zwischen dem Sharepad-System und externen Systemen. Die Analyse historischer Buchungsdaten zeigt, dass bei stündlicher Synchronisation 90% aller Buchungen erfasst werden, während kürzere Intervalle nur marginale Verbesserungen bringen. Zentrale Use Cases umfassen das Aufsperren und Zusperren von Fahrzeugen (UC2/UC3), die Nutzerregistrierung und Vereinszuordnung (UC6/UC10), sowie das Berechtigungskonzept (UC15). Besondere Aufmerksamkeit gilt der Verwaltung von Mehrverein-Mitgliedschaften und Vereinswechsel-Szenarien, wo Nutzer temporär bei mehreren Vereinen geführt werden müssen, sowie der Unterscheidung zwischen Nutzern mit und ohne Fahrberechtigung.
-
-**Schlagworte:** Synchronisation, Buchungsdaten, Use Cases, Nutzerregistrierung, Vereinsverwaltung, Berechtigungskonzept, Mehrverein-Mitgliedschaft, Fahrberechtigung, Whitelist, Freigabeprozess
-
 ## Use Cases
 
-## Use Cases
+| UC | Kurztitel | System | Kurzbeschreibung |
+|-----|-----------|--------|------------------|
+| [UC-01](#uc-01-auto-buchen) | Auto buchen | Sharepad | Eine Fahrzeugbuchung erstellen |
+| [UC-02](#uc-02-auto-öffnen) | Auto öffnen | ZK / Übergreifend | Zugang zum reservierten Fahrzeug erlangen |
+| [UC-03a](#uc-03a-auto-absperren-während-aktiver-reservierung) | Auto absperren (während aktiver Reservierung) | ZK | Das Fahrzeug während der Buchungszeit absperren |
+| [UC-03b](#uc-03b-auto-absperren-nach-terminendeüberziehung) | Auto absperren (nach Terminende/Überziehung) | ZK | Das Fahrzeug nach Terminende absperren |
+| [UC-03c](#uc-03c-überziehen--absperren-nach-terminende) | Überziehen / Absperren nach Terminende | ZK / Sharepad | Überziehungssituation erkennen und behandeln |
+| [UC-03d](#uc-03d-vorzeitiges-absperren--übergabe) | Vorzeitiges Absperren / Übergabe | ZK / Sharepad | Auto vorzeitig zurückgeben und restliche Zeit freigeben |
+| [UC-04](#uc-04-buchung-ändernstornieren) | Buchung ändern/stornieren | Sharepad / Übergreifend | Bestehende Buchungen anpassen oder löschen |
+| [UC-05](#uc-05-terminaktualisierung-abfragen) | Terminaktualisierung abfragen | ZK / Übergreifend | Aktuelle Buchungsdaten vom Server abrufen |
+| [UC-06](#uc-06-karte-sperrenlöschen) | Karte sperren/löschen | Sharepad / Übergreifend | Kartenzugang entziehen (z.B. bei verlorenem Führerschein) |
+| [UC-07](#uc-07-auto-registrieren) | Auto registrieren | Sharepad / ZK | Neue ZK mit Fahrzeug und Verein verknüpfen |
+| [UC-08](#uc-08-nutzer-registrieren) | Nutzer registrieren | Sharepad | Neuen Nutzer anlegen und mit Mitgliedschaften verknüpfen |
+| [UC-09](#uc-09-chip-kodieren) | Chip kodieren | Externe Hardware / Sharepad | NFC-Karte mit Vereinsschlüssel kodieren |
+| [UC-10](#uc-10-kilometererfassung) | Kilometererfassung | ZK / Sharepad | Gefahrene Kilometer automatisch erfassen und übertragen |
+| [UC-11](#uc-11-firmware-update) | Firmware-Update | ZK / Sharepad | ZK-Software aktualisieren |
+| [UC-12](#uc-12-protokolle-verwalten) | Protokolle verwalten | ZK / Sharepad | ZK-Aktivitäten protokollieren und überwachen |
+| [UC-13](#uc-13-führerscheindaten-ändernfreigeben) | Führerscheindaten ändern/freigeben | Sharepad / Übergreifend | Führerscheindaten aktualisieren und für Fahrberechtigung freigeben |
+| [UC-14](#uc-14-vereinswechsel-verwalten) | Vereinswechsel verwalten | Sharepad | Nutzer zwischen Vereinen wechseln oder mehrfach zuordnen |
+| [UC-15](#uc-15-berechtigungen-verwalten) | Berechtigungen verwalten | Sharepad | Nutzerrollen und Berechtigungen vereinsspezifisch zuweisen |
+| [UC-16](#uc-16-buchen-ohne-fahrberechtigung) | Buchen ohne Fahrberechtigung | Sharepad / ZK | Buchungen erstellen ohne Fahrzeugzugang |
+| [UC-17](#uc-17-nutzer--mitglied-ändern) | Nutzer / Mitglied ändern | Sharepad | Stammdaten eines Nutzers oder Mitglieds ändern |
+| [UC-18](#uc-18-nutzer--mitglied--ressource-stilllegen-und-löschen) | Nutzer / Mitglied / Ressource stilllegen und löschen | Sharepad | Lifecycle-Management für Nutzer, Mitglieder und Ressourcen |
+| [UC-19](#uc-19-ressource-konfigurieren--ändern) | Ressource konfigurieren / ändern | Sharepad / ZK | Parameter einer Ressource ändern (z.B. Standort, Verhalten der ZK) |
+| [UC-20](#uc-20-daten-exportieren--importieren) | Daten exportieren / importieren | Sharepad | Buchungsdaten exportieren und Kilometerdaten aus Drittsystemen importieren |
+| [UC-21](#uc-21-auswertung) | Auswertung | Sharepad | Statistische Auswertungen über Buchungen, Nutzung, Kilometer |
+| [UC-22](#uc-22-bestehende-karte-mit-user-verknüpfen) | Bestehende Karte mit User verknüpfen | Sharepad / Übergreifend | Bereits beklebten Führerschein bei neuem Verein registrieren |
+| [UC-23](#uc-23-kartenverlust-vereinsweise-sperren) | Kartenverlust vereinsweise sperren | Sharepad | Verlorene oder gestohlene Karte vereinsspezifisch sperren |
+| [UC-24](#uc-24-juristische-person-verwalten) | Juristische Person verwalten | Sharepad | Fahrberechtigte, Karten und Buchungsberechtigungen für juristische Personen verwalten |
+| [UC-25](#uc-25-box-registrieren) | Box registrieren | Sharepad / ZK | Neue ZK-Box mit Seriennummer und QR-Code registrieren |
 
 ### UC-01: Auto buchen
 - **System:** Sharepad
@@ -81,13 +96,13 @@ Das ZK_sharepad System behandelt verschiedene Use Cases für die Synchronisation
 - **System:** ZK / Übergreifend
 - **Akteur:** ZK-System
 - **Ziel:** Aktuelle Buchungsdaten vom Server abrufen
-- **Beschreibung:** Die ZK fragt in zwei Stufen ab: Erst "gibt es Änderungen?", dann bei Bedarf die vollständigen Terminlisten. Dies erfolgt 5 Minuten vor Terminbeginn, bei Kartenablehnungen und regelmäßig während abgesperrter Zustände mit aktiven Terminen. Basierend auf historischen Daten werden bei stündlicher Synchronisation 90% der Buchungen erfasst, bei 5-minütlicher Synchronisation 98,7%.
+- **Beschreibung:** Die ZK fragt in zwei Stufen ab: Erst "gibt es Änderungen?", dann bei Bedarf die vollständigen Terminlisten. Dies erfolgt 5 Minuten vor Terminbeginn, bei Kartenablehnungen und regelmäßig während abgesperrter Zustände mit aktiven Terminen. Basierend auf historischen Daten werden bei stündlicher Synchronisation 90% der Buchungen erfasst, bei 5-minütlicher Synchronisation 98,7%. Die Termin-Whitelists werden über die Member-User-NFC-ID Kette berechnet: Zu einem Member werden alle User gesucht und zu jedem User die verknüpften NFC-IDs.
 
 ### UC-06: Karte sperren/löschen
 - **System:** Sharepad / Übergreifend
 - **Akteur:** Administrator
 - **Ziel:** Kartenzugang entziehen (z.B. bei verlorenem Führerschein)
-- **Beschreibung:** Der Administrator entfernt eine Karten-UID aus dem System. Die UID wird aus allen Termin-Whitelisten und der globalen Whitelist entfernt. Alle betroffenen ZK-Systeme werden über die Änderung informiert. Die UID bleibt zur Nachverfolgbarkeit in historischen Daten erhalten.
+- **Beschreibung:** Der Administrator entfernt eine Karten-UID aus dem System. Die UID wird aus allen Termin-Whitelisten und der globalen Whitelist entfernt. Alle betroffenen ZK-Systeme werden über die Änderung informiert. Die UID bleibt zur Nachverfolgbarkeit in historischen Daten erhalten. Bei Doppelmitgliedschaften muss jeder betroffene Verein die Sperrung separat durchführen - es gibt keine automatische vereinsübergreifende Sperrung.
 
 ### UC-07: Auto registrieren
 - **System:** Sharepad / ZK
@@ -141,7 +156,7 @@ Das ZK_sharepad System behandelt verschiedene Use Cases für die Synchronisation
 - **System:** Sharepad
 - **Akteur:** Administrator
 - **Ziel:** Nutzerrollen und Berechtigungen vereinsspezifisch zuweisen
-- **Beschreibung:** Nutzer sind standardmäßig Anwender. Administrator- oder Super-User-Rechte werden vereinsspezifisch durch Aufnahme in entsprechende Listen vergeben. Vereinsangestellte ohne Mitgliedschaft werden über spezielle Orga-Mitgliedschaften verwaltet. Beim Entfernen aus allen Mitgliedschaften eines Vereins erlöschen automatisch die erweiterten Berechtigungen.
+- **Beschreibung:** Nutzer sind standardmäßig Anwender. Administrator- oder Supervisor-Rechte werden vereinsspezifisch durch Aufnahme in entsprechende Listen vergeben. Supervisor und Admin haben ähnliche Buchungsrechte, nur Admin hat zusätzlich Zugang zur Admin-Oberfläche. Vereinsangestellte ohne Mitgliedschaft werden über spezielle Orga-Mitgliedschaften verwaltet. Beim Entfernen aus allen Mitgliedschaften eines Vereins erlöschen automatisch die erweiterten Berechtigungen.
 
 ### UC-16: Buchen ohne Fahrberechtigung
 - **System:** Sharepad / ZK
@@ -179,9 +194,51 @@ Das ZK_sharepad System behandelt verschiedene Use Cases für die Synchronisation
 - **Ziel:** Statistische Auswertungen über Buchungen, Nutzung, Kilometer
 - **Beschreibung:** Für den aktuellen Scope bewusst nicht vorgesehen (zurückgestellt).
 
+### UC-22: Bestehende Karte mit User verknüpfen
+- **System:** Sharepad / Übergreifend
+- **Akteur:** Administrator
+- **Ziel:** Bereits beklebten Führerschein bei neuem Verein registrieren
+- **Beschreibung:** Ein Nutzer wechselt zu einem neuen Verein oder wird zusätzlich bei einem zweiten Verein Mitglied und möchte seinen bereits mit NFC-Chip beklebten Führerschein weiternutzen. Der Administrator trägt die Nutzerdaten in die App ein, scannt den vorhandenen Chip und sendet die Daten an das Backend. Das System erstellt eine neue Verknüpfung zwischen der bestehenden NFC-ID und dem neuen User. Als Sicherheitsfeature wird zurückgemeldet, bei welchen anderen Vereinen diese ID bereits registriert ist. Bei unerwarteten Mehrfachregistrierungen kann eine Doppel-ID-Situation erkannt werden.
+
+### UC-23: Kartenverlust vereinsweise sperren
+- **System:** Sharepad
+- **Akteur:** Administrator
+- **Ziel:** Verlorene oder gestohlene Karte vereinsspezifisch sperren
+- **Beschreibung:** Bei Verlust oder Diebstahl einer NFC-Karte meldet das Mitglied dies dem Verein. Der Administrator kann die entsprechende UID über die User-Zuordnung finden und aus den Whitelists des eigenen Vereins entfernen. Bei Doppelmitgliedschaften muss jeder betroffene Verein separat informiert werden und die Sperrung eigenständig durchführen. Eine automatische vereinsübergreifende Sperrung erfolgt nicht, um die Vereinsautonomie zu wahren.
+
+### UC-24: Juristische Person verwalten
+- **System:** Sharepad
+- **Akteur:** Administrator
+- **Ziel:** Fahrberechtigte, Karten und Buchungsberechtigungen für juristische Personen verwalten
+- **Beschreibung:** Juristische Personen (Firmen, Gemeinden) erhalten eine flexible Verwaltung über drei User-Kategorien: Karten-User (für physische Karten ohne Personenbezug), Fahrberechtigte-User (für jährliche Führerscheinlisten ohne Login) und Buchungs-User (für Login-Berechtigung ohne Fahrberechtigung). Ein Mitarbeiter kann in allen drei Kategorien gleichzeitig geführt werden. Die juristische Person übermittelt jährlich eine Liste aller Fahrberechtigten mit Bestätigung gültiger Führerscheine. Karten können am Kühlschrank hängen oder zentral verwaltet werden.
+
+### UC-25: Box registrieren
+- **System:** Sharepad / ZK
+- **Akteur:** Administrator
+- **Ziel:** Neue ZK-Box mit Seriennummer und QR-Code registrieren
+- **Beschreibung:** ZK-Boxen werden mit vorprogrammierter Seriennummer geliefert und benötigen keine weitere Programmierung durch den Verein. Die Seriennummer ist als QR-Code außen auf der Box aufgedruckt, um das Scannen ohne Aufschrauben zu ermöglichen. Der Administrator scannt den QR-Code und ordnet die Box dem entsprechenden Fahrzeug und Verein zu.
+
+## Glossar
+| Begriff | Bedeutung |
+|---------|----------|
+| ZK | Zentralkontrolle - Hardware-Box im Fahrzeug für NFC-basierte Zugangssteuerung |
+| NFC-Karte | Near Field Communication Karte mit eindeutiger UID für Fahrzeugzugang |
+| UID | Unique Identifier - eindeutige Kennung der NFC-Karte |
+| Whitelist | Liste berechtigter NFC-UIDs für Fahrzeugzugang |
+| Termin-Whitelist | Buchungsspezifische Liste berechtigter UIDs für eine Reservierung |
+| Globale Whitelist | Vereinsweite Liste aller aktiven NFC-UIDs |
+| Member | Mitgliedschaft einer Person oder Organisation bei einem Verein |
+| User | Benutzer im System, kann natürliche oder juristische Person sein |
+| Login | Anmeldedaten für Zugang zum Buchungssystem |
+| Supervisor | Benutzerrolle mit erweiterten Buchungsrechten, aber ohne Admin-Zugang |
+| Sektor 1 | Verschlüsselter Bereich der NFC-Karte mit vereinsspezifischen Daten |
+| Polling | Regelmäßige Abfrage der ZK beim Server nach Aktualisierungen |
+| Fliegende Übergabe | Fahrzeugwechsel zwischen Nutzern ohne ZK-Kontakt |
+
 ## Quellen
 
 | Datum | Thema | Transkript |
 |-------|-------|------------|
 | 2026-04-02 | Usecases ZK_sharepad | [Transkript](../../../.doku-arbeitsbereich/2026-04-02_Abstimmung-2026-04-02/transkript/transkript_2026-04-02.md) |
 | 2026-04-13 | Usecases ZK_sharepad | [Transkript](../../../.doku-arbeitsbereich/2026-04-13_Abstimmung-2026-04-13/transkript/transkript_2026-04-13.md) |
+| 2026-05-21 | Usecases ZK_sharepad | [Transkript](../../../.doku-arbeitsbereich/2026-05-21_Abstimmung-2026-05-20/transkript/transkript_2026-05-21.md) |

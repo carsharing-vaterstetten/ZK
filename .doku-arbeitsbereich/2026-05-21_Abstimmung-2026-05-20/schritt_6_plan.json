@@ -1,0 +1,43 @@
+{
+  "themen": [
+    {
+      "thema_id": "540b3e1c-cd60-464a-95dc-6fe00816e009",
+      "thema_name": "Usecases ZK_sharepad",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "use_cases",
+          "label": "Use Cases",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    },
+    {
+      "thema_id": "7c0002d2-c5ee-435d-bfb3-ed108b40f9f9",
+      "thema_name": "Datenmodell",
+      "dokumenttyp": "sonstiges",
+      "abschnitte": [
+        {
+          "id": "zusammenfassung",
+          "label": "Zusammenfassung",
+          "status": "erfolgreich"
+        },
+        {
+          "id": "datenmodell",
+          "label": "datenmodell",
+          "status": "erfolgreich"
+        }
+      ],
+      "frontmatter_status": "erfolgreich",
+      "extraktion_status": "erfolgreich"
+    }
+  ],
+  "tagesseite_basis_status": "erfolgreich"
+}
