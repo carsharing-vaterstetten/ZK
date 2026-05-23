@@ -304,6 +304,7 @@ void cardScanTask(void*)
         checkNFCTag(cardReader, true);
         nfcIrqFlag = false;
         cardReader.startPassiveDetect();
+        esp_task_wdt_reset();
     }
 
     nfcScanningTaskStatus = TaskStatus::Stopped;
