@@ -10,6 +10,7 @@ class AccessControl
     std::optional<bool> loggedInRfidConsentsToGPSTracking = std::nullopt;
 
     uint8_t keyOpenPin, keyClosePin, keyPowerPin;
+    uint powerUpTimeMs, powerDownTimeMs;
     const char* storageName;
 
     void unlockCar() const;
@@ -18,9 +19,9 @@ class AccessControl
     void turnOffKey() const;
 
 public:
-    AccessControl(const uint8_t keyOpenPin, const uint8_t keyClosePin, const uint8_t keyPowerPin,
+    AccessControl(const uint8_t keyOpenPin, const uint8_t keyClosePin, const uint8_t keyPowerPin, uint powerUpTimeMs, uint powerDownTimeMs,
                   const char* storageNameIdentifier) :
-        keyOpenPin(keyOpenPin), keyClosePin(keyClosePin), keyPowerPin(keyPowerPin),
+        keyOpenPin(keyOpenPin), keyClosePin(keyClosePin), keyPowerPin(keyPowerPin), powerUpTimeMs(powerUpTimeMs), powerDownTimeMs(powerDownTimeMs),
         storageName(storageNameIdentifier) {}
 
     bool begin();

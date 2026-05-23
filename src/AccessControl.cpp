@@ -66,7 +66,9 @@ void AccessControl::login(const uint32_t rfid)
 {
     cachedLoggedInRfid = rfid;
     turnOnKey();
+    delay(powerUpTimeMs);
     unlockCar();
+    delay(powerDownTimeMs);
     turnOffKey();
     loggedInRfidConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfid);
     fileLog.infoln(loggedInRfidConsentsToGPSTracking.value()
@@ -80,7 +82,9 @@ void AccessControl::logout()
     cachedLoggedInRfid = std::nullopt;
     loggedInRfidConsentsToGPSTracking = std::nullopt;
     turnOnKey();
+    delay(powerUpTimeMs);
     lockCar();
+    delay(powerDownTimeMs);
     turnOffKey();
     persistentStorage.remove(loggedInRfidKey);
 }
