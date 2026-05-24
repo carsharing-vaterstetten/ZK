@@ -22,43 +22,42 @@ enum class StatusColor
 class LED
 {
 public:
-    LED(uint16_t ledCount, int16_t ledPin, neoPixelType type);
+    explicit LED(Adafruit_NeoPixel& ledDriver);
 
-    bool begin();
-    void setColor(uint32_t hex);
-    void clear();
-    void flash(uint32_t hexColor, uint16_t durationMs);
+    bool begin() const;
+    void setColor(uint32_t hex) const;
+    void clear() const;
+    void flash(uint32_t hexColor, uint16_t durationMs) const;
 
 protected:
-    Adafruit_NeoPixel neo;
+    Adafruit_NeoPixel& neo;
 };
 
 class StatusLED : public LED
 {
 public:
     using LED::LED;
-    void setStatusColor(StatusColor color);
-    void flash(StatusColor color, uint16_t durationMs);
+    void setStatusColor(StatusColor color) const;
+    void flash(StatusColor color, uint16_t durationMs) const;
     static uint32_t getStatusColorValue(StatusColor color);
 };
 
 class CardReaderLED : public StatusLED
 {
 public:
-    CardReaderLED(uint16_t ledCount, int16_t ledPin, neoPixelType type);
+    using StatusLED::StatusLED;
 
-    void unlockFlash();
-    void lockFlash();
-    void cardDeclinedFlash();
+    void unlockFlash() const;
+    void lockFlash() const;
+    void cardDeclinedFlash() const;
 
     void loadingCircleStart();
     void loadingCircleNext(StatusColor color);
-    void loadingCircleStop();
+    void loadingCircleStop() const;
 
-    void progressIndicatorNext(StatusColor color, float progress);
-    void progressIndicatorStop();
+    void progressIndicatorNext(StatusColor color, float progress) const;
+    void progressIndicatorStop() const;
 
 protected:
-
     uint16_t loadingCircleIndex = 0;
 };

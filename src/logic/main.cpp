@@ -1,10 +1,10 @@
 #include <Modem.h>
 #include <NFCCardReader.h>
 #include <HelperUtils.h>
-#include <LED.h>
 #include <esp32-hal.h>
 #include <esp_task_wdt.h>
 
+#include "../modules/LED.h"
 #include "esp_pm.h"
 #include "esp_log.h"
 #include "AccessControl.h"
@@ -49,7 +49,8 @@ Modem modem{
 AccessControl accessControl{OPEN_KEY, CLOSE_KEY, KEY_POWER, 100, 200, "AccCtrl v1"};
 GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
 ApiClient* api = nullptr;
-CardReaderLED statusLed{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
+Adafruit_NeoPixel ledDriver{LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800};
+CardReaderLED statusLed{ledDriver};
 auto config = new LocalConfig{
     DEFAULT_CONFIG_APN,
     DEFAULT_CONFIG_GPRS_USER,

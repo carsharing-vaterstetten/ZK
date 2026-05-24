@@ -1,37 +1,37 @@
 #include "LED.h"
 
-LED::LED(const uint16_t ledCount, const int16_t ledPin, const neoPixelType type) : neo{ledCount, ledPin, type} {}
+LED::LED(Adafruit_NeoPixel& ledDriver) : neo(ledDriver) {}
 
-bool LED::begin()
+bool LED::begin() const
 {
     return neo.begin();
 }
 
-void LED::setColor(const uint32_t hex)
+void LED::setColor(const uint32_t hex) const
 {
     neo.fill(hex);
     neo.show();
 }
 
-void LED::clear()
+void LED::clear() const
 {
     neo.clear();
     neo.show();
 }
 
-void LED::flash(const uint32_t hexColor, const uint16_t durationMs)
+void LED::flash(const uint32_t hexColor, const uint16_t durationMs) const
 {
     setColor(hexColor);
     delay(durationMs);
     clear();
 }
 
-void StatusLED::setStatusColor(const StatusColor color)
+void StatusLED::setStatusColor(const StatusColor color) const
 {
     setColor(getStatusColorValue(color));
 }
 
-void StatusLED::flash(const StatusColor color, const uint16_t durationMs)
+void StatusLED::flash(const StatusColor color, const uint16_t durationMs) const
 {
     setStatusColor(color);
     delay(durationMs);
@@ -65,24 +65,21 @@ uint32_t StatusLED::getStatusColorValue(const StatusColor color)
     }
 }
 
-CardReaderLED::CardReaderLED(const uint16_t ledCount, const int16_t ledPin, const neoPixelType type) : StatusLED(
-    ledCount, ledPin, type) {}
-
-void CardReaderLED::unlockFlash()
+void CardReaderLED::unlockFlash() const
 {
     flash(StatusColor::CarUnlocked, 100);
     delay(100);
     flash(StatusColor::CarUnlocked, 100);
 }
 
-void CardReaderLED::lockFlash()
+void CardReaderLED::lockFlash() const
 {
     flash(StatusColor::CarLocked, 100);
     delay(100);
     flash(StatusColor::CarLocked, 100);
 }
 
-void CardReaderLED::cardDeclinedFlash()
+void CardReaderLED::cardDeclinedFlash() const
 {
     flash(StatusColor::NFCUnknownUIDScanned, 1500);
 }
@@ -102,12 +99,12 @@ void CardReaderLED::loadingCircleNext(const StatusColor color)
     loadingCircleIndex = (loadingCircleIndex + 1) % neo.numPixels();
 }
 
-void CardReaderLED::loadingCircleStop()
+void CardReaderLED::loadingCircleStop() const
 {
     clear();
 }
 
-void CardReaderLED::progressIndicatorNext(const StatusColor color, const float progress)
+void CardReaderLED::progressIndicatorNext(const StatusColor color, const float progress) const
 {
     const uint16_t activePixels = progress * static_cast<float>(neo.numPixels());
 
@@ -129,7 +126,7 @@ void CardReaderLED::progressIndicatorNext(const StatusColor color, const float p
     neo.show();
 }
 
-void CardReaderLED::progressIndicatorStop()
+void CardReaderLED::progressIndicatorStop() const
 {
     clear();
 }
