@@ -1,14 +1,13 @@
 #include "AccessControl.h"
 #include "Globals.h"
-#include "HelperUtils.h"
-#include "RFIDs.h"
+#include "logic/HelperUtils.h"
+#include "../logic/RFIDs.h"
 
 bool AccessControl::begin()
 {
-    pinMode(keyOpenPin, OUTPUT);
-    pinMode(keyClosePin, OUTPUT);
+    driver.begin();
 
-    const bool storageInitSuccess = persistentStorage.begin(storageName, false);
+    const bool storageInitSuccess = persistentStorage.begin(kStorageName, false);
 
     if (storageInitSuccess)
     {
@@ -16,8 +15,9 @@ bool AccessControl::begin()
         {
             const uint32_t loggedInRfid = persistentStorage.getULong(loggedInRfidKey);
             cachedLoggedInRfid = loggedInRfid;
-            fileLog.infoln("RFID " + String(loggedInRfid, 16) + " is logged in");
             loggedInRfidConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(loggedInRfid);
+
+            fileLog.infoln("RFID " + String(loggedInRfid, 16) + " is logged in");
             fileLog.infoln(loggedInRfidConsentsToGPSTracking.value()
                                ? "Logged in RFID consents to GPS tracking"
                                : "Logged in RFID does not consent to GPS tracking");
@@ -36,56 +36,26 @@ void AccessControl::end()
     persistentStorage.end();
 }
 
-void AccessControl::lockCar() const
-{
-    digitalWrite(keyClosePin, HIGH);
-    delay(200);
-    digitalWrite(keyClosePin, LOW);
-    fileLog.infoln("Car locked");
-}
-
-void AccessControl::turnOnKey() const
-{
-    digitalWrite(keyPowerPin, HIGH);
-}
-
-void AccessControl::turnOffKey() const
-{
-    digitalWrite(keyPowerPin, LOW);
-}
-
-void AccessControl::unlockCar() const
-{
-    digitalWrite(keyOpenPin, HIGH);
-    delay(200);
-    digitalWrite(keyOpenPin, LOW);
-    fileLog.infoln("Car unlocked");
-}
-
 void AccessControl::login(const uint32_t rfid)
 {
     cachedLoggedInRfid = rfid;
-    turnOnKey();
-    delay(powerUpTimeMs);
-    unlockCar();
-    delay(powerDownTimeMs);
-    turnOffKey();
     loggedInRfidConsentsToGPSTracking = RFIDs::RFIDConsentsToGPSTrackingTest(rfid);
+
+    driver.open();
+
     fileLog.infoln(loggedInRfidConsentsToGPSTracking.value()
                        ? "Logged in RFID consents to GPS tracking"
                        : "Logged in RFID does not consent to GPS tracking");
+
     persistentStorage.putULong(loggedInRfidKey, rfid);
 }
 
 void AccessControl::logout()
 {
+    driver.close();
+
     cachedLoggedInRfid = std::nullopt;
     loggedInRfidConsentsToGPSTracking = std::nullopt;
-    turnOnKey();
-    delay(powerUpTimeMs);
-    lockCar();
-    delay(powerDownTimeMs);
-    turnOffKey();
     persistentStorage.remove(loggedInRfidKey);
 }
 

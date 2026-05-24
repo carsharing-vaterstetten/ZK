@@ -2,7 +2,7 @@
 
 #include <WString.h>
 
-#include "ApiStreams.h"
+#include "../abstract/ApiStreams.h"
 
 class WdClient;
 class Modem;

@@ -12,7 +12,7 @@ ein autorisierter Tag erkannt wird, wird der Zugang gewährt oder verweigert.
 
 ### Pinbelegung
 
-Die Pinbelegung kann in [`include/Config.h`](include/Config.h) angepasst werden.
+Die Pinbelegung kann in [`include/Config.h`](src/config/Config.h) angepasst werden.
 
 ## Firmware
 

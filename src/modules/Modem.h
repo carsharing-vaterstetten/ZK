@@ -6,8 +6,9 @@
 #define TINY_GSM_RX_BUFFER 1024 // 1 KiB
 #include <TinyGsmClient.h>
 
-#include "ApiStreams.h"
-#include "GPS.h"
+#include "../abstract/ApiStreams.h"
+#include "../logic/GPS.h"
+#include "drivers/modem.h"
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
 
@@ -52,15 +53,15 @@ class Modem
 protected:
     bool modemIsAwake = false, gpsIsEnabled = false;
     ulong serialBaud;
-    int8_t rxPin, txPin;
 
     HardwareSerial& serial;
     TinyGsmSim7000& gsmModem;
 
     const char *gprsUser = "", *gprsPassword = "", *apn = "";
 
-    uint8_t boardPowerOnPin, boardPWRKeyPin, modemDTRPin;
-    uint32_t modemPowerOnPulseWidthMs, modemPowerOffPulseWidthMs;
+    static constexpr uint32_t modemPowerOnPulseWidthMs = 1000, modemPowerOffPulseWidthMs = 1300;
+
+    const ModemDriver& driver;
 
     bool beginSleep();
     std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
@@ -71,9 +72,7 @@ protected:
     void forcePowerCycle() const;
 
 public:
-    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, int8_t rxPin, int8_t txPin,
-          uint8_t boardPowerOnPin, uint8_t boardPWRKeyPin, uint8_t modemDTRPin, uint32_t modemPowerOnPulseWidthMs,
-          uint32_t modemPowerOffPulseWidthMs);
+    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemDriver& driver);
 
     bool powerOff() const;
     void powerOn() const;

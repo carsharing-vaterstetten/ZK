@@ -1,7 +1,7 @@
 #include "Log.h"
 
-#include "HelperUtils.h"
-#include "Modem.h"
+#include "logic/HelperUtils.h"
+#include "modules/Modem.h"
 
 #define COLOR_RESET   "\033[0m"
 #define COLOR_RED     "\033[31m"

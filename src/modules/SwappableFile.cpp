@@ -3,7 +3,7 @@
 #include <LittleFS.h>
 
 #include "Globals.h"
-#include "StorageManager.h"
+#include "../logic/LittleFSHelper.h"
 
 bool SwappableFile::begin(const bool moveBOverToA)
 {
@@ -126,7 +126,7 @@ bool SwappableFile::replaceAwithBAndSwapToA()
 {
     if (currentLogFile)
         currentLogFile->close();
-    StorageManager::move(fileBPath, fileAPath, true);
+    LittleFSHelper::move(fileBPath, fileAPath, true);
     return swapToA();
 }
 

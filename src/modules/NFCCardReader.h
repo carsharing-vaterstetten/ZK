@@ -19,19 +19,23 @@ struct ScanResult
     uint32_t uid; // Only valid if status is NewCard or Duplicate
 };
 
-class NFCCardReader : protected Adafruit_PN532
+class NFCCardReader
 {
+protected:
     std::optional<uint32_t> _lastUid = std::nullopt;
     ulong _lastSeenTime = 0;
     const ulong _cooldownMs;
+    Adafruit_PN532& nfc;
 
     // Helper to handle hardware reading
-    [[nodiscard]] std::optional<uint32_t> readRawTag(bool detected);
+    [[nodiscard]] std::optional<uint32_t> readRawTag(bool detected) const;
 
 public:
-    NFCCardReader(SPIClass& spi, uint8_t cs, ulong cooldownMs = 7000);
-    bool begin();
+    explicit NFCCardReader(Adafruit_PN532& nfcDriver, ulong cooldownMs = 7000);
+    bool begin() const;
 
     [[nodiscard]] ScanResult scan(bool detected);
-    void startPassiveDetect();
+    void startPassiveDetect() const;
+
+
 };

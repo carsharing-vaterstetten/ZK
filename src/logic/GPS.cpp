@@ -3,7 +3,7 @@
 #include <LittleFS.h>
 
 #include "Globals.h"
-#include "Modem.h"
+#include "../modules/Modem.h"
 
 GPS::GPS(const char* localFilePath, const char* uploadEndpoint) : localFilePath(localFilePath),
                                                                   uploadEndpoint(uploadEndpoint) {}

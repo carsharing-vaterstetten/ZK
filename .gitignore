@@ -1,6 +1,6 @@
 .pio
 .vscode/**
-include/Config.h
+src/config/Config.h
 configs
 .DS_Store
 .idea

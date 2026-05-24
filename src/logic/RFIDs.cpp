@@ -2,10 +2,11 @@
 
 #include "mbedtls/md5.h"
 #include <ArduinoJson.h>
-#include "Backend.h"
+#include "config/Backend.h"
 #include "Globals.h"
 #include "HelperUtils.h"
-#include "StorageManager.h"
+#include "LittleFSHelper.h"
+#include "config/Intern.h"
 
 std::vector<uint32_t> rfids;
 
@@ -18,13 +19,13 @@ bool RFIDs::isRegisteredRFID(const uint32_t rfid)
 /// So always call this on startup and after the file changed on the disk (e.g. after remote download)
 bool RFIDs::load()
 {
-    if (!StorageManager::exists(RFID_FILE_PATH))
+    if (!LittleFS.exists(RFID_FILE_PATH))
     {
         fileLog.errorln("Failed to check UID, file does not exist");
         return false;
     }
 
-    File f = StorageManager::openRFIDs(FILE_READ);
+    File f = LittleFS.open(RFID_FILE_PATH, FILE_READ);
 
     if (!f)
     {
@@ -51,7 +52,7 @@ bool RFIDs::load()
 
 void generateChecksum(uint8_t out[16])
 {
-    if (!StorageManager::rfidsFileExists())
+    if (!LittleFS.exists(RFID_FILE_PATH))
     {
         fileLog.infoln("Local RFIDs file does not exist");
         constexpr uint8_t empty_md5[16] = {
@@ -64,7 +65,7 @@ void generateChecksum(uint8_t out[16])
         return;
     }
 
-    File f = StorageManager::openRFIDs(FILE_READ);
+    File f = LittleFS.open(RFID_FILE_PATH, FILE_READ);
     HelperUtils::md5File(f, out);
     f.close();
 }
@@ -101,7 +102,7 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
     }
 
     // Open temp file for writing
-    File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
+    File file = LittleFS.open(TMP_RFID_FILE_PATH,FILE_WRITE, true);
 
     if (!file)
     {
@@ -120,7 +121,7 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
     {
         fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
         file.close();
-        StorageManager::removeTmpRFIDs();
+        LittleFSHelper::remove(TMP_RFID_FILE_PATH);
         return;
     }
 
@@ -137,14 +138,15 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
 
     fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
-    StorageManager::replaceRFIDsFileWithTmpRFIDs();
+    const bool moveSuccess = LittleFSHelper::move(TMP_RFID_FILE_PATH, RFID_FILE_PATH, true);
+    fileLog.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
 }
 
-bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
+bool RFIDs::downloadGPSTrackingConsentedRFIDs(const ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
 
-    File file = StorageManager::openTmpRFIDs(FILE_WRITE, true);
+    File file = LittleFS.open(TMP_RFID_FILE_PATH, FILE_WRITE, true);
 
     if (!file)
     {
@@ -178,19 +180,21 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
         fileLog.errorln(
             "Downloaded size (" + String(bytesDownloaded) + " B) does not match content size (" +
             String(resp.bodyLength) + " B). GPS UIDs not updated");
-        StorageManager::removeTmpRFIDs();
+        LittleFSHelper::remove(TMP_RFID_FILE_PATH);
         return false;
     }
 
     fileLog.infoln("Successfully downloaded file");
 
-    return StorageManager::replaceGpsUIDsFileWithTmpUIDs();
+    const bool moveSuccess = LittleFSHelper::move(TMP_RFID_FILE_PATH, GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, true);
+    fileLog.logInfoOrErrorln(moveSuccess, "GPS RFID UIDs updated successfully", "GPS RFID UIDs not updated");
+    return moveSuccess;
 }
 
 
 bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid)
 {
-    File file = StorageManager::openGpsRFIDs(FILE_READ);
+    File file = LittleFS.open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, FILE_READ);
 
     if (!file)
     {

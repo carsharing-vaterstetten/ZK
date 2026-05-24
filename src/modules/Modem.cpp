@@ -1,45 +1,29 @@
 #include <esp_system.h>
 
-#include "HelperUtils.h"
+#include "logic/HelperUtils.h"
 #include "Modem.h"
 #include "Api.h"
 #include "Globals.h"
-#include "StorageManager.h"
+#include "logic/LittleFSHelper.h"
 
-Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud, const int8_t rxPin,
-             const int8_t txPin, const uint8_t boardPowerOnPin, const uint8_t boardPWRKeyPin, const uint8_t modemDTRPin,
-             const uint32_t modemPowerOnPulseWidthMs, const uint32_t modemPowerOffPulseWidthMs
-
-) : serialBaud(serialBaud), rxPin(rxPin), txPin(txPin), serial(hwSerial), gsmModem(gsmModem),
-    boardPowerOnPin(boardPowerOnPin), boardPWRKeyPin(boardPWRKeyPin), modemDTRPin(modemDTRPin),
-    modemPowerOnPulseWidthMs(modemPowerOnPulseWidthMs), modemPowerOffPulseWidthMs(modemPowerOffPulseWidthMs) {}
+Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud, const ModemDriver& driver) :
+    serialBaud(serialBaud), serial(hwSerial), gsmModem(gsmModem), driver(driver) {}
 
 void Modem::powerOn() const
 {
-    pinMode(boardPowerOnPin, OUTPUT);
-    digitalWrite(boardPowerOnPin, HIGH);
+    driver.providePower();
     fileLog.infoln("Modem power on");
 }
 
 void Modem::turnOn() const
 {
-    pinMode(boardPWRKeyPin, OUTPUT);
-    digitalWrite(boardPWRKeyPin, LOW);
-    delay(100);
-    digitalWrite(boardPWRKeyPin, HIGH);
-    delay(modemPowerOnPulseWidthMs);
-    digitalWrite(boardPWRKeyPin, LOW);
+    driver.turnOn();
     fileLog.infoln("Modem turned on");
 }
 
 void Modem::turnOff() const
 {
-    digitalWrite(boardPWRKeyPin, LOW);
-    delay(100);
-    pinMode(boardPWRKeyPin, OUTPUT);
-    digitalWrite(boardPWRKeyPin, HIGH);
-    delay(modemPowerOffPulseWidthMs);
-    digitalWrite(boardPWRKeyPin, LOW);
+    driver.turnOff();
     fileLog.infoln("Modem turned off");
 }
 
@@ -56,13 +40,14 @@ void Modem::forcePowerCycle() const
 {
     fileLog.warningln("Forcing Modem Power Cycle...");
 
-    digitalWrite(boardPowerOnPin, LOW); // Cut power completely (Mimic Hard Reset)
+    driver.cutPower(); // Cut power completely (Mimic Hard Reset)
     delay(2000); // Wait for capacitors to discharge
-    digitalWrite(boardPowerOnPin, HIGH); // Restore power
+    driver.providePower(); // Restore power
     delay(500); // Wait for voltage to stabilize
 
     fileLog.infoln("Modem power restored");
 }
+
 
 void Modem::wakeup()
 {
@@ -74,8 +59,7 @@ void Modem::wakeup()
         return;
     }
 
-    pinMode(modemDTRPin, OUTPUT);
-    digitalWrite(modemDTRPin, LOW);
+    driver.wakeup();
     // delay(2000);
     gsmModem.sleepEnable(false);
     modemIsAwake = true;
@@ -91,8 +75,7 @@ void Modem::wakeupAndWait(const uint32_t timeoutMs)
 
 bool Modem::beginSleep()
 {
-    pinMode(modemDTRPin, OUTPUT);
-    digitalWrite(modemDTRPin, HIGH);
+    driver.sleep();
     const bool success = gsmModem.sleepEnable(true);
     fileLog.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
     if (success)
@@ -182,6 +165,8 @@ bool Modem::begin(const char* simPin, const char* user, const char* password, co
     gprsUser = user;
     gprsPassword = password;
     apn = netApn;
+
+    driver.begin();
 
     wakeup();
 
@@ -462,7 +447,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const 
     if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
     {
         f.close();
-        const bool removeSuccess = StorageManager::remove(filePath);
+        const bool removeSuccess = LittleFSHelper::remove(filePath);
         fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }

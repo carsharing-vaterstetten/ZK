@@ -5,14 +5,14 @@
 #include <iomanip>
 #include <LittleFS.h>
 
-#include "Backend.h"
+#include "config/Backend.h"
 #include "Globals.h"
-#include "Intern.h"
+#include "config/Intern.h"
 #include "mbedtls/base64.h"
 
-#include "Modem.h"
+#include "modules/Modem.h"
 #include "LocalConfig.h"
-#include "SwappableFile.h"
+#include "modules/SwappableFile.h"
 
 
 std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)

@@ -2,45 +2,45 @@
 
 #include "Globals.h"
 
-NFCCardReader::NFCCardReader(SPIClass& spi, const uint8_t cs, const ulong cooldownMs) : Adafruit_PN532(cs, &spi),
-    _cooldownMs(cooldownMs) {}
+NFCCardReader::NFCCardReader(Adafruit_PN532& nfcDriver, const ulong cooldownMs) : _cooldownMs(cooldownMs),
+    nfc(nfcDriver) {}
 
-bool NFCCardReader::begin()
+bool NFCCardReader::begin() const
 {
     fileLog.debugln("Connecting to NFC board...");
 
-    if (!Adafruit_PN532::begin())
+    if (!nfc.begin())
     {
         fileLog.criticalln("Failed to initialize NFC card reader. No RFID scanning possible");
         return false;
     }
 
-    if (!getFirmwareVersion())
+    if (!nfc.getFirmwareVersion())
     {
         fileLog.criticalln("Failed to connect to NFC board. No RFID scanning possible");
         return false;
     }
 
-    SAMConfig();
+    nfc.SAMConfig();
 
     fileLog.infoln("NFC board connected successfully");
 
     return true;
 }
 
-std::optional<uint32_t> NFCCardReader::readRawTag(const bool detected)
+std::optional<uint32_t> NFCCardReader::readRawTag(const bool detected) const
 {
     uint8_t uidArr[7] = {};
     uint8_t uidLen = 0;
 
     if (detected)
     {
-        if (!readDetectedPassiveTargetID(uidArr, &uidLen))
+        if (!nfc.readDetectedPassiveTargetID(uidArr, &uidLen))
             return std::nullopt;
     }
     else
     {
-        if (!readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
+        if (!nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uidArr, &uidLen, 200))
             return std::nullopt;
     }
 
@@ -74,7 +74,7 @@ ScanResult NFCCardReader::scan(const bool detected)
     return {isDuplicate ? ScanStatus::Duplicate : ScanStatus::NewCard, *currentUid};
 }
 
-void NFCCardReader::startPassiveDetect()
+void NFCCardReader::startPassiveDetect() const
 {
-    startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+    nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
 }

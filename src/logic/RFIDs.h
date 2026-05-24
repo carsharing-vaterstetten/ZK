@@ -16,7 +16,7 @@ namespace RFIDs
 {
     bool isRegisteredRFID(uint32_t rfid);
     void downloadRfidsIfChanged(const ApiClient& api);
-    bool downloadGPSTrackingConsentedRFIDs(ApiClient& api);
+    bool downloadGPSTrackingConsentedRFIDs(const ApiClient& api);
     bool RFIDConsentsToGPSTrackingTest(uint32_t rfid);
     bool load();
 }

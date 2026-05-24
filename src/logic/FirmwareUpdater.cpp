@@ -2,11 +2,11 @@
 
 #include <Update.h>
 
-#include "Api.h"
-#include "Backend.h"
+#include "../modules/Api.h"
+#include "config/Backend.h"
 #include "Globals.h"
-#include "Modem.h"
-#include "StorageManager.h"
+#include "../modules/Modem.h"
+#include "config/Intern.h"
 
 #define UPDATE_COMMAND U_FLASH
 
