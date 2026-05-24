@@ -273,7 +273,7 @@ void cardScanTask(void*)
 
     SPIClass nfcSpi{ACTIVE_BOARD->nfcSpi};
     Adafruit_PN532 nfcDriver{ACTIVE_BOARD->nfcCs, &nfcSpi};
-    NFCCardReader cardReader{nfcDriver, ACTIVE_BOARD->nfcCs};
+    NFCCardReader cardReader{nfcDriver};
 
     nfcSpi.begin(ACTIVE_BOARD->nfcClk, ACTIVE_BOARD->nfcMiso, ACTIVE_BOARD->nfcMosi, ACTIVE_BOARD->nfcCs);
     cardReader.begin();
