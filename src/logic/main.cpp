@@ -165,7 +165,7 @@ void checkNFCTag(NFCCardReader& cardReader, bool detected)
 
     fileLog.debugln("Waiting for tasks to stop");
 
-    while (nfcScanningTaskStatus == TaskStatus::StopRequested || gpsDataTaskStatus == TaskStatus::Stopped)
+    while (nfcScanningTaskStatus != TaskStatus::Stopped || gpsDataTaskStatus != TaskStatus::Stopped)
         vTaskDelay(pdMS_TO_TICKS(100));
 
     modem->wakeupAndWait();
