@@ -1,25 +1,32 @@
 #pragma once
 
-#include "config/hw_config.h"
+#include "abstract/PinSequencePlayer.h"
+#include "shared/KeySequenceManager.h"
+
+
+struct SequencePoint;
 
 class CarKeyDriver
 {
 public:
-    explicit CarKeyDriver(const BoardConfig& board) : board(board) {}
+    CarKeyDriver(uint8_t openKeyPin, uint8_t closeKeyPin, uint8_t keyPowerPin,
+                 bool hasPowerKey, const KeySequenceManager& keySequenceManager);
 
     void begin() const;
-    void open() const;
-    void close() const;
 
-private:
-    const BoardConfig& board;
+    void startOpenSequence();
+    [[nodiscard]] bool openSequenceCompleted() const;
 
-    static constexpr uint32_t kPulseMs     = 200;
-    static constexpr uint32_t kPowerUpMs   = 500;
-    static constexpr uint32_t kPowerDownMs = 300;
+    void startCloseSequence();
+    [[nodiscard]] bool closeSequenceCompleted() const;
+    void pollOpen();
+    void pollClose();
 
-    void powerOn() const;
-    void powerOff() const;
-    static void pulse(uint8_t pin);
-    void poweredPulse(uint8_t pin) const;
+protected:
+    uint8_t openKeyPin, closeKeyPin, keyPowerPin;
+    bool hasPowerKey;
+
+    const KeySequenceManager& keySequenceManager;
+
+    SequencePlayer openSequencePlayer{{}}, closeSequencePlayer{{}};
 };

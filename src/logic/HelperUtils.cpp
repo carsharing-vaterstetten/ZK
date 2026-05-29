@@ -4,15 +4,13 @@
 #include "mbedtls/md5.h"
 #include <iomanip>
 #include <LittleFS.h>
+#include <mbedtls/base64.h>
 
 #include "config/Backend.h"
-#include "Globals.h"
-#include "config/Intern.h"
-#include "mbedtls/base64.h"
-
+#include "shared/Globals.h"
 #include "modules/Modem.h"
-#include "LocalConfig.h"
-#include "modules/SwappableFile.h"
+#include "shared/LocalConfig.h"
+#include "shared/SwappableFile.h"
 
 
 std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputString)
@@ -287,7 +285,7 @@ void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bo
 
     swLog.swapToB();
 
-    Modem::uploadFileAndDelete(api, LOG_FILE_UPLOAD_ENDPOINT, PRIMARY_LOG_FILE_PATH, deleteIfSuccess,
+    Modem::uploadFileAndDelete(api, LOG_FILE_UPLOAD_ENDPOINT, fileInfo->path.c_str(), deleteIfSuccess,
                                deleteAfterRetrying, retries);
 
     // Primary log is now deleted and the secondary log "becomes" the primary.

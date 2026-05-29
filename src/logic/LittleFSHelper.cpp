@@ -1,6 +1,6 @@
 #include "LittleFSHelper.h"
 
-#include "Globals.h"
+#include "shared/Globals.h"
 
 bool LittleFSHelper::move(const String& oldPath, const String& newPath, const bool deleteIfNewExists = false)
 {

@@ -1,6 +1,8 @@
 #pragma once
 #include <FS.h>
 #include <WString.h>
+#include <mutex> // Added for thread protection
+#include <optional>
 
 struct FileInfo
 {
@@ -11,7 +13,8 @@ struct FileInfo
 class SwappableFile : public Print
 {
 public:
-    SwappableFile(const String& fileAPath, const String& fileBPath) : fileAPath(fileAPath), fileBPath(fileBPath) {}
+    SwappableFile(const String& fileAPath, const String& fileBPath)
+        : fileAPath(fileAPath), fileBPath(fileBPath) {}
 
     bool begin(bool moveBOverToA = true);
     void end();
@@ -21,7 +24,6 @@ public:
     bool replaceAwithBAndSwapToA();
     bool swapToB();
     bool swap();
-    [[nodiscard]] std::optional<File> getCurrentFile() const;
     [[nodiscard]] std::optional<FileInfo> getCurrentFileInfo() const;
     void flush() override;
     void close();
@@ -29,8 +31,15 @@ public:
 protected:
     String fileAPath, fileBPath;
     std::optional<File> currentLogFile;
+
+    // Core Print mutations
     size_t write(const uint8_t* buffer, size_t size) override;
     size_t write(uint8_t b) override;
+
     bool isA = true;
     bool swapToPath(const String& path);
+
+private:
+    // Protects file state transitions across multiple FreeRTOS tasks
+    mutable std::recursive_mutex _fileMutex;
 };

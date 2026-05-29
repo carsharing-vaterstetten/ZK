@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "Globals.h"
+#include "shared/Globals.h"
 
 ApiClient::ApiClient(HttpClient& httpClient, String defaultBasicAuthUsername,
                      String defaultBasicAuthPassword, const size_t writeBufferSize,

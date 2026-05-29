@@ -1,57 +1,49 @@
 #include "car_key.h"
 #include <Arduino.h>
 
+CarKeyDriver::CarKeyDriver(const uint8_t openKeyPin, const uint8_t closeKeyPin, const uint8_t keyPowerPin,
+                           const bool hasPowerKey, const KeySequenceManager& keySequenceManager) :
+    openKeyPin(openKeyPin), closeKeyPin(closeKeyPin), keyPowerPin(keyPowerPin), hasPowerKey(hasPowerKey),
+    keySequenceManager(keySequenceManager) {}
+
+
 void CarKeyDriver::begin() const
 {
-    pinMode(board.keyOpen, OUTPUT);
-    pinMode(board.keyClose, OUTPUT);
+    pinMode(openKeyPin, OUTPUT);
+    pinMode(closeKeyPin, OUTPUT);
 
-    if (board.hasKeyPower)
-        pinMode(*board.keyPower, OUTPUT);
+    if (hasPowerKey)
+        pinMode(keyPowerPin, OUTPUT);
 }
 
-void CarKeyDriver::open() const
+void CarKeyDriver::startOpenSequence()
 {
-    poweredPulse(board.keyOpen);
+    openSequencePlayer = SequencePlayer{*keySequenceManager.getOpenSequence()};
+    openSequencePlayer.start();
 }
 
-void CarKeyDriver::close() const
+bool CarKeyDriver::openSequenceCompleted() const
 {
-    poweredPulse(board.keyClose);
+    return openSequencePlayer.completed();
 }
 
-void CarKeyDriver::powerOn() const
+void CarKeyDriver::startCloseSequence()
 {
-    if (board.hasKeyPower)
-        digitalWrite(*board.keyPower, HIGH);
+    closeSequencePlayer = SequencePlayer{*keySequenceManager.getCloseSequence()};
+    closeSequencePlayer.start();
 }
 
-void CarKeyDriver::powerOff() const
+bool CarKeyDriver::closeSequenceCompleted() const
 {
-    if (board.hasKeyPower)
-        digitalWrite(*board.keyPower, LOW);
+    return closeSequencePlayer.completed();
 }
 
-void CarKeyDriver::pulse(const uint8_t pin)
+void CarKeyDriver::pollOpen() // TODO: no polling
 {
-    digitalWrite(pin, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(kPulseMs));
-    digitalWrite(pin, LOW);
+    openSequencePlayer.poll();
 }
 
-void CarKeyDriver::poweredPulse(const uint8_t pin) const
+void CarKeyDriver::pollClose()
 {
-    if (board.hasKeyPower)
-    {
-        powerOn();
-        vTaskDelay(pdMS_TO_TICKS(kPowerUpMs));
-    }
-
-    pulse(pin);
-
-    if (board.hasKeyPower)
-    {
-        vTaskDelay(pdMS_TO_TICKS(kPowerDownMs));
-        powerOff();
-    }
+    closeSequencePlayer.poll();
 }

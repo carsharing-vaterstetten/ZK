@@ -1,31 +1,56 @@
 #include "RFIDs.h"
 
-#include "mbedtls/md5.h"
+#include <mbedtls/md5.h>
 #include <ArduinoJson.h>
+
 #include "config/Backend.h"
 #include "Globals.h"
-#include "HelperUtils.h"
-#include "LittleFSHelper.h"
-#include "config/Intern.h"
+#include "logic/HelperUtils.h"
+#include "logic/LittleFSHelper.h"
 
-std::vector<uint32_t> rfids;
 
-bool RFIDs::isRegisteredRFID(const uint32_t rfid)
+RFIDs::RFIDs(const char* filePath, const char* tmpFilePath, const char* gpsFilePath, const char* tmpGpsFilePath) :
+    filePath(filePath), tmpFilePath(tmpFilePath), gpsFilePath(gpsFilePath), tmpGpsFilePath(tmpGpsFilePath)
 {
-    return std::binary_search(rfids.begin(), rfids.end(), rfid);
+    rfids = std::make_shared<const std::vector<uint32_t>>();
+    gpsRfids = std::make_shared<const std::vector<uint32_t>>();
+}
+
+std::shared_ptr<const std::vector<uint32_t>> RFIDs::getUids() const
+{
+    std::lock_guard lock(ramMutex);
+    return rfids; // Returns a lightweight copy of the pointer (thread-safe)
+}
+
+std::shared_ptr<const std::vector<uint32_t>> RFIDs::getGPSUids() const
+{
+    std::lock_guard lock(gpsRamMutex);
+    return gpsRfids;
+}
+
+bool RFIDs::isRegisteredRFID(const uint32_t rfid) const
+{
+    const auto ids = getUids();
+    return std::binary_search(ids->begin(), ids->end(), rfid);
+}
+
+bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid) const
+{
+    const auto ids = getGPSUids();
+    return std::binary_search(ids->begin(), ids->end(), rfid);
 }
 
 /// Call this function to load the UIDs into RAM to be able to check if a UID is registered.
 /// So always call this on startup and after the file changed on the disk (e.g. after remote download)
-bool RFIDs::load()
+bool RFIDs::loadFromFileToRam()
 {
-    if (!LittleFS.exists(RFID_FILE_PATH))
+    if (!LittleFS.exists(filePath))
     {
-        fileLog.errorln("Failed to check UID, file does not exist");
+        fileLog.errorln("Failed to load UIDs to RAM, file does not exist");
         return false;
     }
 
-    File f = LittleFS.open(RFID_FILE_PATH, FILE_READ);
+    File f = LittleFS.open(filePath, FILE_READ);
 
     if (!f)
     {
@@ -36,23 +61,72 @@ bool RFIDs::load()
     constexpr uint uidSize = sizeof(uint32_t);
     const size_t uidsCount = f.size() / uidSize;
 
-    rfids.clear();
-    rfids.resize(uidsCount);
-    f.read(reinterpret_cast<uint8_t*>(rfids.data()), uidsCount * sizeof(uint32_t));
+    // Create a new staging vector completely isolated on the heap
+    auto newVector = std::make_unique<std::vector<uint32_t>>(uidsCount);
+
+    f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
+    f.close();
 
     fileLog.debugln("Sorting RFIDs...");
 
-    std::sort(rfids.begin(), rfids.end()); // it has to be sorted for binary search
+    std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
+
+    // ATOMIC SWAP: Update the shared pointer under lock
+    {
+        std::lock_guard lock(ramMutex);
+        rfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
+    }
 
     fileLog.infoln(
-        "Loaded and sorted " + String(rfids.size()) + " UIDs (consumes " + rfids.capacity() * uidSize + " B)");
+        "Loaded and sorted " + String(rfids->size()) + " UIDs (consumes " + rfids->capacity() * uidSize + " B)");
 
     return true;
 }
 
-void generateChecksum(uint8_t out[16])
+bool RFIDs::loadFromGpsFileToRam()
 {
-    if (!LittleFS.exists(RFID_FILE_PATH))
+    if (!LittleFS.exists(gpsFilePath))
+    {
+        fileLog.errorln("Failed to load GPS UIDs to RAM, file does not exist");
+        return false;
+    }
+
+    File f = LittleFS.open(gpsFilePath, FILE_READ);
+
+    if (!f)
+    {
+        fileLog.errorln("Failed to open rfid gps file for reading");
+        return false;
+    }
+
+    constexpr uint uidSize = sizeof(uint32_t);
+    const size_t uidsCount = f.size() / uidSize;
+
+    // Create a new staging vector completely isolated on the heap
+    auto newVector = std::make_unique<std::vector<uint32_t>>(uidsCount);
+
+    f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
+    f.close();
+
+    fileLog.debugln("Sorting RFIDs...");
+
+    std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
+
+    // ATOMIC SWAP: Update the shared pointer under lock
+    {
+        std::lock_guard lock(gpsRamMutex);
+        gpsRfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
+    }
+
+    fileLog.infoln(
+        "Loaded and sorted " + String(gpsRfids->size()) + " UIDs (consumes " + gpsRfids->capacity() * uidSize + " B)");
+
+    return true;
+}
+
+void RFIDs::generateChecksum(uint8_t* out) const
+{
+    if (!LittleFS.exists(filePath))
     {
         fileLog.infoln("Local RFIDs file does not exist");
         constexpr uint8_t empty_md5[16] = {
@@ -65,7 +139,7 @@ void generateChecksum(uint8_t out[16])
         return;
     }
 
-    File f = LittleFS.open(RFID_FILE_PATH, FILE_READ);
+    File f = LittleFS.open(filePath, FILE_READ);
     HelperUtils::md5File(f, out);
     f.close();
 }
@@ -102,7 +176,7 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
     }
 
     // Open temp file for writing
-    File file = LittleFS.open(TMP_RFID_FILE_PATH,FILE_WRITE, true);
+    File file = LittleFS.open(tmpFilePath,FILE_WRITE, true);
 
     if (!file)
     {
@@ -121,7 +195,7 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
     {
         fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
         file.close();
-        LittleFSHelper::remove(TMP_RFID_FILE_PATH);
+        LittleFSHelper::remove(tmpFilePath);
         return;
     }
 
@@ -138,7 +212,11 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
 
     fileLog.infoln("Successfully downloaded and parsed RFIDs file");
 
-    const bool moveSuccess = LittleFSHelper::move(TMP_RFID_FILE_PATH, RFID_FILE_PATH, true);
+    const bool moveSuccess = LittleFSHelper::move(tmpFilePath, filePath, true);
+
+    if (moveSuccess)
+        loadFromFileToRam();
+
     fileLog.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
 }
 
@@ -146,7 +224,7 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs(const ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
 
-    File file = LittleFS.open(TMP_RFID_FILE_PATH, FILE_WRITE, true);
+    File file = LittleFS.open(tmpGpsFilePath, FILE_WRITE, true);
 
     if (!file)
     {
@@ -180,41 +258,17 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs(const ApiClient& api)
         fileLog.errorln(
             "Downloaded size (" + String(bytesDownloaded) + " B) does not match content size (" +
             String(resp.bodyLength) + " B). GPS UIDs not updated");
-        LittleFSHelper::remove(TMP_RFID_FILE_PATH);
+        LittleFSHelper::remove(tmpGpsFilePath);
         return false;
     }
 
     fileLog.infoln("Successfully downloaded file");
 
-    const bool moveSuccess = LittleFSHelper::move(TMP_RFID_FILE_PATH, GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, true);
+    const bool moveSuccess = LittleFSHelper::move(tmpGpsFilePath, gpsFilePath, true);
     fileLog.logInfoOrErrorln(moveSuccess, "GPS RFID UIDs updated successfully", "GPS RFID UIDs not updated");
+
+    if (moveSuccess)
+        loadFromGpsFileToRam();
+
     return moveSuccess;
-}
-
-
-bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid)
-{
-    File file = LittleFS.open(GPS_TRACKING_CONSENTED_RFIDS_FILE_PATH, FILE_READ);
-
-    if (!file)
-    {
-        fileLog.errorln("Failed to open GPS consent RFIDs file for reading");
-        return false;
-    }
-
-    const size_t rfidsCount = file.size() / 4;
-    uint32_t buffer;
-
-    for (int i = 0; i < rfidsCount; i++)
-    {
-        file.read(reinterpret_cast<uint8_t*>(&buffer), 4);
-        if (buffer == rfid)
-        {
-            file.close();
-            return true;
-        }
-    }
-
-    file.close();
-    return false;
 }

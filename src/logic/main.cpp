@@ -1,29 +1,30 @@
+#include <atomic>
 #include <esp32-hal.h>
 #include <esp_task_wdt.h>
 
 #include "modules/Modem.h"
 #include "modules/NFCCardReader.h"
-#include "modules/LED.h"
 #include "HelperUtils.h"
 #include "esp_log.h"
-#include "modules/AccessControl.h"
 #include "modules/Api.h"
-#include "config/Backend.h"
-#include "FirmwareUpdater.h"
-#include "Globals.h"
-#include "GPS.h"
-#include "GPSAlg.h"
-#include "LocalConfig.h"
-#include "RFIDs.h"
-#include "modules/SwappableFile.h"
+#include "shared/Globals.h"
+#include "modules/GPS.h"
+#include "shared/GPSAlg.h"
+#include "shared/KeySequenceManager.h"
+#include "shared/LocalConfig.h"
+#include "shared/RFIDs.h"
+#include "shared/SwappableFile.h"
 #include "LittleFSHelper.h"
+#include "SystemManager.h"
 #include "config/hw_config.h"
 #include "config/Intern.h"
 #include "esp32/rom/rtc.h"
 #include "config/Config.h"
 #include "config/user_config.h"
-
-#define DAY_MILLIS 86400000U // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds
+#include "services/CardReaderService.h"
+#include "tasks/AccessControlTask.h"
+#include "tasks/GpsTask.h"
+#include "tasks/RestartTask.h"
 
 enum class TaskStatus
 {
@@ -33,184 +34,40 @@ enum class TaskStatus
     Stopped,
 };
 
-ulong restartTargetMs;
-uint contiguousFailedSleepAttempts = 0;
-uint contiguousFailedDisableGPSAttempts = 0;
-
-ulong lastLogin, lastLogout; // These are volatile
-
-GPSAlgPrediction lastGpsState;
-
-volatile TaskStatus nfcScanningTaskStatus = TaskStatus::NotStarted, gpsDataTaskStatus = TaskStatus::NotStarted;
-
 #ifdef HW_REV
 constexpr const BoardConfig* ACTIVE_BOARD = activeBoard<HW_REV>();
 #else
 const BoardConfig* ACTIVE_BOARD;
 #endif
 
-TinyGsmSim7000 gsmModem{Serial1};
-std::optional<ModemDriver> modemDriver;
-std::optional<Modem> modem;
-std::optional<CarKeyDriver> carKeyDriver;
-std::optional<AccessControl> accessControl;
-GPS gps{GPS_FILE_PATH, GPS_FILE_UPLOAD_ENDPOINT};
-std::optional<ApiClient> api;
-std::optional<Adafruit_NeoPixel> ledDriver;
-std::optional<CardReaderLED> statusLed;
 
+// Shared
 std::optional<LocalConfig> config;
-SwappableFile swLog{PRIMARY_LOG_FILE_PATH, SECONDARY_LOG_FILE_PATH};
 GPSAlg gpsAlg{};
+RFIDs rfidsManager{"/rfids.bin", "/tmp_rfids.bin", "/rfids_gps_consent.bin", "/tmp_rfids_gps_consent.bin"};
+KeySequenceManager keySequenceManager;
+AccessStatus accessStatus{"AccCtrl v1", rfidsManager};
 
+// Drivers
+std::optional<Adafruit_PN532> pn532Driver;
+std::optional<CarKeyDriver> carKeyDriver;
+std::optional<Adafruit_NeoPixel> ledDriver;
 
-void checkNFCTag(NFCCardReader& cardReader, bool detected)
-{
-    const auto [status, rfidUid] = cardReader.scan(detected);
+// Modules
+std::optional<NFCCardReader> cardReaderModule;
+std::optional<KeyControl> keyControlModule;
+std::optional<CardReaderLED> ledModule;
 
-    switch (status)
-    {
-    case ScanStatus::NoCard:
-        return;
-    case ScanStatus::NewCard:
-    case ScanStatus::Duplicate:
-        break;
-    }
+// Services
+std::optional<CardReaderService> cardReaderService;
+std::optional<KeyControlService> keyControlService;
+std::optional<LedService> ledService;
+std::optional<ModemService> modemService;
 
-    const ulong firstScanMs = millis();
-
-    if (RFIDs::isRegisteredRFID(rfidUid))
-    {
-        fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
-        if (accessControl->toggleLogin(rfidUid))
-        {
-            lastLogin = millis();
-            statusLed->unlockFlash();
-
-            if (accessControl->hasPermissionForGPSTracking())
-            {
-                modem->wakeupAndWait();
-                modem->enableGPS();
-
-                if (!gpsAlg.isTripActive())
-                {
-                    gpsAlg.startTrip();
-                    fileLog.infoln("Trip started");
-                }
-            }
-        }
-        else
-        {
-            lastLogout = millis();
-            statusLed->lockFlash();
-
-            if (gpsAlg.isTripActive())
-            {
-                const float traveledDistance = gpsAlg.endTrip();
-                fileLog.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
-            }
-        }
-    }
-    else
-    {
-        fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
-        statusLed->cardDeclinedFlash();
-    }
-
-    // Wait for 2 seconds for the card to be removed
-    constexpr uint waitForRemovalMs = 2000;
-    delay(waitForRemovalMs);
-
-    // Then check again for two 1 second if a card is present
-    constexpr uint waitForScanMs = 1000;
-    bool scannedDuplicate = false;
-    while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs)
-    {
-        if (cardReader.scan(false).status == ScanStatus::Duplicate)
-        {
-            scannedDuplicate = true;
-            break;
-        }
-    }
-
-    if (!scannedDuplicate) return;
-
-    // If it scanned the same card twice wait another 3 seconds for it to be removed
-    // and indicate a cooldown via the LED. The LED starts full brightness cyan and fades out
-
-    constexpr uint showLedMs = 3000;
-    const ulong s = millis();
-
-    while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs + showLedMs)
-    {
-        float progress = 1.0f - static_cast<float>(millis() - s) / static_cast<float>(showLedMs);
-        statusLed->progressIndicatorNext(StatusColor::WaitingForNFCCardToBeRemoved, std::clamp(progress, 0.0f, 1.0f));
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-
-    // From the first card scan to here it should be 6 seconds
-
-    statusLed->progressIndicatorStop();
-}
-
-[[noreturn]] void restartRoutine()
-{
-    fileLog.infoln("Time reached to upload log and restart ESP32");
-
-    statusLed->setStatusColor(StatusColor::UploadingLogs);
-
-    // Stop other tasks
-    nfcScanningTaskStatus = TaskStatus::StopRequested;
-    gpsDataTaskStatus = TaskStatus::StopRequested;
-
-    fileLog.debugln("Waiting for tasks to stop");
-
-    while (nfcScanningTaskStatus != TaskStatus::Stopped || gpsDataTaskStatus != TaskStatus::Stopped)
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-    modem->wakeupAndWait();
-    modem->ensureNetworkConnection();
-
-    if (LittleFS.exists(GPS_FILE_PATH))
-        gps.uploadFileAndBeginNew(*api, true, true, 2);
-    else
-        fileLog.infoln("No GPS data recorded. Nothing to upload");
-
-    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(*api, swLog);
-
-    fileLog.infoln("Restarting now");
-
-    // NO MORE FILE LOGGING FROM HERE
-
-    swLog.end();
-
-    ESP.restart();
-
-    while (true); // to disable no return warning
-}
-
-void calculateNextRestartTime()
-{
-    int hour, minute, second;
-
-    modem->getNetworkTime(nullptr, nullptr, nullptr, &hour, &minute, &second, nullptr);
-
-    // Calculate milliseconds since midnight
-    const ulong timeOfDayInMs = (hour * 3600 + minute * 60 + second) * 1000;
-
-    if (timeOfDayInMs < TARGET_TIME_FOR_ESP_RESTART)
-    {
-        restartTargetMs = TARGET_TIME_FOR_ESP_RESTART - timeOfDayInMs;
-    }
-    else
-    {
-        restartTargetMs = DAY_MILLIS - (timeOfDayInMs - TARGET_TIME_FOR_ESP_RESTART);
-    }
-
-    restartTargetMs += millis();
-
-    fileLog.infoln("Next restart planned in " + String(restartTargetMs / 1000) + " seconds");
-}
+// Tasks
+std::optional<AccessControlTask> acTask;
+std::optional<GPSTask> gpsTask;
+std::optional<RestartTask> restartTask;
 
 int espLogHandler(const char* fmt, const va_list args)
 {
@@ -239,108 +96,6 @@ void loadConfig()
         const bool configSaveSuccess = StorableConfig{config.value(), CONFIG_PREFS_NAME}.save();
         fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
     }
-}
-
-void checkGPS()
-{
-    if (!accessControl->hasPermissionForGPSTracking()) return;
-
-    if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
-    {
-        // GPS is logging to flash and storage is low
-        serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
-        return;
-    }
-
-    GPS_DATA_t gpsData;
-    modem->getGPS(gpsData);
-    gps.writeData(gpsData);
-    const GPSAlgPrediction gpsState = gpsAlg.pushData(gpsData);
-    if (gpsState != lastGpsState)
-    {
-        fileLog.infoln("Car state changed to " + GPSAlg::gpsAlgPredictionToStr(gpsState));
-        lastGpsState = gpsState;
-    }
-}
-
-
-void cardScanTask(void*)
-{
-    esp_task_wdt_add(nullptr);
-    nfcScanningTaskStatus = TaskStatus::Running;
-
-    fileLog.debugln("Card scanner task started");
-
-    SPIClass nfcSpi{ACTIVE_BOARD->nfcSpi};
-    Adafruit_PN532 nfcDriver{ACTIVE_BOARD->nfcCs, &nfcSpi};
-    NFCCardReader cardReader{nfcDriver};
-
-    nfcSpi.begin(ACTIVE_BOARD->nfcClk, ACTIVE_BOARD->nfcMiso, ACTIVE_BOARD->nfcMosi, ACTIVE_BOARD->nfcCs);
-    cardReader.begin();
-
-    while (nfcScanningTaskStatus != TaskStatus::StopRequested)
-    {
-        checkNFCTag(cardReader, false);
-        esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-
-    nfcScanningTaskStatus = TaskStatus::Stopped;
-    fileLog.debugln("Card scanner task ended");
-
-    esp_task_wdt_delete(nullptr);
-    vTaskDelete(nullptr);
-}
-
-[[noreturn]] void restartTask(void*)
-{
-    fileLog.debugln("Restart task started");
-    while (true)
-    {
-        if (millis() >= restartTargetMs)
-        {
-            esp_task_wdt_add(nullptr);
-            restartRoutine();
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-}
-
-void gpsDataTask(void*)
-{
-    esp_task_wdt_add(nullptr);
-
-    gpsDataTaskStatus = TaskStatus::Running;
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-
-    fileLog.debugln("GPS data task started");
-
-    while (gpsDataTaskStatus != TaskStatus::StopRequested)
-    {
-        TickType_t xFrequency;
-
-        if (accessControl->isLoggedIn())
-        {
-            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_DRIVING);
-            checkGPS();
-        }
-        else
-        {
-            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_STANDING);
-            if constexpr (RECORD_GPS_WHILE_STANDING)
-                checkGPS();
-        }
-
-        esp_task_wdt_reset();
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-    }
-
-    fileLog.debugln("GPS data task ended");
-    gpsDataTaskStatus = TaskStatus::Stopped;
-
-    esp_task_wdt_delete(nullptr);
-    vTaskDelete(nullptr);
 }
 
 void setup()
@@ -397,24 +152,18 @@ void setup()
     fileLog.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(cpu0ResetReason));
     fileLog.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
 
-    // Cleanup
-    LittleFSHelper::remove(GPS_FILE_PATH);
-
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
-    ledDriver.emplace(ACTIVE_BOARD->ledCount, ACTIVE_BOARD->led, NEO_GRB + NEO_KHZ800);
-    statusLed.emplace(*ledDriver);
 
-    statusLed->begin();
+    accessStatus.begin();
+
+    rfidsManager.loadFromFileToRam();
+    rfidsManager.loadFromGpsFileToRam();
+    keySequenceManager.loadSequenceInRAM(*ACTIVE_BOARD); // TODO: no more board
+    accessStatus.loadToRAM();
 
     // Now let's start the modem and set the system time fetched by the Modem network
-    statusLed->setStatusColor(StatusColor::InitializationPhase);
 
-    carKeyDriver.emplace(*ACTIVE_BOARD);
-    accessControl.emplace(*carKeyDriver);
-
-    accessControl->begin();
-    gps.begin();
     Serial1.setRxBufferSize(2048);
     Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, ACTIVE_BOARD->modemRx, ACTIVE_BOARD->modemTx);
 
@@ -429,77 +178,50 @@ void setup()
 
     fileLog.infoln("Loaded config: " + config->toString());
 
+    SystemManager::Init();
 
-    modemDriver.emplace(*ACTIVE_BOARD);
-    modem.emplace(gsmModem, Serial1, MODEM_SERIAL_BAUD, *modemDriver);
+    // Drivers
+    pn532Driver.emplace(ACTIVE_BOARD->nfcCs, ACTIVE_BOARD->nfcSpi);
+    pn532Driver->begin();
+    carKeyDriver.emplace(ACTIVE_BOARD->keyOpen, ACTIVE_BOARD->keyClose, ACTIVE_BOARD->keyPower.value_or(0),
+                         ACTIVE_BOARD->hasKeyPower, keySequenceManager);
+    carKeyDriver->begin();
+    ledDriver.emplace(ACTIVE_BOARD->ledCount, ACTIVE_BOARD->led, NEO_GRB + NEO_KHZ800);
+    ledDriver->begin();
 
-    modem->begin(config->simPin.c_str(), config->gprsUser.c_str(), config->gprsPassword.c_str(),
-                 config->apn.c_str());
-    // In my tests connecting network first, then gprs is best after a hard reset (e.g. code upload). The other order after a ESP.restart().
-    modem->ensureNetworkConnection(cpu0ResetReason != POWERON_RESET);
-    HelperUtils::syncTimeWithModem(*modem, 20);
+    // Modules
+    cardReaderModule.emplace(pn532Driver.value());
+    cardReaderModule->begin();
+    keyControlModule.emplace(carKeyDriver.value(),rfidsManager, accessStatus);
+    ledModule.emplace(ledDriver.value());
 
+    // Services
+    cardReaderService.emplace(cardReaderModule.value());
+    keyControlService.emplace(keyControlModule.value());
+    ledService.emplace(ledModule.value());
 
-    if (RECORD_GPS_WHILE_STANDING || (accessControl->isLoggedIn() && accessControl->hasPermissionForGPSTracking()))
-        modem->enableGPS();
-
-    fileLog.infoln("Signal Quality: " + String(modem->getSignalQuality()));
-
-    fileLog.infoln(
-        "Time (v1.0.0): millis: " + String(millis()) + " ms, Localtime: " + modem->getGSMDateTime() +
-        ", Unix timestamp: " + String(modem->getUnixTimestamp()) + ", system time: " + String(
-            HelperUtils::systemTimeMillisecondsSinceEpoche()) + " ms");
-    calculateNextRestartTime();
-
-    // We need the modem IMEI for communicating with the server therefore it is needed before we do anything with the modem
-    String modemIMEI = modem->getIMEI();
-    fileLog.infoln("Modem IMEI: " + modemIMEI);
-
-    auto* gsmClient = new TinyGsmSim7000::GsmClientSim7000{gsmModem};
-    auto* modemClient = new WdClient{*gsmClient, config->server, config->serverPort};
-    api.emplace(*modemClient, modemIMEI, config->serverPassword);
-
-    // Do the connection speed test before any up-/downloads
     if constexpr (GIVE_CONNECTION_SPEED_ESTIMATE)
-        HelperUtils::performConnectionSpeedTest(*api,CONNECTION_SPEED_TEST_FILE_SIZE);
+        queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::PerformConnectionSpeedTest);
 
-    // Now we are ready to check for a firmware update
     if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
-    {
-        statusLed->setStatusColor(StatusColor::PerformingOTAUpdate);
-        FirmwareUpdater::doUpdateIfAvailable(*api);
-    }
+        queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DoFirmwareUpdateIfAvailable);
     else
         fileLog.infoln("Skipped firmware update check");
 
     // If there is no update we will continue with getting everything ready for reading NFC tags
-    statusLed->setStatusColor(StatusColor::UpdatingRFIDs);
-    RFIDs::downloadRfidsIfChanged(*api);
-    RFIDs::downloadGPSTrackingConsentedRFIDs(*api);
-    RFIDs::load();
+
+    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DownloadRfidIfChanged);
+    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DownloadGPSRfids);
 
     HelperUtils::logRAMUsage(fileLog, LoggingLevel::INFO);
     LittleFSHelper::logFilesystemsInformation();
 
     // Almost everything is done and the created log can be uploaded
-    statusLed->setStatusColor(StatusColor::UploadingLogs);
-    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(*api, swLog);
-    statusLed->clear();
+    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::UploadLog);
 
     // Power saving
-    modem->disconnectNetwork();
-    modem->requestSleep();
-
-    // Start tasks
-    esp_task_wdt_deinit();
-    esp_task_wdt_init(HW_WATCHDOG_DEFAULT_TIMEOUT, true); // update timeout
-    xTaskCreatePinnedToCore(cardScanTask, "NFC", 4096, nullptr, 3, nullptr, 1);
-    xTaskCreatePinnedToCore(gpsDataTask, "GPS", 4096, nullptr, 2, nullptr, 1);
-    xTaskCreatePinnedToCore(restartTask, "RST", 4096, nullptr, 1, nullptr, 1);
-
-    // Set the watchdog to a shorter timeout for the main loop
-    fileLog.infoln("Setup done");
-    esp_task_wdt_delete(nullptr);
+    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DisconnectNetwork);
+    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::SleepIfPossible);
 }
 
 void loop()

@@ -3,7 +3,7 @@
 #include "logic/HelperUtils.h"
 #include "Modem.h"
 #include "Api.h"
-#include "Globals.h"
+#include "shared/Globals.h"
 #include "logic/LittleFSHelper.h"
 
 Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud, const ModemDriver& driver) :
@@ -66,11 +66,12 @@ void Modem::wakeup()
     fileLog.debugln("Modem wakeup sent");
 }
 
-void Modem::wakeupAndWait(const uint32_t timeoutMs)
+bool Modem::wakeupAndWait(const uint32_t timeoutMs)
 {
     wakeup();
-    gsmModem.testAT(timeoutMs);
-    fileLog.infoln("Modem awake and responsive");
+    const bool active = gsmModem.testAT(timeoutMs);
+    fileLog.logInfoOrErrorln(active, "Modem awake and responsive", "Modem not waking up");
+    return active;
 }
 
 bool Modem::beginSleep()

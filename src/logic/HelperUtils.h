@@ -8,7 +8,7 @@
 #include <rom/rtc.h>
 
 #include "modules/Api.h"
-#include "Log.h"
+#include "shared/Log.h"
 #include "TinyGsmGPRS.tpp"
 
 #define STR_HELPER(s) #s

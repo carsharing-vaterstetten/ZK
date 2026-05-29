@@ -1,9 +1,6 @@
 #pragma once
 
-// ReSharper disable once CppUnusedIncludeDirective
-#include <cstdint>
 #include <Adafruit_NeoPixel.h>
-#include <mutex>
 
 
 enum class StatusColor
@@ -24,7 +21,6 @@ class LED
 public:
     explicit LED(Adafruit_NeoPixel& ledDriver);
 
-    bool begin() const;
     void setColor(uint32_t hex) const;
     void clear() const;
     void flash(uint32_t hexColor, uint16_t durationMs) const;

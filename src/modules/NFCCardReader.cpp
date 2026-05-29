@@ -1,6 +1,6 @@
 #include "NFCCardReader.h"
 
-#include "Globals.h"
+#include "shared/Globals.h"
 
 NFCCardReader::NFCCardReader(Adafruit_PN532& nfcDriver, const ulong cooldownMs) : _cooldownMs(cooldownMs),
     nfc(nfcDriver) {}
@@ -8,12 +8,6 @@ NFCCardReader::NFCCardReader(Adafruit_PN532& nfcDriver, const ulong cooldownMs) 
 bool NFCCardReader::begin() const
 {
     fileLog.debugln("Connecting to NFC board...");
-
-    if (!nfc.begin())
-    {
-        fileLog.criticalln("Failed to initialize NFC card reader. No RFID scanning possible");
-        return false;
-    }
 
     if (!nfc.getFirmwareVersion())
     {

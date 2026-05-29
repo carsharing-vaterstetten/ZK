@@ -2,11 +2,11 @@
 
 #include <Update.h>
 
-#include "../modules/Api.h"
+#include "modules/Api.h"
 #include "config/Backend.h"
-#include "Globals.h"
-#include "../modules/Modem.h"
+#include "modules/Modem.h"
 #include "config/Intern.h"
+#include "shared/Globals.h"
 
 #define UPDATE_COMMAND U_FLASH
 
@@ -116,5 +116,5 @@ void FirmwareUpdater::doUpdateIfAvailable(const ApiClient& api)
 
     fileLog.infoln("Update complete. Rebooting in 5 seconds...");
     delay(5000);
-    ESP.restart();
+    ESP.restart(); // TODO: ONLY RESTART IF OTHER TASKS ARE DONE
 }

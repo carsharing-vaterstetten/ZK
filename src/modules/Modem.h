@@ -7,7 +7,7 @@
 #include <TinyGsmClient.h>
 
 #include "../abstract/ApiStreams.h"
-#include "../logic/GPS.h"
+#include "GPS.h"
 #include "drivers/modem.h"
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
@@ -83,7 +83,7 @@ public:
     bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
     bool ensureNetworkConnection(bool tryGprsFirst = true, uint maxRetries = 2) const;
     void wakeup();
-    void wakeupAndWait(uint32_t timeoutMs = 10000);
+    bool wakeupAndWait(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(const ApiClient& api, const char* endpoint, Stream& stream,
                                                    size_t streamLen, uint retries);

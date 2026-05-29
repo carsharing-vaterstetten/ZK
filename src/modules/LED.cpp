@@ -2,11 +2,6 @@
 
 LED::LED(Adafruit_NeoPixel& ledDriver) : neo(ledDriver) {}
 
-bool LED::begin() const
-{
-    return neo.begin();
-}
-
 void LED::setColor(const uint32_t hex) const
 {
     neo.fill(hex);
@@ -17,13 +12,6 @@ void LED::clear() const
 {
     neo.clear();
     neo.show();
-}
-
-void LED::flash(const uint32_t hexColor, const uint16_t durationMs) const
-{
-    setColor(hexColor);
-    delay(durationMs);
-    clear();
 }
 
 void StatusLED::setStatusColor(const StatusColor color) const
@@ -42,26 +30,16 @@ uint32_t StatusLED::getStatusColorValue(const StatusColor color)
 {
     switch (color)
     {
-    case StatusColor::PerformingOTAUpdate:
-        return 0x800080;
-    case StatusColor::Error:
-        return 0xFF0000;
-    case StatusColor::InitializationPhase:
-        return 0xFFFFFF;
-    case StatusColor::UpdatingRFIDs:
-        return 0xFFA500;
-    case StatusColor::UploadingLogs:
-        return 0x0000FF;
-    case StatusColor::CarLocked:
-        return 0xFF0000;
-    case StatusColor::CarUnlocked:
-        return 0x00FF00;
-    case StatusColor::NFCUnknownUIDScanned:
-        return 0xFF0000;
-    case StatusColor::WaitingForNFCCardToBeRemoved:
-        return 0x00FFFF;
-    default:
-        return 0;
+    case StatusColor::PerformingOTAUpdate: return 0x800080;
+    case StatusColor::Error: return 0xFF0000;
+    case StatusColor::InitializationPhase: return 0xFFFFFF;
+    case StatusColor::UpdatingRFIDs: return 0xFFA500;
+    case StatusColor::UploadingLogs: return 0x0000FF;
+    case StatusColor::CarLocked: return 0xFF0000;
+    case StatusColor::CarUnlocked: return 0x00FF00;
+    case StatusColor::NFCUnknownUIDScanned: return 0xFF0000;
+    case StatusColor::WaitingForNFCCardToBeRemoved: return 0x00FFFF;
+    default: return 0;
     }
 }
 
@@ -106,7 +84,8 @@ void CardReaderLED::loadingCircleStop() const
 
 void CardReaderLED::progressIndicatorNext(const StatusColor color, const float progress) const
 {
-    const uint16_t activePixels = progress * static_cast<float>(neo.numPixels());
+    const uint16_t totalPixels = neo.numPixels();
+    const auto activePixels = static_cast<uint16_t>(progress * static_cast<float>(totalPixels));
 
     const uint32_t colorVal = getStatusColorValue(color);
 
@@ -115,13 +94,17 @@ void CardReaderLED::progressIndicatorNext(const StatusColor color, const float p
     for (uint16_t n = 0; n < activePixels; ++n)
         neo.setPixelColor(n, colorVal);
 
-    const float progressDiff = progress - static_cast<float>(activePixels) / static_cast<float>(neo.numPixels());
-    const float brightness = progressDiff * static_cast<float>(neo.numPixels());
+    // Only paint the partial pixel if there's actually a pixel slot for it
+    if (activePixels < totalPixels)
+    {
+        const float progressDiff = progress - static_cast<float>(activePixels) / static_cast<float>(totalPixels);
+        const float brightness = progressDiff * static_cast<float>(totalPixels);
 
-    const uint8_t r = static_cast<float>(colorVal >> 16 & 0xFF) * brightness;
-    const uint8_t g = static_cast<float>(colorVal >> 8 & 0xFF) * brightness;
-    const uint8_t b = static_cast<float>(colorVal & 0xFF) * brightness;
-    neo.setPixelColor(activePixels, r, g, b);
+        const uint8_t r = static_cast<float>(colorVal >> 16 & 0xFF) * brightness;
+        const uint8_t g = static_cast<float>(colorVal >> 8 & 0xFF) * brightness;
+        const uint8_t b = static_cast<float>(colorVal & 0xFF) * brightness;
+        neo.setPixelColor(activePixels, r, g, b);
+    }
 
     neo.show();
 }

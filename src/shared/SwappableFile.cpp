@@ -18,40 +18,29 @@ void SwappableFile::end()
     close();
 }
 
-size_t SwappableFile::write(const uint8_t* buffer, const size_t size)
-{
-    if (!currentLogFile)
-        return 0;
+size_t SwappableFile::write(const uint8_t* buffer, const size_t size) {
+    std::lock_guard lock(_fileMutex);
+    if (!currentLogFile) return 0;
     return currentLogFile->write(buffer, size);
 }
 
-size_t SwappableFile::write(const uint8_t b)
-{
-    if (!currentLogFile)
-        return 0;
+size_t SwappableFile::write(const uint8_t b) {
+    std::lock_guard lock(_fileMutex);
+    if (!currentLogFile) return 0;
     return currentLogFile->write(b);
 }
 
-bool SwappableFile::swapToPath(const String& path)
-{
+bool SwappableFile::swapToPath(const String& path) {
+    std::lock_guard lock(_fileMutex);
     if (path != fileAPath && path != fileBPath) return false;
 
-    if (currentLogFile)
-        currentLogFile->close();
+    if (currentLogFile) currentLogFile->close();
 
     const File file = LittleFS.open(path, FILE_APPEND, true);
-
-    if (!file)
-    {
-        fileLog.errorln("Failed to open " + path);
-        return false;
-    }
+    if (!file) return false;
 
     currentLogFile.emplace(file);
-
     isA = path == fileAPath;
-    fileLog.infoln("Swapped to " + String(currentLogFile->path()));
-
     return true;
 }
 
@@ -62,6 +51,8 @@ bool SwappableFile::swapToA()
 
 bool SwappableFile::appendBToA(const bool deleteBAfterwards)
 {
+    std::lock_guard lock(_fileMutex);
+
     if (currentLogFile)
         currentLogFile->close();
 
@@ -143,31 +134,18 @@ bool SwappableFile::swap()
     return swapToA();
 }
 
-/// Use getCurrentFileInfo over getCurrentFile if possible
-std::optional<File> SwappableFile::getCurrentFile() const
-{
-    return currentLogFile;
-}
-
-/// Use getCurrentFileInfo over getCurrentFile if possible
-std::optional<FileInfo> SwappableFile::getCurrentFileInfo() const
-{
+std::optional<FileInfo> SwappableFile::getCurrentFileInfo() const {
+    std::lock_guard lock(_fileMutex);
     if (!currentLogFile) return std::nullopt;
-
-    return FileInfo{
-        .path = currentLogFile->path(),
-        .size = currentLogFile->size(),
-    };
+    return FileInfo{ .path = currentLogFile->path(), .size = currentLogFile->size() };
 }
 
-void SwappableFile::flush()
-{
-    if (currentLogFile)
-        currentLogFile->flush();
+void SwappableFile::flush() {
+    std::lock_guard lock(_fileMutex);
+    if (currentLogFile) currentLogFile->flush();
 }
 
-void SwappableFile::close()
-{
-    if (currentLogFile)
-        currentLogFile->close();
+void SwappableFile::close() {
+    std::lock_guard lock(_fileMutex);
+    if (currentLogFile) currentLogFile->close();
 }

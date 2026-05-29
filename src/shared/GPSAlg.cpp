@@ -5,14 +5,14 @@
 static constexpr float EARTH_RADIUS_M = 6'371'000.0f;
 
 
-GPSAlg::GPSAlg(float eval_window_secs)
+GPSAlg::GPSAlg(const float eval_window_secs)
     : eval_window_secs(eval_window_secs)
 {
     if (eval_window_secs <= 0.0f)
         throw std::invalid_argument("GPSAlg: eval_window_secs must be > 0.");
 }
 
-float GPSAlg::haversineDistance(float lat1, float lon1, float lat2, float lon2)
+float GPSAlg::haversineDistance(const float lat1, const float lon1, const float lat2, const float lon2)
 {
     const float dLat = (lat2 - lat1) * DEG_TO_RAD;
     const float dLon = (lon2 - lon1) * DEG_TO_RAD;
@@ -24,7 +24,7 @@ float GPSAlg::haversineDistance(float lat1, float lon1, float lat2, float lon2)
     return EARTH_RADIUS_M * 2.0f * std::atan2(std::sqrt(a), std::sqrt(1.0f - a));
 }
 
-bool GPSAlg::isSampleReliable(const GPS_DATA_t& sample) const
+bool GPSAlg::isSampleReliable(const GPS_DATA_t& sample)
 {
     if (sample.accuracy > MAX_ACCEPTABLE_ACCURACY) return false;
     if (sample.accuracy < 0.0f) return false;
@@ -42,6 +42,7 @@ bool GPSAlg::isSampleReliable(const GPS_DATA_t& sample) const
 
 GPSAlgPrediction GPSAlg::evaluateWindow() const
 {
+    std::lock_guard lock(algMutex);
     if (data_buffer.empty()) return last_prediction;
 
     const uint64_t newest = data_buffer.back().unixTimestamp;
@@ -106,6 +107,8 @@ GPSAlgPrediction GPSAlg::evaluateWindow() const
 
 void GPSAlg::accumulateTripDistance(const GPS_DATA_t& sample)
 {
+    // No lock because this function only gets called from pushData
+
     if (!trip_active || !isSampleReliable(sample))
         return;
 
@@ -130,14 +133,22 @@ void GPSAlg::accumulateTripDistance(const GPS_DATA_t& sample)
 
 GPSAlgPrediction GPSAlg::pushData(const GPS_DATA_t& data)
 {
+    std::lock_guard lock(algMutex);
     data_buffer.push_back(data);
     accumulateTripDistance(data);
     last_prediction = evaluateWindow();
+    const uint64_t dynamicCutoff = data.unixTimestamp - static_cast<uint64_t>(eval_window_secs);
+    data_buffer.erase(
+        std::remove_if(data_buffer.begin(), data_buffer.end(),
+                       [dynamicCutoff](const GPS_DATA_t& s) { return s.unixTimestamp < dynamicCutoff; }),
+        data_buffer.end()
+    );
     return last_prediction;
 }
 
 void GPSAlg::startTrip()
 {
+    std::lock_guard lock(algMutex);
     if (trip_active)
         throw std::logic_error("GPSAlg: cannot start a trip - one is already active.");
 
@@ -148,6 +159,7 @@ void GPSAlg::startTrip()
 
 float GPSAlg::endTrip()
 {
+    std::lock_guard lock(algMutex);
     if (!trip_active)
         throw std::logic_error("GPSAlg: cannot end a trip - no trip is active.");
 
