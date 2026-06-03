@@ -4,11 +4,6 @@
 #include "shared/Globals.h"
 #include "shared/SharedData.h"
 
-ScanResult AccessControlTask::scan(const TickType_t timeout)
-{
-    return *static_cast<ScanResult*>(SharedData::receiveDataFromCommand(CardReaderService::newCardScannedId, timeout));
-}
-
 void AccessControlTask::doThings(const uint32_t rfidUid)
 {
     if (!rfidsManager.isRegisteredRFID(rfidUid))
@@ -20,18 +15,18 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
 
     fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
 
-    const bool login = !accessStatus.isLoggedIn();
-
-    keyControlService.toggleLogin(rfidUid);
-
-    if (login)
+    if (!accessStatus.isLoggedIn())
     {
+        keyControlService.unlock();
         led.playSequence(LedSequence::CarUnlocked);
+        accessStatus.setLoginData(rfidUid);
+
+        fileLog.infoln("Car unlocked");
 
         if (rfidsManager.RFIDConsentsToGPSTrackingTest(rfidUid))
         {
-            modem.queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::Wakeup);
-            modem.queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::EnableGPS);
+            modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::Wakeup);
+            modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::EnableGPS);
 
             if (!gpsAlg.isTripActive())
             {
@@ -42,7 +37,11 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
     }
     else
     {
+        keyControlService.lock();
         led.playSequence(LedSequence::CarLocked);
+        accessStatus.clrLoginData();
+
+        fileLog.infoln("Car locked");
 
         if (gpsAlg.isTripActive())
         {
@@ -50,32 +49,6 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
             fileLog.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
         }
     }
-}
-
-void AccessControlTask::cooldownSequence() const
-{
-    const ulong firstScanMs = millis();
-
-    // Wait for 2 seconds for the card to be removed
-    constexpr uint waitForRemovalMs = 2000;
-    vTaskDelay(pdMS_TO_TICKS(waitForRemovalMs));
-
-    // Then check again for 1 second if a card is present
-    constexpr uint waitForScanMs = 1000;
-
-    ScanResult scanResult = scan(pdMS_TO_TICKS(100));
-    while (millis() - firstScanMs < waitForRemovalMs + waitForScanMs)
-        scanResult = scan(pdMS_TO_TICKS(100));
-
-    if (scanResult.status != ScanStatus::Duplicate) return;
-
-    // If it scanned the same card twice wait another 3 seconds for it to be removed
-    // and indicate a cooldown via the LED
-
-    led.playSequence(LedSequence::WaitingForCardRemoval);
-    vTaskDelay(pdMS_TO_TICKS(3000));
-
-    // From the first card scan to here it should be 6 seconds
 }
 
 void AccessControlTask::OnCommand(SystemCommand cmd)
@@ -101,26 +74,32 @@ void AccessControlTask::setup()
 
 void AccessControlTask::run()
 {
+    constexpr TickType_t cooldown1 = pdMS_TO_TICKS(1000);
+
     while (m_running)
     {
-        auto [status, uid] = scan(portMAX_DELAY);
+        std::optional<ScanResult> result = cardReader.waitForScanResult(pdMS_TO_TICKS(500));
+        if (!result.has_value()) continue;
 
-        switch (status)
-        {
-        case ScanStatus::NoCard:
-            break;
-        case ScanStatus::NewCard:
-            doThings(uid);
-            cooldownSequence();
-            break;
-        case ScanStatus::Duplicate:
-            break;
-        }
+        // make sure it's an up-to-date scan
+        if (xTaskGetTickCount() - result->ts > pdMS_TO_TICKS(10)) continue;
+
+        doThings(result->uid);
+
+        vTaskDelay(cooldown1);
+
+        result = cardReader.waitForScanResult(pdMS_TO_TICKS(10));
+
+        if (!result.has_value()) continue; // no card scanned while cooldown1
+
+        const TickType_t resultAge = xTaskGetTickCount() - result->ts;
+        if (resultAge > cooldown1 / 10) continue; // card was removed during cooldown1
+
+        led.playSequence(LedSequence::WaitingForCardRemoval);
+        vTaskDelay(LedService::cardRemovalCooldown);
     }
 
     fileLog.debugln("Card scanner task ended");
 
     SystemManager::ReportReadyForRestart(m_id);
-
-    vTaskDelete(nullptr);
 }

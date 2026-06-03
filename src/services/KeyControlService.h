@@ -6,17 +6,25 @@
 #include "logic/SystemManager.h"
 #include "modules/KeyControl.h"
 
+enum class KeyControlCommand
+{
+    Lock,
+    Unlock,
+};
+
+
 class KeyControlService : public SystemThread
 {
 public:
-    KeyControlService(const KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlService, "KEYCTRL", 4096,
-                                                                   2), keyControl(keyControl)
+    explicit KeyControlService(const KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlService, "KEYCTRL", 4096,
+                                                                            ThreadPriority::KeyControlService), keyControl(keyControl)
     {
         SystemManager::RegisterThread(this);
     }
 
     void OnCommand(SystemCommand cmd) override;
-    void toggleLogin(uint32_t uid) const;
+    void lock() const;
+    void unlock() const;
 
 protected:
     void setup() override;
@@ -27,5 +35,5 @@ private:
 
     const KeyControl& keyControl;
 
-    QueueHandle_t uidQueue = xQueueCreate(10, sizeof(uint32_t));
+    QueueHandle_t cmdQueue = xQueueCreate(10, sizeof(KeyControlCommand));
 };

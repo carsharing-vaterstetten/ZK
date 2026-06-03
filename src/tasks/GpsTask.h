@@ -11,8 +11,12 @@
 class GPSTask : SystemThread
 {
 public:
-    GPSTask(const AccessStatus& accessStatus, ModemService& modem, GPSAlg& gpsAlg) : SystemThread(
-            SystemThreadId::GPSTask, "GPSTask", 4096, 3), accessStatus(accessStatus), modem(modem), gpsAlg(gpsAlg) {}
+    GPSTask(const AccessStatus& accessStatus, ModemService& modem, GPSAlg& gpsAlg, GPS& gps) : SystemThread(
+            SystemThreadId::GPSTask, "GPSTask", 4096, ThreadPriority::GPSTask), accessStatus(accessStatus), modem(modem), gps(gps),
+        gpsAlg(gpsAlg)
+    {
+        SystemManager::RegisterThread(this);
+    }
 
     void OnCommand(SystemCommand cmd) override;
 
@@ -23,8 +27,11 @@ protected:
 private:
     std::atomic<bool> m_running = true;
 
+    TickType_t currentGPSPollingTime;
+
     const AccessStatus& accessStatus;
     ModemService& modem;
+    GPS& gps;
     GPSAlg& gpsAlg;
     GPSAlgPrediction lastGpsState = GPSAlgPrediction::Standing;
 

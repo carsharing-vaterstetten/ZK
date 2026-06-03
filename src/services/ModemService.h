@@ -5,11 +5,12 @@
 #include <atomic>
 
 #include "SystemThread.h"
-#include "abstract/PinSequencePlayer.h"
+#include "abstract/SequencePlayer.h"
 #include "config/hw_config.h"
 #include "../modules/GPS.h"
 #include "logic/SystemManager.h"
 #include "shared/AccessStatus.h"
+#include "shared/ImeiStore.h"
 #include "shared/LocalConfig.h"
 #include "shared/RFIDs.h"
 #include "shared/SwappableFile.h"
@@ -32,6 +33,9 @@ enum class ModemTaskCommand
     GetGPSData,
     UploadGPSData,
     GetAccessControlSequences,
+    GetUnixTime,
+    GetTimestamp,
+    GetImei,
 };
 
 enum class ModemTxDataType
@@ -41,6 +45,7 @@ enum class ModemTxDataType
     WakeupSuccess,
     GPSData,
     AccessControlSequences,
+    UnixTimestamp,
 };
 
 enum class ModemRxDataType
@@ -50,18 +55,12 @@ enum class ModemRxDataType
 
 typedef struct
 {
-    std::vector<SequencePoint> openSequence;
-    std::vector<SequencePoint> closeSequence;
-} AccessControlSequences;
-
-typedef struct
-{
     int hour;
     int minute;
     int second;
 } ModemTimestamp;
 
-using ModemFlexibleTxPayload = std::variant<String, bool, ModemTimestamp, GPS_DATA_t, AccessControlSequences>;
+using ModemFlexibleTxPayload = std::variant<String, bool, ModemTimestamp, GPS_DATA_t, time_t>;
 using ModemFlexibleRxPayload = std::variant<ModemTaskCommand>;
 
 typedef struct ModemTxMessage
@@ -84,18 +83,17 @@ public:
                  const LocalConfig& config,
                  RFIDs& rfidsManager,
                  SwappableFile& swLog, const AccessStatus& accessStatus, Modem& modem,
-                 GPS& gps) : SystemThread(SystemThreadId::ModemService, "MODEMSER", 8192, 4), board(board),
+                 GPS& gps, ApiClient& api, ImeiStore& imeiStore) : SystemThread(SystemThreadId::ModemService, "MODEMSER", 8192, ThreadPriority::ModemService), board(board),
                              config(config), accessStatus(accessStatus), modem(modem), rfidsManager(rfidsManager),
-                             gps(gps), swLog(swLog)
+                             gps(gps), swLog(swLog), api(api), imeiStore(imeiStore)
     {
         SystemManager::RegisterThread(this);
     }
 
     void OnCommand(SystemCommand cmd) override;
 
-    void queueModemTaskRxJob(ModemRxDataType dataType, ModemFlexibleRxPayload payload);
-    void modemFinishTasksAndStop();
-    ModemTxMessage* waitForSpecificModemMessage(ModemTxDataType dataType);
+    void sendMessage(ModemRxDataType dataType, const ModemFlexibleRxPayload& payload);
+    ModemTxMessage* waitForSpecificMessage(ModemTxDataType dataType, TickType_t timeout);
 
 protected:
     void setup() override;
@@ -104,8 +102,8 @@ protected:
 private:
     std::atomic<bool> m_running = true;
 
-    QueueHandle_t modemTaskTxQueue = xQueueCreate(10, sizeof(ModemTxMessage*));
-    QueueHandle_t modemTaskRxQueue = xQueueCreate(10, sizeof(ModemRxMessage*));
+    QueueHandle_t modemTaskTxQueue = xQueueCreate(20, sizeof(ModemTxMessage*));
+    QueueHandle_t modemTaskRxQueue = xQueueCreate(20, sizeof(ModemRxMessage*));
 
     const BoardConfig& board;
     const LocalConfig& config;
@@ -114,6 +112,8 @@ private:
     RFIDs& rfidsManager;
     GPS& gps;
     SwappableFile& swLog;
+    ApiClient& api;
+    ImeiStore& imeiStore;
 
-    std::optional<ApiClient> api;
+    void sendMessage(ModemTxDataType dataType, const ModemFlexibleTxPayload& payload);
 };

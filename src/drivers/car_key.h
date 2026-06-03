@@ -1,6 +1,6 @@
 #pragma once
 
-#include "abstract/PinSequencePlayer.h"
+#include "abstract/SequencePlayer.h"
 #include "shared/KeySequenceManager.h"
 
 
@@ -14,13 +14,8 @@ public:
 
     void begin() const;
 
-    void startOpenSequence();
-    [[nodiscard]] bool openSequenceCompleted() const;
-
-    void startCloseSequence();
-    [[nodiscard]] bool closeSequenceCompleted() const;
-    void pollOpen();
-    void pollClose();
+    void playOpenSequence();
+    void playCloseSequence();
 
 protected:
     uint8_t openKeyPin, closeKeyPin, keyPowerPin;
@@ -28,5 +23,5 @@ protected:
 
     const KeySequenceManager& keySequenceManager;
 
-    SequencePlayer openSequencePlayer{{}}, closeSequencePlayer{{}};
+    std::optional<SequencePlayer> openSequencePlayer, closeSequencePlayer;
 };

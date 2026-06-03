@@ -18,18 +18,36 @@ void CardReaderService::OnCommand(const SystemCommand cmd)
     }
 }
 
+std::optional<ScanResult> CardReaderService::waitForScanResult(const TickType_t timeout) const
+{
+    ScanResult result{};
+    if (xQueueReceive(scanResultQueue, &result, timeout) == pdTRUE)
+        return result;
+    return std::nullopt;
+}
+
 void CardReaderService::setup()
 {
+    cardReader.connect();
 }
 
 void CardReaderService::run()
 {
-    static ScanResult scanResult;
+    ScanResult scanResult{};
 
     while (m_running)
     {
-        scanResult = cardReader.scan(false);
-        SharedData::registerData(newCardScannedId, &scanResult);
+        std::optional<uint32_t> uid = cardReader.scan();
+
+        if (!uid.has_value())
+        {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            continue;
+        }
+
+        scanResult.uid = uid.value();
+        scanResult.ts = xTaskGetTickCount();
+        xQueueOverwrite(scanResultQueue, &scanResult);
     }
 
     SystemManager::ReportReadyForRestart(m_id);

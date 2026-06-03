@@ -1,6 +1,7 @@
 #pragma once
 #include "config/hw_config.h"
 #include "logic/SystemManager.h"
+#include "services/CardReaderService.h"
 #include "services/KeyControlService.h"
 #include "services/LedService.h"
 #include "services/ModemService.h"
@@ -13,10 +14,12 @@ class AccessControlTask : public SystemThread
 {
 public:
     AccessControlTask(const BoardConfig& board, const RFIDs& rfidsManager, GPSAlg& gpsAlg,
-                      const KeyControlService& keyControlService, const AccessStatus& accessStatus,
-                      const LedService& led, ModemService& modem)
-        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, 1), board(board), rfidsManager(rfidsManager),
-          gpsAlg(gpsAlg), keyControlService(keyControlService), accessStatus(accessStatus), led(led), modem(modem)
+                      const KeyControlService& keyControlService, AccessStatus& accessStatus,
+                      const LedService& led, ModemService& modem, const CardReaderService& cardReader)
+        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask),
+          board(board), rfidsManager(rfidsManager),
+          gpsAlg(gpsAlg), keyControlService(keyControlService), accessStatus(accessStatus), led(led), modem(modem),
+          cardReader(cardReader)
     {
         SystemManager::RegisterThread(this);
     }
@@ -34,11 +37,10 @@ private:
     const RFIDs& rfidsManager;
     GPSAlg& gpsAlg;
     const KeyControlService& keyControlService;
-    const AccessStatus& accessStatus;
+    AccessStatus& accessStatus;
     const LedService& led;
     ModemService& modem;
+    const CardReaderService& cardReader;
 
-    static ScanResult scan(TickType_t timeout);
     void doThings(uint32_t rfidUid);
-    void cooldownSequence() const;
 };

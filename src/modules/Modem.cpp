@@ -2,37 +2,49 @@
 
 #include "logic/HelperUtils.h"
 #include "Modem.h"
-#include "Api.h"
+#include "../shared/Api.h"
 #include "shared/Globals.h"
 #include "logic/LittleFSHelper.h"
 
-Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud, const ModemDriver& driver) :
+Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud,
+             const ModemHardwareDriver& driver) :
     serialBaud(serialBaud), serial(hwSerial), gsmModem(gsmModem), driver(driver) {}
 
 void Modem::powerOn() const
 {
-    driver.providePower();
-    fileLog.infoln("Modem power on");
-}
-
-void Modem::turnOn() const
-{
-    driver.turnOn();
+    // The hardware design guide doesnt specify a delay between VBAT and PWRKEY.
+    // PWRKEY rises when VBAT (modem internal pull up) is provided, then theoretically the power on sequence can be started immediately
+    driver.powerOn();
     fileLog.infoln("Modem turned on");
 }
 
-void Modem::turnOff() const
+void Modem::powerOff(PowerOffMethod method) const
 {
-    driver.turnOff();
-    fileLog.infoln("Modem turned off");
-}
+    /**
+    the following methods can be used to power off SIM7000.
+    - Method 1: Power off SIM7000 by pulling the PWRKEY pin to ground.
+    - Method 2: Power off SIM7000 by AT command “AT+CPOWD=1”.
+    - Method 3: over-voltage or under-voltage automatic power off. The functioncan be enabled by AT
+    command “AT+CBATCHK=1”. Default is disabled.
+     */
 
-bool Modem::powerOff() const
-{
     fileLog.debugln("Powering off modem...");
-    const bool success = gsmModem.poweroff();
-    fileLog.logInfoOrErrorln(success, "Modem powered off successfully", "Failed to power off modem");
-    return success;
+
+    switch (method)
+    {
+    case PowerOffMethod::UartCommand:
+        {
+            const bool success = gsmModem.poweroff();
+            fileLog.logInfoOrErrorln(success, "Modem powered off successfully", "Failed to power off modem");
+            break;
+        }
+    case PowerOffMethod::PwrKey:
+        {
+            driver.powerOff();
+            fileLog.infoln("Modem powered off via PWRKEY");
+            break;
+        }
+    }
 }
 
 
@@ -103,21 +115,14 @@ bool Modem::enableGPS()
 {
     fileLog.debugln("Enabling GPS...");
 
-    if (gsmModem.isEnableGPS())
+    if (gsmModem.isEnableGPS()) // not necessary?
     {
         gpsIsEnabled = true;
         fileLog.debugln("GPS already enabled");
         return true;
     }
 
-    gsmModem.sendAT("+CGPIO=0,48,1,1");
-
-    if (gsmModem.waitResponse(10000L) != 1)
-    {
-        fileLog.errorln("Set GPS Power HIGH failed");
-    }
-
-    const bool success = gsmModem.enableGPS();
+    const bool success = gsmModem.enableGPS(48, 1); // TODO: set pins in hw config
 
     fileLog.logInfoOrCriticalErrorln(success, "Enabled GPS", "Failed to enable GPS");
 
@@ -141,15 +146,7 @@ bool Modem::disableGPS()
         return true;
     }
 
-    gsmModem.sendAT("+CGPIO=0,48,1,0");
-
-    if (gsmModem.waitResponse(5000L) != 1)
-    {
-        fileLog.errorln("Set GPS Power LOW failed");
-        return false;
-    }
-
-    const bool success = gsmModem.disableGPS();
+    const bool success = gsmModem.disableGPS(48, 0); // TODO: put 48 and 1 into hw config
 
     fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
 
@@ -161,17 +158,18 @@ bool Modem::disableGPS()
     return success;
 }
 
-bool Modem::begin(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
+bool Modem::connect(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
 {
     gprsUser = user;
     gprsPassword = password;
     apn = netApn;
 
-    driver.begin();
-
-    wakeup();
+    driver.providePower();
+    driver.wakeup();
 
     const esp_reset_reason_t reason = esp_reset_reason();
+
+    //digitalRead();
 
     // Check if we are coming from a soft restart or a hard power-up
     if (reason == ESP_RST_SW)
@@ -197,10 +195,12 @@ bool Modem::beginHot(const char* simPin)
     if (success)
     {
         fileLog.infoln("Modem already active at " + String(detectedBaud) + " baud.");
-        return finishInit(simPin, detectedBaud);
+        successfulHotstart = finishInit(simPin, detectedBaud);
     }
+    else
+        successfulHotstart = false;
 
-    return false;
+    return successfulHotstart;
 }
 
 bool Modem::beginCold(const char* simPin, const uint retries)
@@ -209,13 +209,12 @@ bool Modem::beginCold(const char* simPin, const uint retries)
     {
         fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
 
-        powerOn(); // boardPowerOnPin HIGH
-
         // If the modem was already running, turnOff() ensures a clean start.
         // If it was already off, this pulse might be ignored or act as a toggle.
-        turnOff();
-        delay(1000);
-        turnOn(); // Pulse PWRKEY to boot
+        // TODO: turnOff();
+
+        // delay(1000);
+        powerOn(); // Pulse PWRKEY to boot
 
         // The SIM7000 takes ~4.5s to start its serial interface.
         // We use autoBaud with a 10-second timeout to catch it as it wakes up.
@@ -288,9 +287,12 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud) const
     return true;
 }
 
-bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries) const
+bool Modem::connectGPRSAndNetwork(const uint retries) const
 {
     fileLog.infoln("Connecting GPRS and network...");
+
+    // TODO: find out best connection order. According to TinyGSM lib: gprs first. My experience: based on previous modem state
+    const bool tryGprsFirst = successfulHotstart;
 
     bool gprsSuccess = gsmModem.isGprsConnected(), networkSuccess = gsmModem.isNetworkConnected();
 
@@ -335,9 +337,9 @@ bool Modem::connectGPRSAndNetwork(const bool tryGprsFirst, const uint retries) c
     return false;
 }
 
-bool Modem::ensureNetworkConnection(const bool tryGprsFirst, const uint maxRetries) const
+bool Modem::ensureNetworkConnection(const uint maxRetries) const
 {
-    if (!connectGPRSAndNetwork(tryGprsFirst, maxRetries)) return false;
+    if (!connectGPRSAndNetwork(maxRetries)) return false;
 
     // Wait for signal
     int16_t signalQuality = gsmModem.getSignalQuality();

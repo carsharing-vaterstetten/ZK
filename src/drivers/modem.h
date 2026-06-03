@@ -2,16 +2,16 @@
 
 #include "config/hw_config.h"
 
-class ModemDriver
+class ModemHardwareDriver
 {
 public:
-    explicit ModemDriver(const BoardConfig& board) : board(board) {}
+    explicit ModemHardwareDriver(const BoardConfig& board) : board(board) {}
 
     void begin() const;
     void providePower() const;
     void cutPower() const;
-    void turnOn() const;
-    void turnOff() const;
+    void powerOn() const;
+    void powerOff() const;
     void wakeup() const;
     void sleep() const;
 

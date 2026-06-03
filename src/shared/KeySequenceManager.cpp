@@ -1,5 +1,7 @@
 #include "KeySequenceManager.h"
 
+#include <Arduino.h>
+
 KeySequenceManager::KeySequenceManager() {}
 
 void KeySequenceManager::loadSequenceInRAM(const BoardConfig& board)

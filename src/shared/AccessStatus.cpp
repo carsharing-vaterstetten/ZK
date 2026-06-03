@@ -2,19 +2,18 @@
 
 #include "Globals.h"
 
-bool AccessStatus::begin()
-{
-    return prefs.begin(storageName, false);
-}
-
 void AccessStatus::end()
 {
+    std::lock_guard lock(mtx);
     prefs.end();
 }
 
 void AccessStatus::loadToRAM()
 {
     std::lock_guard lock(mtx);
+
+    prefs.begin(storageName, false);
+
     if (prefs.isKey(loggedInRfidKey))
     {
         const uint32_t loggedInRfid = prefs.getULong(loggedInRfidKey);

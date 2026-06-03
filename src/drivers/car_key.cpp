@@ -16,34 +16,26 @@ void CarKeyDriver::begin() const
         pinMode(keyPowerPin, OUTPUT);
 }
 
-void CarKeyDriver::startOpenSequence()
+void CarKeyDriver::playOpenSequence()
 {
-    openSequencePlayer = SequencePlayer{*keySequenceManager.getOpenSequence()};
-    openSequencePlayer.start();
+    if (!openSequencePlayer.has_value())
+    {
+        const auto loadedSeq = keySequenceManager.getOpenSequence();
+        if (loadedSeq == nullptr) return;
+        openSequencePlayer.emplace(*loadedSeq);
+    }
+
+    openSequencePlayer->play();
 }
 
-bool CarKeyDriver::openSequenceCompleted() const
+void CarKeyDriver::playCloseSequence()
 {
-    return openSequencePlayer.completed();
-}
+    if (!closeSequencePlayer.has_value())
+    {
+        const auto loadedSeq = keySequenceManager.getCloseSequence();
+        if (loadedSeq == nullptr) return;
+        closeSequencePlayer.emplace(*loadedSeq);
+    }
 
-void CarKeyDriver::startCloseSequence()
-{
-    closeSequencePlayer = SequencePlayer{*keySequenceManager.getCloseSequence()};
-    closeSequencePlayer.start();
-}
-
-bool CarKeyDriver::closeSequenceCompleted() const
-{
-    return closeSequencePlayer.completed();
-}
-
-void CarKeyDriver::pollOpen() // TODO: no polling
-{
-    openSequencePlayer.poll();
-}
-
-void CarKeyDriver::pollClose()
-{
-    closeSequencePlayer.poll();
+    closeSequencePlayer->play();
 }

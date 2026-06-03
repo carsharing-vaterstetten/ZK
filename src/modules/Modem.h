@@ -48,10 +48,17 @@ enum class SleepRequestResult
     AlreadySleeping,
 };
 
+enum class PowerOffMethod
+{
+    UartCommand,
+    PwrKey,
+};
+
 class Modem
 {
 protected:
     bool modemIsAwake = false, gpsIsEnabled = false;
+    bool successfulHotstart;
     ulong serialBaud;
 
     HardwareSerial& serial;
@@ -61,27 +68,25 @@ protected:
 
     static constexpr uint32_t modemPowerOnPulseWidthMs = 1000, modemPowerOffPulseWidthMs = 1300;
 
-    const ModemDriver& driver;
+    const ModemHardwareDriver& driver;
 
     bool beginSleep();
     std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
-    bool connectGPRSAndNetwork(bool tryGprsFirst = true, uint retries = 2) const;
+    bool connectGPRSAndNetwork(uint retries = 2) const;
     bool beginHot(const char* simPin);
     bool beginCold(const char* simPin, uint retries);
     bool finishInit(const char* simPin, ulong detectedBaud) const;
     void forcePowerCycle() const;
 
 public:
-    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemDriver& driver);
+    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemHardwareDriver& driver);
 
-    bool powerOff() const;
+    void powerOff(PowerOffMethod method) const;
     void powerOn() const;
-    void turnOn() const;
-    void turnOff() const;
     SleepRequestResult requestSleep();
 
-    bool begin(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
-    bool ensureNetworkConnection(bool tryGprsFirst = true, uint maxRetries = 2) const;
+    bool connect(const char* simPin, const char* user, const char* password, const char* netApn, uint retries = 2);
+    bool ensureNetworkConnection(uint maxRetries = 2) const;
     void wakeup();
     bool wakeupAndWait(uint32_t timeoutMs = 10000);
     static ApiResponse uploadData(const ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);

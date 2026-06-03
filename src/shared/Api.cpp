@@ -2,17 +2,11 @@
 
 #include <utility>
 
+#include "LocalConfig.h"
 #include "shared/Globals.h"
 
-ApiClient::ApiClient(HttpClient& httpClient, String defaultBasicAuthUsername,
-                     String defaultBasicAuthPassword, const size_t writeBufferSize,
-                     const size_t readBufferSize) :
-    httpClient(httpClient), defaultBasicAuthUsername(std::move(defaultBasicAuthUsername)),
-    defaultBasicAuthPassword(std::move(defaultBasicAuthPassword)), writeBufferSize(writeBufferSize),
-    readBufferSize(readBufferSize) {}
-
 ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders,
-                                   const ulong timeout) const
+                                   const ulong timeout, bool addUsernameAndPassword) const
 {
     const ulong requestStart = millis();
 
@@ -48,14 +42,15 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         return ApiResponse::failed();
     }
 
-    if (!defaultBasicAuthUsername.isEmpty() && !defaultBasicAuthPassword.isEmpty())
-        httpClient.sendBasicAuth(defaultBasicAuthUsername, defaultBasicAuthPassword);
+    if (addUsernameAndPassword)
+        httpClient.sendBasicAuth(imeiStore.waitForIMEI(), serverPassword);
 
     for (const auto& [key, value] : request.headers)
         httpClient.sendHeader(key, value);
 
     httpClient.beginBody();
 
+    constexpr uint writeBufferSize = 512;
     uint8_t buffer[writeBufferSize];
 
     const ulong uploadStartMs = millis();
@@ -133,11 +128,11 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     return ApiResponse{responseCode, headers, httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout) const
+uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout, size_t bufferSize)
 {
     HttpClient& downloadStream = resp.body;
 
-    uint8_t buf[readBufferSize];
+    uint8_t buf[bufferSize];
 
     uint downloaded = 0;
 
@@ -151,7 +146,7 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
             break;
         }
 
-        int len = downloadStream.read(buf, readBufferSize);
+        int len = downloadStream.read(buf, bufferSize);
         if (len > 0)
         {
             destination.write(buf, len);

@@ -19,23 +19,38 @@ void KeyControlService::OnCommand(const SystemCommand cmd)
     }
 }
 
-void KeyControlService::toggleLogin(const uint32_t uid) const
+void KeyControlService::lock() const
 {
-    xQueueSend(uidQueue, &uid, portMAX_DELAY);
+    constexpr auto cmd = KeyControlCommand::Lock;
+    xQueueSend(cmdQueue, &cmd, portMAX_DELAY);
 }
 
-void KeyControlService::setup()
+void KeyControlService::unlock() const
 {
-    keyControl.begin();
+    constexpr auto cmd = KeyControlCommand::Unlock;
+    xQueueSend(cmdQueue, &cmd, portMAX_DELAY);
 }
+
+void KeyControlService::setup() {}
 
 void KeyControlService::run()
 {
+    KeyControlCommand cmd;
+
     while (m_running)
     {
-        uint32_t uid;
-        xQueueReceive(uidQueue, &uid, portMAX_DELAY);
-        keyControl.toggleLogin(uid);
+        if (xQueueReceive(cmdQueue, &cmd, pdMS_TO_TICKS(500)) == pdFALSE)
+            continue;
+
+        switch (cmd)
+        {
+        case KeyControlCommand::Lock:
+            keyControl.lock();
+            break;
+        case KeyControlCommand::Unlock:
+            keyControl.unlock();
+            break;
+        }
     }
 
     SystemManager::ReportReadyForRestart(m_id);

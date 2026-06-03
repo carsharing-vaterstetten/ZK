@@ -4,7 +4,7 @@
 #include <FS.h>
 #include <sys/types.h>
 
-#include "modules/Api.h"
+#include "../shared/Api.h"
 
 #pragma pack(push, 1)
 struct GPS_DATA_t

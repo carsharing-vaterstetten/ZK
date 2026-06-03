@@ -7,7 +7,7 @@
 #include <WString.h>
 #include <rom/rtc.h>
 
-#include "modules/Api.h"
+#include "../shared/Api.h"
 #include "shared/Log.h"
 #include "TinyGsmGPRS.tpp"
 
@@ -41,5 +41,5 @@ namespace HelperUtils
     void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api,
                                                         SwappableFile& swLog, uint retries = 2, bool deleteIfSuccess = true);
     void performConnectionSpeedTest(const ApiClient& api, size_t fileSize);
-    bool syncTimeWithModem(Modem& modem, uint maxRetries);
+    void syncSystemTime(time_t unixTimestamp);
 }

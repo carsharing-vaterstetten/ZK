@@ -2,7 +2,8 @@
 
 #include <Update.h>
 
-#include "modules/Api.h"
+#include "SystemManager.h"
+#include "../shared/Api.h"
 #include "config/Backend.h"
 #include "modules/Modem.h"
 #include "config/Intern.h"
@@ -114,7 +115,6 @@ void FirmwareUpdater::doUpdateIfAvailable(const ApiClient& api)
     if (!writeFirmware(resp)) return;
     if (!finalizeUpdate()) return;
 
-    fileLog.infoln("Update complete. Rebooting in 5 seconds...");
-    delay(5000);
-    ESP.restart(); // TODO: ONLY RESTART IF OTHER TASKS ARE DONE
+    fileLog.infoln("Update complete. Requesting restart");
+    SystemManager::TriggerSystemHotRestart();
 }

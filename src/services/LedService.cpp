@@ -2,6 +2,22 @@
 
 #include "modules/LED.h"
 
+void LedService::OnCommand(SystemCommand cmd)
+{
+    switch (cmd)
+    {
+    case SystemCommand::None:
+        break;
+    case SystemCommand::PrepareForHotRestart:
+        m_running = false;
+        break;
+    case SystemCommand::EnterLowPower:
+        break;
+    case SystemCommand::ResumeNormalOperation:
+        break;
+    }
+}
+
 void LedService::setStateColor(StatusColor color) const
 {
     auto a = LedCommandWithData{.cmd = LedCommand::SetState, .data = color};
@@ -20,13 +36,16 @@ void LedService::playSequence(LedSequence sequence) const
     xQueueSend(commandQueue, &a, portMAX_DELAY);
 }
 
+void LedService::setup() {}
+
 void LedService::run()
 {
     LedCommandWithData cmdAndData;
 
     while (m_running)
     {
-        xQueueReceive(commandQueue, &cmdAndData, portMAX_DELAY);
+        if (xQueueReceive(commandQueue, &cmdAndData, pdMS_TO_TICKS(500)) == pdFALSE)
+            continue;
 
         switch (cmdAndData.cmd)
         {
@@ -36,11 +55,10 @@ void LedService::run()
                 {
                 case LedSequence::WaitingForCardRemoval:
                     {
-                        constexpr ulong cooldownMs = 3000;
                         const ulong s = millis();
-                        while (millis() - s < cooldownMs)
+                        while (millis() - s < cardRemovalCooldown)
                         {
-                            const float progress = 1.0f - (float)(millis() - s) / (float)cooldownMs;
+                            const float progress = 1.0f - (float)(millis() - s) / (float)cardRemovalCooldown;
                             statusLed.progressIndicatorNext(StatusColor::WaitingForNFCCardToBeRemoved, progress);
                         }
                         statusLed.progressIndicatorStop();
@@ -71,7 +89,7 @@ void LedService::run()
             break;
         }
 
-        // Return to previous state
+        // Return to previous state (will be newly set status color, if command was not a sequence)
         if (oldStatusColor.has_value())
             statusLed.setStatusColor(oldStatusColor.value());
         else

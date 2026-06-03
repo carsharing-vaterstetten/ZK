@@ -41,16 +41,23 @@ struct LedCommandWithData
 class LedService : public SystemThread
 {
 public:
-    LedService(CardReaderLED& statusLed) : SystemThread(SystemThreadId::LedService, "LEDSER", 4096, 3), statusLed(statusLed)
+    explicit LedService(CardReaderLED& statusLed) : SystemThread(SystemThreadId::LedService, "LEDSER", 4096,
+                                                                 ThreadPriority::LedService),
+                                                    statusLed(statusLed)
     {
         SystemManager::RegisterThread(this);
     }
+
+    static constexpr TickType_t cardRemovalCooldown = pdMS_TO_TICKS(3000);
+
+    void OnCommand(SystemCommand cmd) override;
 
     void setStateColor(StatusColor color) const;
     void clrStateColor() const;
     void playSequence(LedSequence sequence) const;
 
 protected:
+    void setup() override;
     void run() override;
 
 private:

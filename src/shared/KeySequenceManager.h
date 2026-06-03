@@ -2,7 +2,7 @@
 #include <memory>
 #include <mutex>
 
-#include "abstract/PinSequencePlayer.h"
+#include "abstract/SequencePlayer.h"
 #include "config/hw_config.h"
 
 class KeySequenceManager

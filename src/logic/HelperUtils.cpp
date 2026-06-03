@@ -278,7 +278,8 @@ void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
     );
 }
 
-void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bool deleteIfSuccess, const bool deleteAfterRetrying, const uint retries)
+void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bool deleteIfSuccess,
+                            const bool deleteAfterRetrying, const uint retries)
 {
     const std::optional<FileInfo> fileInfo = swLog.getCurrentFileInfo();
     if (!fileInfo.has_value()) return;
@@ -292,7 +293,8 @@ void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bo
     swLog.appendBToAAndSwapToA();
 }
 
-void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api, SwappableFile& swLog, const uint retries, const bool deleteIfSuccess)
+void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api, SwappableFile& swLog,
+                                                                 const uint retries, const bool deleteIfSuccess)
 {
     const size_t total = LittleFS.totalBytes();
     const size_t freeBytes = total - LittleFS.usedBytes();
@@ -341,29 +343,9 @@ void HelperUtils::performConnectionSpeedTest(const ApiClient& api, const size_t 
     fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
 }
 
-bool HelperUtils::syncTimeWithModem(Modem& modem, const uint maxRetries)
+void HelperUtils::syncSystemTime(const time_t unixTimestamp)
 {
-    fileLog.infoln("Syncing time");
-    uint syncAttempt = 0;
-
-    for (; syncAttempt <= maxRetries; ++syncAttempt)
-    {
-        int year;
-        const bool getTimeSuccess = modem.getNetworkTime(&year, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-        fileLog.logInfoOrWarningln(getTimeSuccess, "Got time successfully", "Failed to get time");
-        if (year < 2070 && year >= 2025) break;
-        serialOnlyLog.warningln("Modem fetched nonsensical time (Year " + String(year) + ")");
-    }
-
-    const bool syncSuccess = syncAttempt < maxRetries;
-
-    if (!syncSuccess) return false;
-
-    const time_t seconds = modem.getUnixTimestamp();
-    const timeval now = {.tv_sec = seconds, .tv_usec = 0};
+    const timeval now = {.tv_sec = unixTimestamp, .tv_usec = 0};
     settimeofday(&now, nullptr);
-
-    fileLog.logInfoOrWarningln(syncSuccess, "Time synced successfully", "Failed to sync time");
-
-    return true;
 }
+

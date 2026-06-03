@@ -2,6 +2,7 @@
 
 #include <Adafruit_NeoPixel.h>
 
+#include "abstract/SequencePlayer.h"
 
 enum class StatusColor
 {
@@ -23,7 +24,6 @@ public:
 
     void setColor(uint32_t hex) const;
     void clear() const;
-    void flash(uint32_t hexColor, uint16_t durationMs) const;
 
 protected:
     Adafruit_NeoPixel& neo;
@@ -54,6 +54,13 @@ public:
     void progressIndicatorNext(StatusColor color, float progress) const;
     void progressIndicatorStop() const;
 
-protected:
+private:
     uint16_t loadingCircleIndex = 0;
+
+    const SequencePlayer unlockFlashSequence{
+        {
+            SequencePoint{0, [this] { flash(StatusColor::CarUnlocked, 100); }},
+            SequencePoint{200, [this] { flash(StatusColor::CarUnlocked, 100); }},
+        }
+    };
 };

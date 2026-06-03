@@ -1,12 +1,14 @@
-#include <atomic>
+#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_T_PCIE
+#define TINY_GSM_RX_BUFFER 1024 // 1 KiB
 #include <esp32-hal.h>
-#include <esp_task_wdt.h>
 
+#include "Config.h"
 #include "modules/Modem.h"
 #include "modules/NFCCardReader.h"
 #include "HelperUtils.h"
 #include "esp_log.h"
-#include "modules/Api.h"
+#include "../shared/Api.h"
 #include "shared/Globals.h"
 #include "modules/GPS.h"
 #include "shared/GPSAlg.h"
@@ -16,14 +18,17 @@
 #include "shared/SwappableFile.h"
 #include "LittleFSHelper.h"
 #include "SystemManager.h"
+#include "config/Backend.h"
 #include "config/hw_config.h"
 #include "config/Intern.h"
 #include "esp32/rom/rtc.h"
 #include "config/Config.h"
 #include "config/user_config.h"
 #include "services/CardReaderService.h"
+#include "shared/ImeiStore.h"
 #include "tasks/AccessControlTask.h"
 #include "tasks/GpsTask.h"
+#include "tasks/StartupTask.h"
 #include "tasks/RestartTask.h"
 
 enum class TaskStatus
@@ -40,6 +45,11 @@ constexpr const BoardConfig* ACTIVE_BOARD = activeBoard<HW_REV>();
 const BoardConfig* ACTIVE_BOARD;
 #endif
 
+// Dont know what these are
+std::optional<ApiClient> apiDriver;
+std::optional<TinyGsm> modemDriver;
+std::optional<TinyGsmClient> gsmClient;
+std::optional<WdClient> wdClient;
 
 // Shared
 std::optional<LocalConfig> config;
@@ -47,16 +57,22 @@ GPSAlg gpsAlg{};
 RFIDs rfidsManager{"/rfids.bin", "/tmp_rfids.bin", "/rfids_gps_consent.bin", "/tmp_rfids_gps_consent.bin"};
 KeySequenceManager keySequenceManager;
 AccessStatus accessStatus{"AccCtrl v1", rfidsManager};
+ImeiStore imeiStore{};
 
 // Drivers
 std::optional<Adafruit_PN532> pn532Driver;
 std::optional<CarKeyDriver> carKeyDriver;
 std::optional<Adafruit_NeoPixel> ledDriver;
+std::optional<ModemHardwareDriver> modemHardwareDriver;
+std::optional<HardwareSerial> modemSerialDriver;
+std::optional<SPIClass> nfcSpiDriver;
 
 // Modules
 std::optional<NFCCardReader> cardReaderModule;
 std::optional<KeyControl> keyControlModule;
 std::optional<CardReaderLED> ledModule;
+std::optional<Modem> modemModule;
+std::optional<GPS> gpsModule;
 
 // Services
 std::optional<CardReaderService> cardReaderService;
@@ -68,6 +84,7 @@ std::optional<ModemService> modemService;
 std::optional<AccessControlTask> acTask;
 std::optional<GPSTask> gpsTask;
 std::optional<RestartTask> restartTask;
+std::optional<StartupTask> startupTask;
 
 int espLogHandler(const char* fmt, const va_list args)
 {
@@ -89,10 +106,7 @@ void loadConfig()
     else
     {
         serialOnlyLog.warningln("No or outdated config found. Requesting new config.");
-        esp_task_wdt_delete(nullptr); // remove wdt while waiting for config
         config.emplace(HelperUtils::requestConfig());
-        esp_task_wdt_add(nullptr);
-        esp_task_wdt_reset();
         const bool configSaveSuccess = StorableConfig{config.value(), CONFIG_PREFS_NAME}.save();
         fileLog.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
     }
@@ -133,14 +147,12 @@ void setup()
         serialOnlyLog.addOutputSink(Serial, "Serial", true, COLORIZE_SERIAL_LOGGING, SERIAL_LOGGING_LEVEL);
     }
 
-    // Start watchdog
-    esp_task_wdt_init(HW_WATCHDOG_INITIAL_STARTUP_TIMEOUT, true);
-    esp_task_wdt_add(nullptr);
-
     // Mount filesystems
     const bool flashInitSuccess = LittleFS.begin(true);
     serialOnlyLog.logInfoOrCriticalErrorln(flashInitSuccess, "Flash initialized successfully",
                                            "Flash initialization failed");
+
+    LittleFS.remove("/gps.bin"); // Delete old file
 
     swLog.begin(true);
     fileLog.addOutputSink(swLog, "", true, false, FLASH_LOGGING_LEVEL, true, true);
@@ -155,17 +167,10 @@ void setup()
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
 
-    accessStatus.begin();
-
     rfidsManager.loadFromFileToRam();
     rfidsManager.loadFromGpsFileToRam();
     keySequenceManager.loadSequenceInRAM(*ACTIVE_BOARD); // TODO: no more board
     accessStatus.loadToRAM();
-
-    // Now let's start the modem and set the system time fetched by the Modem network
-
-    Serial1.setRxBufferSize(2048);
-    Serial1.begin(MODEM_SERIAL_BAUD, SERIAL_8N1, ACTIVE_BOARD->modemRx, ACTIVE_BOARD->modemTx);
 
     if constexpr (USE_DEFAULT_CONFIG)
     {
@@ -181,47 +186,59 @@ void setup()
     SystemManager::Init();
 
     // Drivers
-    pn532Driver.emplace(ACTIVE_BOARD->nfcCs, ACTIVE_BOARD->nfcSpi);
+    nfcSpiDriver.emplace(ACTIVE_BOARD->nfcSpi);
+    nfcSpiDriver->begin(ACTIVE_BOARD->nfcClk, ACTIVE_BOARD->nfcMiso, ACTIVE_BOARD->nfcMosi, ACTIVE_BOARD->nfcCs);
+    pn532Driver.emplace(ACTIVE_BOARD->nfcCs, &nfcSpiDriver.value());
     pn532Driver->begin();
     carKeyDriver.emplace(ACTIVE_BOARD->keyOpen, ACTIVE_BOARD->keyClose, ACTIVE_BOARD->keyPower.value_or(0),
                          ACTIVE_BOARD->hasKeyPower, keySequenceManager);
     carKeyDriver->begin();
     ledDriver.emplace(ACTIVE_BOARD->ledCount, ACTIVE_BOARD->led, NEO_GRB + NEO_KHZ800);
     ledDriver->begin();
+    modemSerialDriver.emplace(Serial1);
+    modemSerialDriver->setRxBufferSize(2048);
+    modemSerialDriver->begin(MODEM_SERIAL_BAUD, SERIAL_8N1, ACTIVE_BOARD->modemRx, ACTIVE_BOARD->modemTx);
+    modemHardwareDriver.emplace(*ACTIVE_BOARD);
+    modemHardwareDriver->begin();
+
+    // dont know
+    modemDriver.emplace(modemSerialDriver.value());
+    gsmClient.emplace(modemDriver.value());
+    wdClient.emplace(gsmClient.value(), config->server, config->serverPort);
+    apiDriver.emplace(wdClient.value(), imeiStore, config->serverPassword);
 
     // Modules
     cardReaderModule.emplace(pn532Driver.value());
-    cardReaderModule->begin();
-    keyControlModule.emplace(carKeyDriver.value(),rfidsManager, accessStatus);
+    keyControlModule.emplace(carKeyDriver.value());
     ledModule.emplace(ledDriver.value());
+    modemModule.emplace(modemDriver.value(), modemSerialDriver.value(), MODEM_SERIAL_BAUD, modemHardwareDriver.value());
+    gpsModule.emplace("/gps.bin", GPS_FILE_UPLOAD_ENDPOINT);
+    gpsModule->begin();
 
     // Services
     cardReaderService.emplace(cardReaderModule.value());
     keyControlService.emplace(keyControlModule.value());
     ledService.emplace(ledModule.value());
+    modemService.emplace(*ACTIVE_BOARD, config.value(), rfidsManager, swLog, accessStatus, modemModule.value(),
+                         gpsModule.value(), apiDriver.value(), imeiStore);
 
-    if constexpr (GIVE_CONNECTION_SPEED_ESTIMATE)
-        queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::PerformConnectionSpeedTest);
+    // Tasks
+    acTask.emplace(*ACTIVE_BOARD, rfidsManager, gpsAlg, keyControlService.value(), accessStatus, ledService.value(),
+                   modemService.value(), cardReaderService.value());
+    gpsTask.emplace(accessStatus, modemService.value(), gpsAlg, gpsModule.value());
+    restartTask.emplace(TARGET_TIME_FOR_ESP_RESTART, modemService.value());
+    startupTask.emplace(modemService.value(), imeiStore);
 
-    if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
-        queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DoFirmwareUpdateIfAvailable);
-    else
-        fileLog.infoln("Skipped firmware update check");
-
-    // If there is no update we will continue with getting everything ready for reading NFC tags
-
-    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DownloadRfidIfChanged);
-    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DownloadGPSRfids);
+    SystemManager::Start();
 
     HelperUtils::logRAMUsage(fileLog, LoggingLevel::INFO);
     LittleFSHelper::logFilesystemsInformation();
 
-    // Almost everything is done and the created log can be uploaded
-    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::UploadLog);
-
-    // Power saving
-    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::DisconnectNetwork);
-    queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::SleepIfPossible);
+    String imei = imeiStore.waitForIMEI();
+    if (imei != "869951036992281")
+    {
+        serialOnlyLog.criticalln("CORRUPTED IMEI: " + imei);
+    }
 }
 
 void loop()

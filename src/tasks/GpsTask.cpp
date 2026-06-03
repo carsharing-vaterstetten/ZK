@@ -38,12 +38,20 @@ void GPSTask::checkGPS()
         return;
     }
 
-    modem.queueModemTaskRxJob(ModemRxDataType::Command, ModemTaskCommand::GetGPSData);
-    const ModemTxMessage* msg = modem.waitForSpecificModemMessage(ModemTxDataType::GPSData);
+    modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::GetGPSData);
+    const ModemTxMessage* msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, portMAX_DELAY);
+
+    if (msg == nullptr)
+    {
+        //serialOnlyLog.debugln("No gps data");
+        return;
+    }
+
     const GPS_DATA_t gpsData = std::get<GPS_DATA_t>(*msg->payload);
     delete msg;
 
     const GPSAlgPrediction gpsState = gpsAlg.pushData(gpsData);
+    gps.writeData(gpsData);
 
     if (gpsState != lastGpsState)
     {
@@ -63,22 +71,20 @@ void GPSTask::run()
 
     while (m_running)
     {
-        TickType_t xFrequency;
-
         if (accessStatus.isLoggedIn())
         {
-            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_DRIVING);
+            currentGPSPollingTime = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_DRIVING);
             if (accessStatus.givesGPSTrackingPermission().value_or(true))
                 checkGPS();
         }
         else
         {
-            xFrequency = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_STANDING);
+            currentGPSPollingTime = pdMS_TO_TICKS(GPS_UPDATE_INTERVAL_WHILE_STANDING);
             if constexpr (RECORD_GPS_WHILE_STANDING)
                 checkGPS();
         }
 
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        vTaskDelayUntil(&xLastWakeTime, currentGPSPollingTime);
     }
 
     SystemManager::ReportReadyForRestart(m_id);

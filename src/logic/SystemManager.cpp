@@ -8,6 +8,16 @@ void SystemManager::Init()
     m_registry.fill(nullptr);
 }
 
+void SystemManager::Start()
+{
+    for (SystemThread* t : m_registry)
+        if (t != nullptr)
+        {
+            serialOnlyLog.debugln("Task " + String((uint8_t)t->getId()) + " started");
+            t->startTask();
+        }
+}
+
 void SystemManager::RegisterThread(SystemThread* thread)
 {
     const auto index = static_cast<size_t>(thread->getId());
@@ -24,7 +34,9 @@ void SystemManager::RegisterThread(SystemThread* thread)
     }
 
     constexpr EventBits_t expectedBits = (1 << static_cast<uint8_t>(SystemThreadId::Count)) - 1;
-    xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, pdMS_TO_TICKS(5000));
+    EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, pdMS_TO_TICKS(20000));
+
+    serialOnlyLog.debugln("Received bits: " + String(receivedBits, 2));
 
     fileLog.infoln("Restarting now");
 
@@ -39,6 +51,12 @@ void SystemManager::ReportReadyForRestart(SystemThreadId id)
 {
     xEventGroupSetBits(m_lifecycleEventGroup, 1 << static_cast<uint8_t>(id));
 }
+
+void SystemManager::ReportUnReadyForRestart(SystemThreadId id)
+{
+    xEventGroupClearBits(m_lifecycleEventGroup, 1 << static_cast<uint8_t>(id));
+}
+
 
 [[noreturn]] void SystemManager::ExecuteHotRestart()
 {

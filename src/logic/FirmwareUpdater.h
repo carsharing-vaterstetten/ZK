@@ -1,5 +1,5 @@
 #pragma once
-#include "../modules/Api.h"
+#include "../shared/Api.h"
 
 namespace FirmwareUpdater
 {

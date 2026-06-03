@@ -45,9 +45,7 @@ uint32_t StatusLED::getStatusColorValue(const StatusColor color)
 
 void CardReaderLED::unlockFlash() const
 {
-    flash(StatusColor::CarUnlocked, 100);
-    delay(100);
-    flash(StatusColor::CarUnlocked, 100);
+    unlockFlashSequence.play();
 }
 
 void CardReaderLED::lockFlash() const
