@@ -39,7 +39,7 @@ void GPSTask::checkGPS()
     }
 
     modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::GetGPSData);
-    const ModemTxMessage* msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, portMAX_DELAY);
+    const ModemTxMessage* msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, pdMS_TO_TICKS(5000));
 
     if (msg == nullptr)
     {

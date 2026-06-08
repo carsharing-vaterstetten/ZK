@@ -3,7 +3,7 @@
 #include <atomic>
 #include <rom/rtc.h>
 
-#include "Config.h"
+#include "config/Config.h"
 #include "shared/Globals.h"
 #include "config/user_config.h"
 #include "logic/FirmwareUpdater.h"

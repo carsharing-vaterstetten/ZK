@@ -158,6 +158,11 @@ bool Modem::disableGPS()
     return success;
 }
 
+bool Modem::waitForRDY(uint32_t timeout_ms)
+{
+     return gsmModem.waitResponse(timeout_ms, "RDY") > 0;
+}
+
 bool Modem::connect(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
 {
     gprsUser = user;
@@ -168,8 +173,6 @@ bool Modem::connect(const char* simPin, const char* user, const char* password, 
     driver.wakeup();
 
     const esp_reset_reason_t reason = esp_reset_reason();
-
-    //digitalRead();
 
     // Check if we are coming from a soft restart or a hard power-up
     if (reason == ESP_RST_SW)
@@ -215,6 +218,22 @@ bool Modem::beginCold(const char* simPin, const uint retries)
 
         // delay(1000);
         powerOn(); // Pulse PWRKEY to boot
+
+        serialOnlyLog.debugln("Waiting for RDY");
+        bool a = waitForRDY(10000); // TODO: also needed for hot start?
+        serialOnlyLog.debugln("Got " + String(a));
+
+        serialOnlyLog.debugln("Waiting for CFUN");
+        a = gsmModem.waitResponse(10000, "CFUN");
+        serialOnlyLog.debugln("Got " + String(a));
+
+        serialOnlyLog.debugln("Waiting for CPIN");
+        a = gsmModem.waitResponse(10000, "CPIN");
+        serialOnlyLog.debugln("Got " + String(a));
+
+        serialOnlyLog.debugln("Waiting for SMS ready");
+        a = gsmModem.waitResponse(10000, "SMS Ready");
+        serialOnlyLog.debugln("Got " + String(a));
 
         // The SIM7000 takes ~4.5s to start its serial interface.
         // We use autoBaud with a 10-second timeout to catch it as it wakes up.

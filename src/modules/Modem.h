@@ -101,6 +101,7 @@ public:
     bool disconnectNetwork() const;
     bool enableGPS();
     bool disableGPS();
+    bool waitForRDY(uint32_t timeout_ms);
 
     // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
     // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)

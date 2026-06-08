@@ -25,7 +25,7 @@ void SystemManager::RegisterThread(SystemThread* thread)
         m_registry[index] = thread;
 }
 
-[[noreturn]] void SystemManager::TriggerSystemHotRestart()
+[[noreturn]] void SystemManager::TriggerSystemHotRestart(TickType_t timeout)
 {
     for (SystemThread* t : m_registry)
     {
@@ -34,7 +34,7 @@ void SystemManager::RegisterThread(SystemThread* thread)
     }
 
     constexpr EventBits_t expectedBits = (1 << static_cast<uint8_t>(SystemThreadId::Count)) - 1;
-    EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, pdMS_TO_TICKS(20000));
+    EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, timeout);
 
     serialOnlyLog.debugln("Received bits: " + String(receivedBits, 2));
 

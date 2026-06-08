@@ -15,7 +15,7 @@ public:
     static void RegisterThread(SystemThread* thread);
 
     /// Any task can call this to initiate an orderly system reboot
-    [[noreturn]] static void TriggerSystemHotRestart();
+    [[noreturn]] static void TriggerSystemHotRestart(TickType_t timeout = pdMS_TO_TICKS(20000));
     static void ReportReadyForRestart(SystemThreadId id);
     static void ReportUnReadyForRestart(SystemThreadId id);
 

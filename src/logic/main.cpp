@@ -3,7 +3,7 @@
 #define TINY_GSM_RX_BUFFER 1024 // 1 KiB
 #include <esp32-hal.h>
 
-#include "Config.h"
+#include "config/Config.h"
 #include "modules/Modem.h"
 #include "modules/NFCCardReader.h"
 #include "HelperUtils.h"
