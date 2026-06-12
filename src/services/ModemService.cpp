@@ -1,9 +1,7 @@
 #include "ModemService.h"
 
 #include <atomic>
-#include <rom/rtc.h>
 
-#include "config/Config.h"
 #include "shared/Globals.h"
 #include "config/user_config.h"
 #include "logic/FirmwareUpdater.h"
@@ -19,7 +17,6 @@ void ModemService::OnCommand(SystemCommand cmd)
         break;
     case SystemCommand::PrepareForHotRestart:
         m_running = false;
-        // TODO: asdf
         break;
     case SystemCommand::EnterLowPower:
         // TODO: lp
@@ -46,8 +43,6 @@ void ModemService::sendMessage(const ModemTxDataType dataType, const ModemFlexib
     };
     xQueueSend(modemTaskTxQueue, &msg, portMAX_DELAY);
 }
-
-#include <chrono>
 
 ModemTxMessage* ModemService::waitForSpecificMessage(ModemTxDataType dataType, TickType_t timeout)
 {
@@ -101,12 +96,18 @@ ModemTxMessage* ModemService::waitForSpecificMessage(ModemTxDataType dataType, T
     }
 }
 
+bool ModemService::isWorkingOnTasks()
+{
+    return workingOnTasks;
+}
+
 void ModemService::setup()
 {
     modem.connect(config.simPin.c_str(), config.gprsUser.c_str(), config.gprsPassword.c_str(), config.apn.c_str());
 
-    if (RECORD_GPS_WHILE_STANDING || (accessStatus.isLoggedIn() && accessStatus.givesGPSTrackingPermission()))
-        modem.enableGPS();
+    String model, revision;
+    modem.getRevision(model, revision);
+    fileLog.debugln("Model: " + model + ", Revision: " + revision);
 }
 
 void ModemService::run()
@@ -123,10 +124,16 @@ void ModemService::run()
 
         if (receivedMsg == nullptr)
         {
-            if (!m_running && millis() - lastReceivedMsgMs > 100)
-                break;
+            if (millis() - lastReceivedMsgMs < 100) continue;
+
+            workingOnTasks = false;
+
+            if (!m_running) break;
+
             continue;
         }
+
+        workingOnTasks = true;
 
         lastReceivedMsgMs = millis();
 
@@ -274,7 +281,7 @@ void ModemService::run()
         delete receivedMsg;
     }
 
-    serialOnlyLog.debugln("STOP");
+    workingOnTasks = false;
 
     SystemManager::ReportReadyForRestart(m_id);
 }

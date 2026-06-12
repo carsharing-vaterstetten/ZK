@@ -36,7 +36,7 @@ void SystemManager::RegisterThread(SystemThread* thread)
     constexpr EventBits_t expectedBits = (1 << static_cast<uint8_t>(SystemThreadId::Count)) - 1;
     EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, timeout);
 
-    serialOnlyLog.debugln("Received bits: " + String(receivedBits, 2));
+    fileLog.debugln("Ended tasks: " + String(receivedBits, 2));
 
     fileLog.infoln("Restarting now");
 

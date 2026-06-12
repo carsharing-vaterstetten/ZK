@@ -36,7 +36,10 @@ void LedService::playSequence(LedSequence sequence) const
     xQueueSend(commandQueue, &a, portMAX_DELAY);
 }
 
-void LedService::setup() {}
+void LedService::setup()
+{
+    statusLed.clear();
+}
 
 void LedService::run()
 {
@@ -91,7 +94,10 @@ void LedService::run()
 
         // Return to previous state (will be newly set status color, if command was not a sequence)
         if (oldStatusColor.has_value())
+        {
+            vTaskDelay(pdMS_TO_TICKS(200)); // wait a little to let the user see flashing etc.
             statusLed.setStatusColor(oldStatusColor.value());
+        }
         else
             statusLed.clear();
     }

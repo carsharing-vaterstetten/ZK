@@ -60,10 +60,7 @@ void GPSTask::checkGPS()
     }
 }
 
-void GPSTask::setup()
-{
-    fileLog.debugln("GPS data task started");
-}
+void GPSTask::setup() {}
 
 void GPSTask::run()
 {

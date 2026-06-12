@@ -95,12 +95,15 @@ public:
     void sendMessage(ModemRxDataType dataType, const ModemFlexibleRxPayload& payload);
     ModemTxMessage* waitForSpecificMessage(ModemTxDataType dataType, TickType_t timeout);
 
+    bool isWorkingOnTasks();
+
 protected:
     void setup() override;
     void run() override;
 
 private:
     std::atomic<bool> m_running = true;
+    std::atomic<bool> workingOnTasks = false;
 
     QueueHandle_t modemTaskTxQueue = xQueueCreate(20, sizeof(ModemTxMessage*));
     QueueHandle_t modemTaskRxQueue = xQueueCreate(20, sizeof(ModemRxMessage*));

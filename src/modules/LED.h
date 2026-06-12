@@ -54,6 +54,8 @@ public:
     void progressIndicatorNext(StatusColor color, float progress) const;
     void progressIndicatorStop() const;
 
+    void stopAllAnimations() const;
+
 private:
     uint16_t loadingCircleIndex = 0;
 

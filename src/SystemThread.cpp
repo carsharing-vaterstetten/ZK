@@ -1,5 +1,7 @@
 #include "SystemThread.h"
 
+#include "shared/Globals.h"
+
 
 SystemThread::~SystemThread()
 {
@@ -20,8 +22,12 @@ void SystemThread::TaskHook(void* pvParams)
 {
     auto* instance = static_cast<SystemThread*>(pvParams);
 
+    fileLog.debugln("Task " + String(instance->name) + " started");
+
     instance->setup();
     instance->run();
+
+    fileLog.debugln("Task " + String(instance->name) + " ended");
 
     vTaskDelete(nullptr);
 }

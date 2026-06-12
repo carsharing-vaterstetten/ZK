@@ -111,3 +111,9 @@ void CardReaderLED::progressIndicatorStop() const
 {
     clear();
 }
+
+void CardReaderLED::stopAllAnimations() const
+{
+    loadingCircleStop();
+    progressIndicatorStop();
+}

@@ -170,7 +170,11 @@ void setup()
     rfidsManager.loadFromFileToRam();
     rfidsManager.loadFromGpsFileToRam();
     keySequenceManager.loadSequenceInRAM(*ACTIVE_BOARD); // TODO: no more board
+    accessStatus.begin();
     accessStatus.loadToRAM();
+
+    if (accessStatus.isLoggedIn())
+        fileLog.infoln("RFID UID " + String(accessStatus.getLoggedInUID().value_or(0), 16) + " is logged in");
 
     if constexpr (USE_DEFAULT_CONFIG)
     {
@@ -227,7 +231,7 @@ void setup()
                    modemService.value(), cardReaderService.value());
     gpsTask.emplace(accessStatus, modemService.value(), gpsAlg, gpsModule.value());
     restartTask.emplace(TARGET_TIME_FOR_ESP_RESTART, modemService.value());
-    startupTask.emplace(modemService.value(), imeiStore);
+    startupTask.emplace(modemService.value(), imeiStore, accessStatus, ledService.value());
 
     SystemManager::Start();
 
@@ -238,7 +242,14 @@ void setup()
     if (imei != "869951036992281")
     {
         serialOnlyLog.criticalln("CORRUPTED IMEI: " + imei);
+        //ledService->setStateColor(StatusColor::Error);
     }
+    else
+    {
+        //ledService->setStateColor(StatusColor::CarUnlocked);
+    }
+
+    SystemManager::TriggerSystemHotRestart();
 }
 
 void loop()

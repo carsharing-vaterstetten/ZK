@@ -12,6 +12,7 @@ public:
     AccessStatus(const char* storageName, const RFIDs& rfidsManager) : storageName(storageName),
                                                                        rfidsManager(rfidsManager) {}
 
+    void begin();
     void end();
 
     void loadToRAM();

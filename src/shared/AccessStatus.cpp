@@ -2,6 +2,11 @@
 
 #include "Globals.h"
 
+void AccessStatus::begin()
+{
+    prefs.begin(storageName, false);
+}
+
 void AccessStatus::end()
 {
     std::lock_guard lock(mtx);
@@ -11,8 +16,6 @@ void AccessStatus::end()
 void AccessStatus::loadToRAM()
 {
     std::lock_guard lock(mtx);
-
-    prefs.begin(storageName, false);
 
     if (prefs.isKey(loggedInRfidKey))
     {

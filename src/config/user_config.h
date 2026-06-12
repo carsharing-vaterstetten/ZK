@@ -11,7 +11,7 @@
 #define TARGET_TIME_FOR_ESP_RESTART 12600000U // [ms] = (3 * 3600 + 30 * 60) * 1000 -> 03:30 AM
 
 // Check for firmware update on boot
-#define CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT true
+#define CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT false
 
 #define USB_SERIAL_BAUD 921600U
 

@@ -115,6 +115,11 @@ public:
         return gsmModem.getNetworkTime(year, month, day, hour, minute, second, timezone);
     }
 
+    void getRevision(String& model, String& revision) const
+    {
+        gsmModem.getRevision(model, revision);
+    }
+
     [[nodiscard]] time_t getUnixTimestamp() const;
     bool getGPS(GPS_DATA_t& out) const;
 

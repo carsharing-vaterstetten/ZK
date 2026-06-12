@@ -222,7 +222,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
         serialOnlyLog.debugln("Waiting for RDY");
         bool a = waitForRDY(10000); // TODO: also needed for hot start?
         serialOnlyLog.debugln("Got " + String(a));
-
+        /*
         serialOnlyLog.debugln("Waiting for CFUN");
         a = gsmModem.waitResponse(10000, "CFUN");
         serialOnlyLog.debugln("Got " + String(a));
@@ -234,7 +234,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
         serialOnlyLog.debugln("Waiting for SMS ready");
         a = gsmModem.waitResponse(10000, "SMS Ready");
         serialOnlyLog.debugln("Got " + String(a));
-
+*/
         // The SIM7000 takes ~4.5s to start its serial interface.
         // We use autoBaud with a 10-second timeout to catch it as it wakes up.
         auto [success, detectedBaud] = autoBaud(10000);

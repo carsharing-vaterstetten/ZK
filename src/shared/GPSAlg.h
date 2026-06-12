@@ -35,7 +35,7 @@ protected:
 
     GPSAlgPrediction last_prediction = GPSAlgPrediction::Standing;
 
-    mutable std::mutex algMutex;
+    mutable std::recursive_mutex algMutex;
 
     static float haversineDistance(float lat1, float lon1, float lat2, float lon2);
     GPSAlgPrediction evaluateWindow() const;
