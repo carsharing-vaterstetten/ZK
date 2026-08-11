@@ -9,7 +9,7 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
     if (!rfidsManager.isRegisteredRFID(rfidUid))
     {
         fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
-        led.playSequence(LedSequence::CardDeclined);
+        led.queueCardDeclinedFlash();
         return;
     }
 
@@ -18,15 +18,15 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
     if (!accessStatus.isLoggedIn())
     {
         keyControlService.unlock();
-        led.playSequence(LedSequence::CarUnlocked);
+        led.queueUnlockFlash();
         accessStatus.setLoginData(rfidUid);
 
         fileLog.infoln("Car unlocked");
 
         if (rfidsManager.RFIDConsentsToGPSTrackingTest(rfidUid))
         {
-            modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::Wakeup);
-            modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::EnableGPS);
+            modem.sendRequest(ModemTaskCommand::Wakeup);
+            modem.sendRequest(ModemTaskCommand::EnableGPS);
 
             if (!gpsAlg.isTripActive())
             {
@@ -38,7 +38,7 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
     else
     {
         keyControlService.lock();
-        led.playSequence(LedSequence::CarLocked);
+        led.queueLockFlash();
         accessStatus.clrLoginData();
 
         fileLog.infoln("Car locked");
@@ -95,8 +95,18 @@ void AccessControlTask::run()
         const TickType_t resultAge = xTaskGetTickCount() - result->ts;
         if (resultAge > cooldown1 / 10) continue; // card was removed during cooldown1
 
-        led.playSequence(LedSequence::WaitingForCardRemoval);
-        vTaskDelay(LedService::cardRemovalCooldown);
+        ProgressState cooldownProgress{.progress = 0, .colorHex = 0x3fd0d4};
+
+        uint progressId = led.queueProgressIndicator();
+        const TickType_t s = xTaskGetTickCount();
+        while (xTaskGetTickCount() - s < LedSchedulerTask::cardRemovalCooldown)
+        {
+            cooldownProgress.progress = 1.0f - static_cast<float>(xTaskGetTickCount() - s) / LedSchedulerTask::cardRemovalCooldown;
+            led.updateProgressOfCommand(progressId, cooldownProgress);
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        led.markCommandAsCompleted(progressId);
     }
 
     fileLog.debugln("Card scanner task ended");

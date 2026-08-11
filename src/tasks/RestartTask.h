@@ -8,7 +8,7 @@ class RestartTask : public SystemThread
 {
 public:
     explicit RestartTask(const ulong targetRestartTimeMs, ModemService& modem)
-        : SystemThread(SystemThreadId::RestartTask, "RSTRT", 4096, ThreadPriority::RestartTask), targetRestartTimeMs(targetRestartTimeMs),
+        : SystemThread(SystemThreadId::RestartTask, "RSTRT", 4096, ThreadPriority::RestartTask, 0), targetRestartTimeMs(targetRestartTimeMs),
           modem(modem)
     {
         SystemManager::RegisterThread(this);

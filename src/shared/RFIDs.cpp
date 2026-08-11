@@ -144,7 +144,7 @@ void RFIDs::generateChecksum(uint8_t* out) const
     f.close();
 }
 
-void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
+void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs JSON");
 
@@ -220,7 +220,7 @@ void RFIDs::downloadRfidsIfChanged(const ApiClient& api)
     fileLog.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
 }
 
-bool RFIDs::downloadGPSTrackingConsentedRFIDs(const ApiClient& api)
+bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
 {
     fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
 

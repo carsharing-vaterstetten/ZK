@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <utility>
 #include <WString.h>
@@ -11,6 +12,19 @@ class LocalConfig;
 class WdClient;
 class Modem;
 
+enum class ApiClientState
+{
+    None,
+    Uploading,
+    Downloading,
+};
+
+struct ApiClientProgress
+{
+    size_t bytesProcessed;
+    size_t bytesTotal;
+};
+
 class ApiClient
 {
 public:
@@ -18,11 +32,24 @@ public:
         imeiStore(imeiStore), serverPassword(serverPassword), httpClient(httpClient) {}
 
     [[nodiscard]] ApiResponse makeRequest(const HttpRequest& request, bool ignoreResponseHeaders = false,
-                                          ulong timeout = 5 * 60, bool addUsernameAndPassword = true) const;
-    static uint fetch(const ApiResponse& resp, Stream& destination, ulong timeout = 5 * 60, size_t bufferSize = 512);
+                                          ulong timeout = 5 * 60, bool addUsernameAndPassword = true);
+    uint fetch(const ApiResponse& resp, Stream& destination, ulong timeout = 5 * 60, size_t bufferSize = 512);
+
+    [[nodiscard]] ApiClientState getState() const
+    {
+        return state;
+    }
+
+    [[nodiscard]] ApiClientProgress getProgress() const
+    {
+        return progress;
+    }
 
 private:
     mutable std::mutex mtx;
+
+    std::atomic<ApiClientState> state;
+    std::atomic<ApiClientProgress> progress;
 
     const ImeiStore& imeiStore;
     const String& serverPassword;

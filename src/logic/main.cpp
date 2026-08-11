@@ -30,6 +30,7 @@
 #include "tasks/GpsTask.h"
 #include "tasks/StartupTask.h"
 #include "tasks/RestartTask.h"
+#include "tasks/SystemWatchTask.h"
 
 enum class TaskStatus
 {
@@ -70,14 +71,13 @@ std::optional<SPIClass> nfcSpiDriver;
 // Modules
 std::optional<NFCCardReader> cardReaderModule;
 std::optional<KeyControl> keyControlModule;
-std::optional<CardReaderLED> ledModule;
+std::optional<StatefulLed> ledModule;
 std::optional<Modem> modemModule;
 std::optional<GPS> gpsModule;
 
 // Services
 std::optional<CardReaderService> cardReaderService;
 std::optional<KeyControlService> keyControlService;
-std::optional<LedService> ledService;
 std::optional<ModemService> modemService;
 
 // Tasks
@@ -85,6 +85,8 @@ std::optional<AccessControlTask> acTask;
 std::optional<GPSTask> gpsTask;
 std::optional<RestartTask> restartTask;
 std::optional<StartupTask> startupTask;
+std::optional<SystemWatchTask> watchTask;
+std::optional<LedSchedulerTask> ledSchedularTask;
 
 int espLogHandler(const char* fmt, const va_list args)
 {
@@ -114,6 +116,11 @@ void loadConfig()
 
 void setup()
 {
+    disableCore0WDT();
+    disableCore1WDT();
+    disableLoopWDT();
+    esp_task_wdt_deinit();
+
     // Start serial communication
     Serial.begin(USB_SERIAL_BAUD);
     while (!Serial) {}
@@ -222,21 +229,19 @@ void setup()
     // Services
     cardReaderService.emplace(cardReaderModule.value());
     keyControlService.emplace(keyControlModule.value());
-    ledService.emplace(ledModule.value());
     modemService.emplace(*ACTIVE_BOARD, config.value(), rfidsManager, swLog, accessStatus, modemModule.value(),
                          gpsModule.value(), apiDriver.value(), imeiStore);
 
     // Tasks
-    acTask.emplace(*ACTIVE_BOARD, rfidsManager, gpsAlg, keyControlService.value(), accessStatus, ledService.value(),
+    ledSchedularTask.emplace(ledModule.value());
+    acTask.emplace(*ACTIVE_BOARD, rfidsManager, gpsAlg, keyControlService.value(), accessStatus, ledSchedularTask.value(),
                    modemService.value(), cardReaderService.value());
     gpsTask.emplace(accessStatus, modemService.value(), gpsAlg, gpsModule.value());
     restartTask.emplace(TARGET_TIME_FOR_ESP_RESTART, modemService.value());
-    startupTask.emplace(modemService.value(), imeiStore, accessStatus, ledService.value());
+    startupTask.emplace(modemService.value(), imeiStore, accessStatus, ledSchedularTask.value(), apiDriver.value());
+    watchTask.emplace();
 
     SystemManager::Start();
-
-    HelperUtils::logRAMUsage(fileLog, LoggingLevel::INFO);
-    LittleFSHelper::logFilesystemsInformation();
 
     String imei = imeiStore.waitForIMEI();
     if (imei != "869951036992281")
@@ -249,7 +254,12 @@ void setup()
         //ledService->setStateColor(StatusColor::CarUnlocked);
     }
 
-    SystemManager::TriggerSystemHotRestart();
+    while (modemService->isWorkingOnTasks())
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    SystemManager::BroadCastCommand(SystemCommand::EnterLowPower);
 }
 
 void loop()

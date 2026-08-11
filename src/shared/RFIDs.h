@@ -25,8 +25,8 @@ public:
     std::shared_ptr<const std::vector<uint32_t>> getGPSUids() const;
 
     bool isRegisteredRFID(uint32_t rfid) const;
-    void downloadRfidsIfChanged(const ApiClient& api);
-    bool downloadGPSTrackingConsentedRFIDs(const ApiClient& api);
+    void downloadRfidsIfChanged(ApiClient& api);
+    bool downloadGPSTrackingConsentedRFIDs(ApiClient& api);
     bool RFIDConsentsToGPSTrackingTest(uint32_t rfid) const;
     bool loadFromFileToRam();
     bool loadFromGpsFileToRam();

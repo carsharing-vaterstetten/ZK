@@ -3,5 +3,5 @@
 
 namespace FirmwareUpdater
 {
-    void doUpdateIfAvailable(const ApiClient& api);
+    void doUpdateIfAvailable(ApiClient& api);
 }

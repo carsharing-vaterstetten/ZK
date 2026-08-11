@@ -70,8 +70,7 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
     if (sink.colorize) line += COLOR_RESET;
     line += "]";
 
-    if (sink.colorize)
-        line += "[" + String(pcTaskGetName(nullptr)) + "]";
+    line += "[" + String(pcTaskGetName(nullptr)) + "]";
 
     if (sink.name && sink.name[0] != '\0') line += "[" + String(sink.name) + "] ";
     else line += " ";

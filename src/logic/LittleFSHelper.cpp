@@ -46,10 +46,3 @@ bool LittleFSHelper::remove(const String& path, const bool notExistingOk)
     const bool removeSuccess = LittleFS.remove(path);
     return removeSuccess;
 }
-
-void LittleFSHelper::logFilesystemsInformation()
-{
-    const size_t flashUtilized = LittleFS.usedBytes();
-    const size_t flashTotal = LittleFS.totalBytes();
-    fileLog.infoln("Flash usage: " + String(flashUtilized) + " B / " + String(flashTotal) + " B");
-}

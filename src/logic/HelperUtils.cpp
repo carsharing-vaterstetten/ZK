@@ -268,17 +268,7 @@ String HelperUtils::toBase64(const uint8_t* data, const size_t len)
     return {reinterpret_cast<char*>(encoded)};
 }
 
-void HelperUtils::logRAMUsage(const Log& log, const LoggingLevel level)
-{
-    log.logMsgln(String("RAM Usage: Total Free: ") + esp_get_free_heap_size() + " B" +
-                 " | Internal Free: " + heap_caps_get_free_size(MALLOC_CAP_INTERNAL) + " B" +
-                 " | External Free: " + heap_caps_get_free_size(MALLOC_CAP_SPIRAM) + " B" +
-                 " | Largest Internal Block: " + heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) + " B",
-                 level
-    );
-}
-
-void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bool deleteIfSuccess,
+void HelperUtils::uploadLog(ApiClient& api, SwappableFile& swLog, const bool deleteIfSuccess,
                             const bool deleteAfterRetrying, const uint retries)
 {
     const std::optional<FileInfo> fileInfo = swLog.getCurrentFileInfo();
@@ -293,7 +283,7 @@ void HelperUtils::uploadLog(const ApiClient& api, SwappableFile& swLog, const bo
     swLog.appendBToAAndSwapToA();
 }
 
-void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api, SwappableFile& swLog,
+void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(ApiClient& api, SwappableFile& swLog,
                                                                  const uint retries, const bool deleteIfSuccess)
 {
     const size_t total = LittleFS.totalBytes();
@@ -311,7 +301,7 @@ void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient
     uploadLog(api, swLog, deleteIfSuccess, deletePressure, retries);
 }
 
-void HelperUtils::performConnectionSpeedTest(const ApiClient& api, const size_t fileSize)
+void HelperUtils::performConnectionSpeedTest(ApiClient& api, const size_t fileSize)
 {
     fileLog.infoln("Performing connection speed test");
 

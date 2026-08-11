@@ -3,7 +3,7 @@
 #include "logic/SystemManager.h"
 #include "services/CardReaderService.h"
 #include "services/KeyControlService.h"
-#include "services/LedService.h"
+#include "LedSchedulerTask.h"
 #include "services/ModemService.h"
 #include "shared/GPSAlg.h"
 #include "shared/RFIDs.h"
@@ -15,8 +15,8 @@ class AccessControlTask : public SystemThread
 public:
     AccessControlTask(const BoardConfig& board, const RFIDs& rfidsManager, GPSAlg& gpsAlg,
                       const KeyControlService& keyControlService, AccessStatus& accessStatus,
-                      const LedService& led, ModemService& modem, const CardReaderService& cardReader)
-        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask),
+                       LedSchedulerTask& led, ModemService& modem, const CardReaderService& cardReader)
+        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask, 0),
           board(board), rfidsManager(rfidsManager),
           gpsAlg(gpsAlg), keyControlService(keyControlService), accessStatus(accessStatus), led(led), modem(modem),
           cardReader(cardReader)
@@ -38,7 +38,7 @@ private:
     GPSAlg& gpsAlg;
     const KeyControlService& keyControlService;
     AccessStatus& accessStatus;
-    const LedService& led;
+    LedSchedulerTask& led;
     ModemService& modem;
     const CardReaderService& cardReader;
 

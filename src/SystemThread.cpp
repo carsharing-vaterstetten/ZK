@@ -15,7 +15,17 @@ SystemThreadId SystemThread::getId() const
 
 void SystemThread::startTask()
 {
-    xTaskCreatePinnedToCore(TaskHook, name, stackDepth, this, prio, &m_taskHandle, 1);
+    xTaskCreatePinnedToCore(TaskHook, name, stackDepth, this, prio, &m_taskHandle, xCoreID);
+}
+
+TaskHandle_t SystemThread::getTaskHandle() const
+{
+    return m_taskHandle;
+}
+
+const char* SystemThread::getName() const
+{
+    return name;
 }
 
 void SystemThread::TaskHook(void* pvParams)

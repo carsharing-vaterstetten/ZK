@@ -33,7 +33,6 @@ void RestartTask::run()
     delete msg;
 
     fileLog.infoln("Next restart planned in " + String(restartTargetTimeMs / 60000) + " minutes");
-    fileLog.infoln("Next restart planned in " + String(pdMS_TO_TICKS_LONG(restartTargetTimeMs)) + " ticks");
 
     SystemManager::ReportReadyForRestart(m_id);
 
@@ -41,7 +40,7 @@ void RestartTask::run()
 
     if (wokenByCommand == pdTRUE)
     {
-        // interrupted early by system command.
+        // interrupted early by system command. Stop restart routine
         return;
     }
 
@@ -49,10 +48,10 @@ void RestartTask::run()
 
     fileLog.infoln("Time reached to upload log and restart ESP32");
 
-    modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::Wakeup);
-    modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::ConnectNetwork);
-    modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::UploadGPSData);
-    modem.sendMessage(ModemRxDataType::Command, ModemTaskCommand::UploadLog);
+    modem.sendRequest(ModemTaskCommand::Wakeup);
+    modem.sendRequest(ModemTaskCommand::ConnectNetwork);
+    modem.sendRequest(ModemTaskCommand::UploadGPSData);
+    modem.sendRequest(ModemTaskCommand::UploadLog);
 
 
     SystemManager::ReportReadyForRestart(m_id);

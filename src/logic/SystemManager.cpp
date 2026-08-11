@@ -27,11 +27,7 @@ void SystemManager::RegisterThread(SystemThread* thread)
 
 [[noreturn]] void SystemManager::TriggerSystemHotRestart(TickType_t timeout)
 {
-    for (SystemThread* t : m_registry)
-    {
-        if (t == nullptr) continue;
-        t->OnCommand(SystemCommand::PrepareForHotRestart);
-    }
+    BroadCastCommand(SystemCommand::PrepareForHotRestart);
 
     constexpr EventBits_t expectedBits = (1 << static_cast<uint8_t>(SystemThreadId::Count)) - 1;
     EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, timeout);
@@ -47,6 +43,15 @@ void SystemManager::RegisterThread(SystemThread* thread)
     ExecuteHotRestart();
 }
 
+void SystemManager::BroadCastCommand(const SystemCommand cmd)
+{
+    for (SystemThread* t : m_registry)
+    {
+        if (t == nullptr) continue;
+        t->OnCommand(cmd);
+    }
+}
+
 void SystemManager::ReportReadyForRestart(SystemThreadId id)
 {
     xEventGroupSetBits(m_lifecycleEventGroup, 1 << static_cast<uint8_t>(id));
@@ -55,6 +60,21 @@ void SystemManager::ReportReadyForRestart(SystemThreadId id)
 void SystemManager::ReportUnReadyForRestart(SystemThreadId id)
 {
     xEventGroupClearBits(m_lifecycleEventGroup, 1 << static_cast<uint8_t>(id));
+}
+
+std::array<TaskHandle_t, SystemManager::taskCount> SystemManager::getAllTaskHandles()
+{
+    std::array<TaskHandle_t, taskCount> handles{};
+
+    for (uint i = 0; i < taskCount; ++i)
+        handles[i] = m_registry[i]->getTaskHandle();
+
+    return handles;
+}
+
+std::array<SystemThread*, SystemManager::taskCount> SystemManager::getAllTasks()
+{
+    return m_registry;
 }
 
 

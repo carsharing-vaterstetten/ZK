@@ -17,7 +17,7 @@ class KeyControlService : public SystemThread
 {
 public:
     explicit KeyControlService(const KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlService, "KEYCTRL", 4096,
-                                                                            ThreadPriority::KeyControlService), keyControl(keyControl)
+                                                                            ThreadPriority::KeyControlService, 0), keyControl(keyControl)
     {
         SystemManager::RegisterThread(this);
     }

@@ -9,7 +9,7 @@
 #include "shared/RFIDs.h"
 #include "modules/Modem.h"
 
-void ModemService::OnCommand(SystemCommand cmd)
+void ModemService::OnCommand(const SystemCommand cmd)
 {
     switch (cmd)
     {
@@ -19,23 +19,19 @@ void ModemService::OnCommand(SystemCommand cmd)
         m_running = false;
         break;
     case SystemCommand::EnterLowPower:
-        // TODO: lp
+        lowPowerRequested = true;
         break;
     case SystemCommand::ResumeNormalOperation:
         break;
     }
 }
 
-void ModemService::sendMessage(const ModemRxDataType dataType, const ModemFlexibleRxPayload& payload)
+void ModemService::sendRequest(const ModemTaskCommand cmd) const
 {
-    const auto msg = new ModemRxMessage{
-        .dataType = dataType,
-        .payload = std::make_shared<ModemFlexibleRxPayload>(payload),
-    };
-    xQueueSend(modemTaskRxQueue, &msg, portMAX_DELAY);
+    xQueueSend(modemTaskRxQueue, &cmd, portMAX_DELAY);
 }
 
-void ModemService::sendMessage(const ModemTxDataType dataType, const ModemFlexibleTxPayload& payload)
+void ModemService::sendAnswer(const ModemTxDataType dataType, const ModemFlexibleTxPayload& payload) const
 {
     const auto msg = new ModemTxMessage{
         .dataType = dataType,
@@ -101,30 +97,30 @@ bool ModemService::isWorkingOnTasks()
     return workingOnTasks;
 }
 
+ModemState ModemService::getCurrentState()
+{
+    return currentSate;
+}
+
 void ModemService::setup()
 {
+    currentSate = ModemState::InitializeModem;
     modem.connect(config.simPin.c_str(), config.gprsUser.c_str(), config.gprsPassword.c_str(), config.apn.c_str());
-
-    String model, revision;
-    modem.getRevision(model, revision);
-    fileLog.debugln("Model: " + model + ", Revision: " + revision);
 }
 
 void ModemService::run()
 {
-    ModemRxMessage* receivedMsg = nullptr;
-
-    ulong lastReceivedMsgMs = millis();
+    ModemTaskCommand receivedCmd = ModemTaskCommand::NONE;
 
     while (true)
     {
-        receivedMsg = nullptr;
+        currentSate = ModemState::READY;
+        receivedCmd = ModemTaskCommand::NONE;
+        xQueueReceive(modemTaskRxQueue, &receivedCmd, pdMS_TO_TICKS(5));
 
-        xQueueReceive(modemTaskRxQueue, &receivedMsg, pdMS_TO_TICKS(5));
-
-        if (receivedMsg == nullptr)
+        if (receivedCmd == ModemTaskCommand::NONE)
         {
-            if (millis() - lastReceivedMsgMs < 100) continue;
+            if (xTaskGetTickCount() - lastReceivedMessageTime < pdMS_TO_TICKS(100)) continue;
 
             workingOnTasks = false;
 
@@ -134,154 +130,133 @@ void ModemService::run()
         }
 
         workingOnTasks = true;
+        currentSate = modemCmdToState(receivedCmd);
+        lastReceivedMessageTime = xTaskGetTickCount();
 
-        lastReceivedMsgMs = millis();
+        // serialOnlyLog.debugln("Working on cmd " + String((int)receivedCmd));
 
-        switch (receivedMsg->dataType)
+        switch (receivedCmd)
         {
-        case ModemRxDataType::Command:
+        case ModemTaskCommand::InitializeModem:
+            break;
+        case ModemTaskCommand::PerformConnectionSpeedTest:
+            HelperUtils::performConnectionSpeedTest(api, CONNECTION_SPEED_TEST_FILE_SIZE);
+            break;
+        case ModemTaskCommand::DoFirmwareUpdateIfAvailable:
+            FirmwareUpdater::doUpdateIfAvailable(api);
+            break;
+        case ModemTaskCommand::DownloadRfidIfChanged:
+            rfidsManager.downloadRfidsIfChanged(api);
+            break;
+        case ModemTaskCommand::DownloadGPSRfids:
+            rfidsManager.downloadGPSTrackingConsentedRFIDs(api);
+            break;
+        case ModemTaskCommand::UploadLog:
+            HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(api, swLog);
+            break;
+        case ModemTaskCommand::DisconnectNetwork:
+            modem.disconnectNetwork();
+            break;
+        case ModemTaskCommand::SleepIfPossible:
+            modem.requestSleep();
+            break;
+        case ModemTaskCommand::ConnectNetwork:
+            modem.ensureNetworkConnection();
+            break;
+        case ModemTaskCommand::Wakeup:
             {
-                auto cmd = std::get_if<ModemTaskCommand>(receivedMsg->payload.get());
+                const bool success = modem.wakeupAndWait();
+                auto msg = new ModemTxMessage{
+                    .dataType = ModemTxDataType::WakeupSuccess,
+                    .payload = std::make_shared<ModemFlexibleTxPayload>(success)
+                };
+                xQueueSend(modemTaskTxQueue, &msg, portMAX_DELAY);
+                break;
+            }
 
-                if (cmd == nullptr)
+        case ModemTaskCommand::EnableGPS:
+            modem.enableGPS();
+            break;
+        case ModemTaskCommand::GetGPSData:
+            {
+                GPS_DATA_t data;
+                modem.getGPS(data);
+                sendAnswer(ModemTxDataType::GPSData, data);
+                break;
+            }
+        case ModemTaskCommand::UploadGPSData:
+            {
+                gps.uploadFileAndBeginNew(api, true, true, 2);
+                break;
+            }
+        case ModemTaskCommand::GetAccessControlSequences:
+            {
+                // TODO: implement once feature on server
+                break;
+            }
+        case ModemTaskCommand::GetUnixTime:
+            {
+                time_t t = modem.getUnixTimestamp();
+
+                for (uint i = 0; i < 100 && t < 0; ++i)
                 {
-                    fileLog.debugln("Mismatched data payload inside Command type!");
-                    break;
+                    serialOnlyLog.debugln("Got invalid unix timestamp " + String(t));
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    t = modem.getUnixTimestamp();
                 }
 
-                serialOnlyLog.debugln("Working on cmd " + String((uint8_t)*cmd));
-
-                switch (*cmd)
-                {
-                case ModemTaskCommand::ReadData:
-                    break;
-                case ModemTaskCommand::WriteData:
-                    break;
-                case ModemTaskCommand::InitializeModem:
-                    break;
-                case ModemTaskCommand::PerformConnectionSpeedTest:
-                    HelperUtils::performConnectionSpeedTest(api, CONNECTION_SPEED_TEST_FILE_SIZE);
-                    break;
-                case ModemTaskCommand::DoFirmwareUpdateIfAvailable:
-                    FirmwareUpdater::doUpdateIfAvailable(api);
-                    break;
-                case ModemTaskCommand::DownloadRfidIfChanged:
-                    rfidsManager.downloadRfidsIfChanged(api);
-                    break;
-                case ModemTaskCommand::DownloadGPSRfids:
-                    rfidsManager.downloadGPSTrackingConsentedRFIDs(api);
-                    break;
-                case ModemTaskCommand::UploadLog:
-                    HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(api, swLog);
-                    break;
-                case ModemTaskCommand::DisconnectNetwork:
-                    modem.disconnectNetwork();
-                    break;
-                case ModemTaskCommand::SleepIfPossible:
-                    modem.requestSleep();
-                    break;
-                case ModemTaskCommand::ConnectNetwork:
-                    modem.ensureNetworkConnection();
-                    break;
-                case ModemTaskCommand::Wakeup:
-                    {
-                        const bool success = modem.wakeupAndWait();
-                        auto msg = new ModemTxMessage{
-                            .dataType = ModemTxDataType::WakeupSuccess,
-                            .payload = std::make_shared<ModemFlexibleTxPayload>(success)
-                        };
-                        xQueueSend(modemTaskTxQueue, &msg, portMAX_DELAY);
-                        break;
-                    }
-
-                case ModemTaskCommand::EnableGPS:
-                    modem.enableGPS();
-                    break;
-                case ModemTaskCommand::GetGPSData:
-                    {
-                        GPS_DATA_t data;
-                        modem.getGPS(data);
-                        sendMessage(ModemTxDataType::GPSData, data);
-                        break;
-                    }
-                case ModemTaskCommand::UploadGPSData:
-                    {
-                        gps.uploadFileAndBeginNew(api, true, true, 2);
-                        break;
-                    }
-                case ModemTaskCommand::GetAccessControlSequences:
-                    {
-                        // TODO: implement once feature on server
-                        break;
-                    }
-                case ModemTaskCommand::GetUnixTime:
-                    {
-                        time_t t = modem.getUnixTimestamp();
-
-                        for (uint i = 0; i < 100 && t < 0; ++i)
-                        {
-                            serialOnlyLog.debugln("Got invalid unix timestamp " + String(t));
-                            vTaskDelay(pdMS_TO_TICKS(10));
-                            t = modem.getUnixTimestamp();
-                        }
-
-                        if (t < 0)
-                            fileLog.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
-                        else
-                            sendMessage(ModemTxDataType::UnixTimestamp, t);
-
-                        break;
-                    }
-                case ModemTaskCommand::GetTimestamp:
-                    {
-                        int hour, minute, second, year;
-
-                        modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
-
-                        for (uint i = 0; (year <= 0 || year > 2060) && i < 100; ++i)
-                        {
-                            vTaskDelay(pdMS_TO_TICKS(10));
-                            modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
-                        }
-
-                        if (year <= 0 || year > 2060)
-                        {
-                            fileLog.errorln("Got invalid network time: Year " + String(year));
-                        }
-                        else
-                        {
-                            serialOnlyLog.debugln("Got time");
-                            ModemTimestamp ts{
-                                .hour = hour,
-                                .minute = minute,
-                                .second = second,
-                            };
-
-                            sendMessage(ModemTxDataType::Timestamp, ts);
-                        }
-
-                        break;
-                    }
-                case ModemTaskCommand::GetImei:
-                    {
-                        // FIXME: where does +CPIN  READY: come from?????????
-                        String imei = modem.getIMEI();
-                        imeiStore.setIMEI(imei);
-                        serialOnlyLog.debugln("Got imei: " + imei + " | " + imeiStore.getIMEI().value_or("AAAA"));
-                        break;
-                    }
-                }
-
-                serialOnlyLog.debugln("Done");
+                if (t < 0)
+                    fileLog.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
+                else
+                    sendAnswer(ModemTxDataType::UnixTimestamp, t);
 
                 break;
             }
-        }
+        case ModemTaskCommand::GetTimestamp:
+            {
+                int hour, minute, second, year;
 
-        delete receivedMsg;
+                modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
+
+                for (uint i = 0; (year <= 0 || year > 2060) && i < 100; ++i)
+                {
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
+                }
+
+                if (year <= 0 || year > 2060)
+                {
+                    fileLog.errorln("Got invalid network time: Year " + String(year));
+                }
+                else
+                {
+                    serialOnlyLog.debugln("Got time");
+                    ModemTimestamp ts{
+                        .hour = hour,
+                        .minute = minute,
+                        .second = second,
+                    };
+
+                    sendAnswer(ModemTxDataType::Timestamp, ts);
+                }
+
+                break;
+            }
+        case ModemTaskCommand::GetImei:
+            {
+                // FIXME: where does +CPIN  READY: come from?????????
+                String imei = modem.getIMEI();
+                imeiStore.setIMEI(imei);
+                serialOnlyLog.debugln("Got imei: " + imei + " | " + imeiStore.getIMEI().value_or("AAAA"));
+                break;
+            }
+        case ModemTaskCommand::NONE:
+            break;
+        }
     }
 
     workingOnTasks = false;
+    currentSate = ModemState::NONE;
 
     SystemManager::ReportReadyForRestart(m_id);
 }

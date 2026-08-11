@@ -18,7 +18,7 @@ public:
     static constexpr CommandId newCardScannedId = 54234;
 
     explicit CardReaderService(NFCCardReader& cardReader) : SystemThread(SystemThreadId::CardReaderService, "CRS", 4096,
-                                                                         ThreadPriority::CardReaderService),
+                                                                         ThreadPriority::CardReaderService, 0),
                                                             cardReader(cardReader)
     {
         SystemManager::RegisterThread(this);

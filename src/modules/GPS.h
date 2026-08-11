@@ -26,7 +26,7 @@ public:
     GPS(const char* localFilePath, const char* uploadEndpoint);
 
     bool writeData(const GPS_DATA_t& data);
-    void uploadFileAndBeginNew(const ApiClient& api, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    void uploadFileAndBeginNew(ApiClient& api, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
     bool begin();
     bool flush();
     void end();

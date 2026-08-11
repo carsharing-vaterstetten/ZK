@@ -398,7 +398,7 @@ bool Modem::disconnectNetwork() const
     return success;
 }
 
-ApiResponse Modem::uploadData(const ApiClient& api, const char* endpoint, Stream& stream, const size_t streamLen)
+ApiResponse Modem::uploadData(ApiClient& api, const char* endpoint, Stream& stream, const size_t streamLen)
 {
     const HttpRequest req = HttpRequest::post(endpoint, stream, streamLen, {
                                                   {"Content-Type", "application/octet-stream"}
@@ -406,7 +406,7 @@ ApiResponse Modem::uploadData(const ApiClient& api, const char* endpoint, Stream
     return api.makeRequest(req, true);
 }
 
-UploadAndRetryResult Modem::uploadDataAndRetry(const ApiClient& api, const char* endpoint, Stream& stream,
+UploadAndRetryResult Modem::uploadDataAndRetry(ApiClient& api, const char* endpoint, Stream& stream,
                                                const size_t streamLen,
                                                const uint retries)
 {
@@ -432,7 +432,7 @@ UploadAndRetryResult Modem::uploadDataAndRetry(const ApiClient& api, const char*
     return UploadAndRetryResult::FAILED;
 }
 
-UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const char* endpoint, File& f,
+UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* endpoint, File& f,
                                                     const bool deleteIfSuccess,
                                                     const bool deleteAfterRetrying, const uint retries)
 {
@@ -488,7 +488,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const 
     throw std::invalid_argument("Invalid result");
 }
 
-UploadFileAndRetryResult Modem::uploadFileAndDelete(const ApiClient& api, const char* endpoint, const char* filePath,
+UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* endpoint, const char* filePath,
                                                     const bool deleteIfSuccess, const bool deleteAfterRetrying,
                                                     const uint retries)
 {

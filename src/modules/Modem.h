@@ -89,12 +89,12 @@ public:
     bool ensureNetworkConnection(uint maxRetries = 2) const;
     void wakeup();
     bool wakeupAndWait(uint32_t timeoutMs = 10000);
-    static ApiResponse uploadData(const ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
-    static UploadAndRetryResult uploadDataAndRetry(const ApiClient& api, const char* endpoint, Stream& stream,
+    static ApiResponse uploadData(ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
+    static UploadAndRetryResult uploadDataAndRetry(ApiClient& api, const char* endpoint, Stream& stream,
                                                    size_t streamLen, uint retries);
-    static UploadFileAndRetryResult uploadFileAndDelete(const ApiClient& api, const char* endpoint, File& f,
+    static UploadFileAndRetryResult uploadFileAndDelete(ApiClient& api, const char* endpoint, File& f,
                                                         bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
-    static UploadFileAndRetryResult uploadFileAndDelete(const ApiClient& api, const char* endpoint,
+    static UploadFileAndRetryResult uploadFileAndDelete(ApiClient& api, const char* endpoint,
                                                         const char* filePath,
                                                         bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
 

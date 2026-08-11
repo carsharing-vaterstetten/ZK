@@ -15,7 +15,7 @@ bool GPS::begin()
     return gpsFile;
 }
 
-void GPS::uploadFileAndBeginNew(const ApiClient& api, const bool deleteIfSuccess, const bool deleteAfterRetrying,
+void GPS::uploadFileAndBeginNew(ApiClient& api, const bool deleteIfSuccess, const bool deleteAfterRetrying,
                                 const uint retries)
 {
     fileLog.infoln("Uploading GPS log (" + String(fileSize()) + " B)");

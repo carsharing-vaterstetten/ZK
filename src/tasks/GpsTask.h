@@ -12,7 +12,7 @@ class GPSTask : SystemThread
 {
 public:
     GPSTask(const AccessStatus& accessStatus, ModemService& modem, GPSAlg& gpsAlg, GPS& gps) : SystemThread(
-            SystemThreadId::GPSTask, "GPSTask", 4096, ThreadPriority::GPSTask), accessStatus(accessStatus), modem(modem), gps(gps),
+            SystemThreadId::GPSTask, "GPSTask", 4096, ThreadPriority::GPSTask, 0), accessStatus(accessStatus), modem(modem), gps(gps),
         gpsAlg(gpsAlg)
     {
         SystemManager::RegisterThread(this);

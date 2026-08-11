@@ -6,7 +6,7 @@
 #include "shared/Globals.h"
 
 ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignoreResponseHeaders,
-                                   const ulong timeout, bool addUsernameAndPassword) const
+                                   const ulong timeout, bool addUsernameAndPassword)
 {
     const ulong requestStart = millis();
 
@@ -53,20 +53,25 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     constexpr uint writeBufferSize = 512;
     uint8_t buffer[writeBufferSize];
 
-    const ulong uploadStartMs = millis();
-
     size_t totalBytesRead = 0;
+
+    progress.store({0, request.bodyLength});
+    state = ApiClientState::Uploading;
+
+    const ulong uploadStartMs = millis();
 
     while (request.body.available() && totalBytesRead < request.bodyLength)
     {
         if (hasTimedOut())
         {
             fileLog.errorln("Timeout during body upload");
+            state = ApiClientState::None;
             return ApiResponse::failed();
         }
 
         const size_t bytesRead = request.body.readBytes(buffer, writeBufferSize);
         totalBytesRead += bytesRead;
+        progress.store({totalBytesRead, request.bodyLength});
 
         size_t wrote = httpClient.write(buffer, bytesRead);
 
@@ -78,6 +83,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
             if (hasTimedOut())
             {
                 fileLog.errorln("Timeout during write retry");
+                state = ApiClientState::None;
                 return ApiResponse::failed();
             }
 
@@ -87,11 +93,13 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
         if (wrote == 0 && retry == maxWriteRetries)
         {
+            state = ApiClientState::None;
             return ApiResponse::failed();
         }
     }
 
     const uint uploadTimeMs = millis() - uploadStartMs;
+    state = ApiClientState::None;
 
     if (hasTimedOut()) return ApiResponse::failed();
 
@@ -136,6 +144,9 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
 
     uint downloaded = 0;
 
+    progress.store({0,resp.bodyLength});
+    state = ApiClientState::Downloading;
+
     const ulong start = millis();
 
     while (downloadStream.connected() || downloadStream.available() > 0)
@@ -151,10 +162,13 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
         {
             destination.write(buf, len);
             downloaded += len;
+            progress.store({downloaded, resp.bodyLength});
         }
         else
             yield(); // Prevent CPU spinning if the modem is mid-packet
     }
+
+    state = ApiClientState::None;
 
     return downloaded;
 }

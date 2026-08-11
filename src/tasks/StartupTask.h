@@ -3,18 +3,20 @@
 
 #include "SystemThread.h"
 #include "services/ModemService.h"
-#include "services/LedService.h"
+#include "LedSchedulerTask.h"
 
 class StartupTask : public SystemThread
 {
 public:
-    StartupTask(ModemService& modem, ImeiStore& imeiStore, const AccessStatus& accessStatus, LedService& led)
-        : SystemThread(SystemThreadId::StartupTask, "STARTUP", 4096, ThreadPriority::StartupTask), modem(modem), imeiStore(imeiStore), accessStatus(accessStatus), led(led)
+    StartupTask(ModemService& modem, ImeiStore& imeiStore, const AccessStatus& accessStatus, LedSchedulerTask& led, const ApiClient& api)
+        : SystemThread(SystemThreadId::StartupTask, "STARTUP", 4096, ThreadPriority::StartupTask, 0), modem(modem), imeiStore(imeiStore), accessStatus(accessStatus), led(led), api(api)
     {
         SystemManager::RegisterThread(this);
     }
 
     void OnCommand(SystemCommand cmd) override;
+    std::optional<uint> displayApiProgress(ModemState desiredState, uint32_t hexColor, TickType_t timeoutToReachDesiredState, TickType_t
+                                           timeToCompleteDesiredState);
 
 protected:
     void setup() override;
@@ -24,7 +26,8 @@ private:
     std::atomic<bool> m_running = true;
 
     ModemService& modem;
+    LedSchedulerTask& led;
     ImeiStore& imeiStore;
+    const ApiClient& api;
     const AccessStatus& accessStatus;
-    LedService& led;
 };

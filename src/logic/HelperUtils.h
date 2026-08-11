@@ -36,10 +36,9 @@ namespace HelperUtils
     String millisToIsoString(uint64_t ms);
     String getResetReasonHumanReadable(RESET_REASON reset_reason);
     String toBase64(const uint8_t* data, size_t len);
-    void logRAMUsage(const Log& log, LoggingLevel level);
-    void uploadLog(const ApiClient& api, SwappableFile& swLog, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
-    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(const ApiClient& api,
+    void uploadLog(ApiClient& api, SwappableFile& swLog, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
+    void uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(ApiClient& api,
                                                         SwappableFile& swLog, uint retries = 2, bool deleteIfSuccess = true);
-    void performConnectionSpeedTest(const ApiClient& api, size_t fileSize);
+    void performConnectionSpeedTest(ApiClient& api, size_t fileSize);
     void syncSystemTime(time_t unixTimestamp);
 }

@@ -7,8 +7,8 @@
 class SystemThread
 {
 public:
-    explicit SystemThread(const SystemThreadId id, const char* name, const uint32_t stackDepth, const ThreadPriority prio) :
-        m_id(id), name(name), stackDepth(stackDepth), prio(static_cast<UBaseType_t>(prio)) {}
+    explicit SystemThread(const SystemThreadId id, const char* name, const uint32_t stackDepth, const ThreadPriority prio,  const int xCoreID) :
+        m_id(id), name(name), stackDepth(stackDepth), prio(static_cast<UBaseType_t>(prio)), xCoreID(xCoreID) {}
 
     virtual ~SystemThread();
 
@@ -19,12 +19,16 @@ public:
 
     void startTask();
 
+    [[nodiscard]] TaskHandle_t getTaskHandle() const;
+    [[nodiscard]] const char* getName() const;
+
 protected:
     TaskHandle_t m_taskHandle = nullptr;
     SystemThreadId m_id;
     const char* name;
     uint32_t stackDepth;
     UBaseType_t prio;
+    const int xCoreID;
 
     // Core lifecycles
     virtual void setup() = 0;
