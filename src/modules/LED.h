@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Adafruit_NeoPixel.h>
+#include <algorithm>
 #include <atomic>
 
 #include "abstract/SequencePlayer.h"
@@ -53,6 +54,18 @@ struct ProgressState
     uint32_t colorHex = 0xFFFFFF;
 };
 
+inline uint32_t scaleColorBrightness(const uint32_t colorHex, const float factor)
+{
+    const float clamped = std::clamp(factor, 0.0f, 1.0f);
+
+    const auto scale = [clamped](const uint32_t channel)
+    {
+        return static_cast<uint32_t>(static_cast<float>(channel) * clamped + 0.5f) & 0xFFu;
+    };
+
+    return scale(colorHex >> 16 & 0xFFu) << 16 | scale(colorHex >> 8 & 0xFFu) << 8 | scale(colorHex & 0xFFu);
+}
+
 class StatefulLed : public LED
 {
 public:
@@ -104,17 +117,29 @@ public:
         return StatefulSequencePlayer{sequence, [this] { clear(); }, 0, true, true, pdMS_TO_TICKS(100)};
     }
 
+    void renderProgress(const float progress, const uint32_t colorHex) const
+    {
+        const uint16_t pixelCount = neo.numPixels();
+        const float filled = std::clamp(progress, 0.0f, 1.0f) * static_cast<float>(pixelCount);
+
+        // Global brightness stays out of the way; dimming happens in the colour.
+        neo.setBrightness(255);
+
+        for (uint16_t i = 0; i < pixelCount; ++i)
+        {
+            // How much of this pixel the bar covers: 1 fully, 0 not at all.
+            const float coverage = std::clamp(filled - static_cast<float>(i), 0.0f, 1.0f);
+            neo.setPixelColor(i, scaleColorBrightness(colorHex, coverage));
+        }
+
+        neo.show();
+    }
+
     StatefulSequencePlayer progressIndicator(std::shared_ptr<ProgressState> state) const
     {
         return StatefulSequencePlayer({
             SequencePoint{
-                0, [this, state]
-                {
-                    const uint8_t brightness = state->progress * 255.0f;
-                    neo.setBrightness(brightness);
-                    neo.fill(state->colorHex);
-                    neo.show();
-                }
+                0, [this, state] { renderProgress(state->progress, state->colorHex); }
             }
         }, [this] { clear(); }, 0, true, true, pdMS_TO_TICKS(20));
     }
