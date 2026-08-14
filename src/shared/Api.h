@@ -33,7 +33,7 @@ public:
 
     [[nodiscard]] ApiResponse makeRequest(const HttpRequest& request, bool ignoreResponseHeaders = false,
                                           ulong timeout = 5 * 60, bool addUsernameAndPassword = true);
-    uint fetch(const ApiResponse& resp, Stream& destination, ulong timeout = 5 * 60, size_t bufferSize = 512);
+    uint fetch(const ApiResponse& resp, Stream& destination, ulong timeout = 5 * 60);
 
     [[nodiscard]] ApiClientState getState() const
     {

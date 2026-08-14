@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <esp_system.h>
 
 #include "logic/HelperUtils.h"
@@ -360,17 +361,17 @@ bool Modem::ensureNetworkConnection(const uint maxRetries) const
 {
     if (!connectGPRSAndNetwork(maxRetries)) return false;
 
-    // Wait for signal
+    // Wait for signal. 99 is the modem's "not known or not detectable".
     int16_t signalQuality = gsmModem.getSignalQuality();
-    int signalTry = 0;
-    for (; signalTry <= maxRetries && signalQuality == 99; ++signalTry)
+
+    for (uint attempt = 0; attempt < maxRetries && signalQuality == 99; ++attempt)
     {
         fileLog.debugln("Waiting for signal...");
         delay(2000);
         signalQuality = gsmModem.getSignalQuality();
     }
 
-    if (signalTry >= maxRetries)
+    if (signalQuality == 99)
     {
         fileLog.errorln("Could not get signal");
         return false;
@@ -484,8 +485,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* 
         return UploadFileAndRetryResult::SUCCESS_AFTER_RETRYING;
     }
 
-    // ReSharper disable once CppDFAUnreachableCode
-    throw std::invalid_argument("Invalid result");
+    return UploadFileAndRetryResult::FAILED;
 }
 
 UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* endpoint, const char* filePath,
@@ -514,13 +514,27 @@ time_t Modem::getUnixTimestamp() const
 
 bool Modem::getGPS(GPS_DATA_t& out) const
 {
+    // GPS_DATA_t is the on-flash/on-wire layout and is byte-packed, so its members
+    // are not naturally aligned — vsat sits at offset 16, usat at 17, accuracy at
+    // 18. TinyGSM writes whole ints and floats through the pointers it is given,
+    // and a 32-bit store to an odd address raises LoadStoreAlignment on the ESP32.
+    // Read into properly aligned locals first, then narrow into the packed struct.
     uint8_t status;
     int year, month, day, hour, minute, second;
-    const bool success = gsmModem.getGPS(&status, &out.lat, &out.lon, &out.speed, &out.alt,
-                                         reinterpret_cast<int*>(&out.vsat), reinterpret_cast<int*>(&out.usat),
-                                         &out.accuracy, &year, &month, &day, &hour, &minute, &second);
+    int vsat = 0, usat = 0;
+    float lat = 0.0f, lon = 0.0f, speed = 0.0f, alt = 0.0f, accuracy = 0.0f;
+
+    const bool success = gsmModem.getGPS(&status, &lat, &lon, &speed, &alt, &vsat, &usat, &accuracy,
+                                         &year, &month, &day, &hour, &minute, &second);
     if (!success) return false;
 
+    out.lat = lat;
+    out.lon = lon;
+    out.speed = speed;
+    out.alt = alt;
+    out.accuracy = accuracy;
+    out.vsat = static_cast<uint8_t>(std::min(vsat, 255));
+    out.usat = static_cast<uint8_t>(std::min(usat, 255));
     out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
 
     return true;

@@ -136,10 +136,13 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     return ApiResponse{responseCode, headers, httpClient, static_cast<uint32_t>(contentLength), uploadTimeMs};
 }
 
-uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout, size_t bufferSize)
+uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong timeout)
 {
     HttpClient& downloadStream = resp.body;
 
+    // Fixed size rather than a runtime-sized array: this sits on a 4 KiB task
+    // stack, and a caller-chosen length is a stack overflow waiting to happen.
+    static constexpr size_t bufferSize = 512;
     uint8_t buf[bufferSize];
 
     uint downloaded = 0;

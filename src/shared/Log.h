@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <Print.h>
 #include <vector>
 #include <WString.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 enum class LoggingLevel
 {
@@ -83,6 +86,12 @@ public:
 protected:
     mutable std::mutex mtx;
     std::vector<LogSink> sinks;
+
+    /// Task currently inside logMsgln, or nullptr. Writing a line goes through
+    /// LittleFS, and LittleFS reports its own failures via esp_log — which is
+    /// routed back into this logger. Without a reentrancy check that path takes
+    /// `mtx` twice on the same task and deadlocks on a non-recursive mutex.
+    mutable std::atomic<TaskHandle_t> writerTask = nullptr;
 
     static void appendMsgToSink(const LogSink& sink, const String& timestampStr, LoggingLevel level, const String& text);
 

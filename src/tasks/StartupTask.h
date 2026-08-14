@@ -23,6 +23,11 @@ protected:
     void run() override;
 
 private:
+    /// The boot sequence is driven by watching the modem's state change, so this
+    /// task polls. It only runs during boot, and the rate has to stay fine enough
+    /// to catch short-lived states.
+    static constexpr TickType_t pollInterval = pdMS_TO_TICKS(10);
+
     std::atomic<bool> m_running = true;
 
     ModemService& modem;

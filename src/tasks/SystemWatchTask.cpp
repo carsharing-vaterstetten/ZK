@@ -14,6 +14,8 @@ void SystemWatchTask::OnCommand(SystemCommand cmd)
         break;
     case SystemCommand::PrepareForHotRestart:
         m_running = false;
+        // Otherwise shutdown would wait out a full reporting interval.
+        if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
         break;
     case SystemCommand::EnterLowPower:
         break;
@@ -27,6 +29,7 @@ void SystemWatchTask::log()
     auto tasks = SystemManager::getAllTasks();
 
     String line;
+    line.reserve(320);
 
     // Uptime
     line += "U:";
@@ -78,14 +81,14 @@ void SystemWatchTask::log()
         line += "B ";
     }
 
-    // Filesystem
-    if (LittleFS.begin(true))
-    {
-        size_t total = LittleFS.totalBytes();
-        size_t used = LittleFS.usedBytes();
+    // Filesystem. Already mounted in setup() — re-running begin() here just makes
+    // LittleFS log a warning, which routes straight back into this logger.
+    const size_t total = LittleFS.totalBytes();
 
+    if (total > 0)
+    {
         line += "| FS:";
-        line += used;
+        line += LittleFS.usedBytes();
         line += "/";
         line += total;
         line += "B";
@@ -98,19 +101,11 @@ void SystemWatchTask::setup() {}
 
 void SystemWatchTask::run()
 {
-    log();
-    TickType_t lastLogTime = xTaskGetTickCount();
-
     while (m_running)
     {
-        const TickType_t now = xTaskGetTickCount();
-
-        if (now - lastLogTime > reportingFrequency)
-        {
-            log();
-            lastLogTime = now;
-        }
-
-        vTaskDelay(checkingFreq);
+        log();
+        ulTaskNotifyTake(pdTRUE, reportingFrequency);
     }
+
+    SystemManager::ReportReadyForRestart(m_id);
 }

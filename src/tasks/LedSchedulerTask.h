@@ -79,8 +79,6 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    static constexpr TickType_t cardRemovalCooldown = pdMS_TO_TICKS(3000);
-
     void OnCommand(SystemCommand cmd) override;
 
     void markCommandAsCompleted(uint commandId);
@@ -135,7 +133,7 @@ private:
     /// pending command, preferring the oldest one (lowest id) on ties.
     [[nodiscard]] std::optional<uint> pickHighestPriorityPendingId() const;
 
-    /// One scheduling decision: retires a finished active command, preempts
+    /// Must be called with mtx held. One scheduling decision: retires a finished active command, preempts
     /// it in favor of a higher priority pending command if it's interruptable,
     /// and promotes a pending command into the active slot if nothing is
     /// currently active and the transition gap has elapsed.
@@ -166,4 +164,8 @@ private:
     StatefulLed& statusLed;
 
     static constexpr TickType_t sequenceTransitionDelay = pdMS_TO_TICKS(100);
+
+    /// Fallback wakeup while the strip is idle. queueCommand() notifies the task
+    /// directly, so this only bounds how long shutdown takes to be noticed.
+    static constexpr TickType_t idleWait = pdMS_TO_TICKS(1000);
 };

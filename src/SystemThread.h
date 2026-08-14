@@ -17,7 +17,8 @@ public:
     // System Manager uses this to inject lifecycle events directly into the task
     virtual void OnCommand(SystemCommand cmd) = 0;
 
-    void startTask();
+    /// Returns false if the task could not be created (out of heap).
+    bool startTask();
 
     [[nodiscard]] TaskHandle_t getTaskHandle() const;
     [[nodiscard]] const char* getName() const;

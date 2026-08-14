@@ -1,11 +1,11 @@
 #include "KeyControl.h"
 
-void KeyControl::lock() const
-{
-    driver.playOpenSequence();
-}
-
-void KeyControl::unlock() const
+void KeyControl::lock()
 {
     driver.playCloseSequence();
+}
+
+void KeyControl::unlock()
+{
+    driver.playOpenSequence();
 }

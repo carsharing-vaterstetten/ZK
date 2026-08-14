@@ -34,19 +34,19 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
 
     while (modem.getCurrentState() != desiredState)
     {
-        if (timedOut()) return std::nullopt;
-        vTaskDelay(pdMS_TO_TICKS(10));
+        if (timedOut() || !m_running) return std::nullopt;
+        vTaskDelay(pollInterval);
     }
 
     const uint loadCmdId = led.queueLoadingCircle(hexColor);
     while (api.getState() == ApiClientState::None && xTaskGetTickCount() - start < timeoutToReachDesiredState)
     {
-        if (timedOut())
+        if (timedOut() || !m_running)
         {
             led.markCommandAsCompleted(loadCmdId);
             return std::nullopt;
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pollInterval);
     }
     led.markCommandAsCompleted(loadCmdId);
 
@@ -55,7 +55,8 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
 
     start = xTaskGetTickCount();
 
-    while (modem.getCurrentState() == desiredState && xTaskGetTickCount() - start < timeToCompleteDesiredState)
+    while (m_running && modem.getCurrentState() == desiredState && xTaskGetTickCount() - start <
+        timeToCompleteDesiredState)
     {
         auto [bytesProcessed, bytesTotal] = api.getProgress();
 
@@ -77,7 +78,7 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
             break;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pollInterval);
     }
 
     return cmdId;
@@ -85,6 +86,9 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
 
 void StartupTask::setup()
 {
+    // The boot sequence must complete even if the modem is slow, so none of these
+    // carry a deadline; they are queued once, before anything else can compete
+    // for the modem.
     modem.sendRequest(ModemTaskCommand::GetImei);
     modem.sendRequest(ModemTaskCommand::ConnectNetwork);
     modem.sendRequest(ModemTaskCommand::GetUnixTime);
@@ -109,19 +113,24 @@ void StartupTask::setup()
     // Power saving
     modem.sendRequest(ModemTaskCommand::DisconnectNetwork);
     modem.sendRequest(ModemTaskCommand::SleepIfPossible);
+}
 
-
+void StartupTask::run()
+{
     ModemState lastState = ModemState::NONE;
     std::optional<uint> lastLedCommandId = std::nullopt;
-    while (true)
+
+    while (m_running)
     {
         ModemState newState = modem.getCurrentState();
 
-        while (newState == lastState)
+        while (m_running && newState == lastState)
         {
             newState = modem.getCurrentState();
-            vTaskDelay(pdMS_TO_TICKS(10));
+            vTaskDelay(pollInterval);
         }
+
+        if (!m_running) break;
 
         if (lastLedCommandId.has_value())
             led.markCommandAsCompleted(lastLedCommandId.value());
@@ -150,7 +159,7 @@ void StartupTask::setup()
         case ModemState::GetUnixTime:
             {
                 // Sync time
-                ModemTxMessage* unixTimestamp = modem.waitForSpecificMessage(
+                const std::unique_ptr<ModemTxMessage> unixTimestamp = modem.waitForSpecificMessage(
                     ModemTxDataType::UnixTimestamp, pdMS_TO_TICKS(20000));
                 if (unixTimestamp != nullptr)
                     HelperUtils::syncSystemTime(std::get<time_t>(*unixTimestamp->payload));
@@ -162,10 +171,9 @@ void StartupTask::setup()
 
         lastState = newState;
     }
-}
 
+    if (lastLedCommandId.has_value())
+        led.markCommandAsCompleted(lastLedCommandId.value());
 
-void StartupTask::run()
-{
     SystemManager::ReportReadyForRestart(m_id);
 }

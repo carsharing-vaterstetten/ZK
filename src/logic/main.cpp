@@ -243,23 +243,7 @@ void setup()
 
     SystemManager::Start();
 
-    String imei = imeiStore.waitForIMEI();
-    if (imei != "869951036992281")
-    {
-        serialOnlyLog.criticalln("CORRUPTED IMEI: " + imei);
-        //ledService->setStateColor(StatusColor::Error);
-    }
-    else
-    {
-        //ledService->setStateColor(StatusColor::CarUnlocked);
-    }
-
-    while (modemService->isWorkingOnTasks())
-    {
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    SystemManager::BroadCastCommand(SystemCommand::EnterLowPower);
+    // StartupTask owns the boot sequence end to end
 }
 
 void loop()

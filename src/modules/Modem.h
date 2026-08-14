@@ -58,7 +58,7 @@ class Modem
 {
 protected:
     bool modemIsAwake = false, gpsIsEnabled = false;
-    bool successfulHotstart;
+    bool successfulHotstart = false;
     ulong serialBaud;
 
     HardwareSerial& serial;

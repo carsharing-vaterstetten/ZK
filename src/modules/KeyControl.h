@@ -7,8 +7,11 @@ class KeyControl
 public:
     explicit KeyControl(CarKeyDriver& driver) : driver(driver) {}
 
-    void lock() const;
-    void unlock() const;
+    // Not const: driving the key is a stateful hardware action. Marking these
+    // const only worked because constness does not propagate through a reference
+    // member, which hid the mutation from every caller up the chain.
+    void lock();
+    void unlock();
 
 protected:
     CarKeyDriver& driver;

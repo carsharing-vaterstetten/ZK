@@ -14,14 +14,14 @@ void RestartTask::run()
 {
     constexpr TickType_t waitForSystemTimeTimeout = pdMS_TO_TICKS(5 * 60 * 1000);
 
-    const ModemTxMessage* msg = modem.waitForSpecificMessage(ModemTxDataType::Timestamp, waitForSystemTimeTimeout);
+    const std::unique_ptr<ModemTxMessage> msg = modem.waitForSpecificMessage(
+        ModemTxDataType::Timestamp, waitForSystemTimeTimeout);
 
     ulong restartTargetTimeMs;
 
-
     if (msg == nullptr)
     {
-        restartTargetTimeMs = 24 * 60 * 60 * 1000;
+        restartTargetTimeMs = dayMillis;
         fileLog.warningln("Failed to get network time in time. Next restart in 24h");
     }
     else
@@ -29,8 +29,6 @@ void RestartTask::run()
         const ModemTimestamp time = std::get<ModemTimestamp>(*msg->payload);
         restartTargetTimeMs = calculateTimeTillRestart(time.hour, time.minute, time.second);
     }
-
-    delete msg;
 
     fileLog.infoln("Next restart planned in " + String(restartTargetTimeMs / 60000) + " minutes");
 
@@ -48,10 +46,13 @@ void RestartTask::run()
 
     fileLog.infoln("Time reached to upload log and restart ESP32");
 
-    modem.sendRequest(ModemTaskCommand::Wakeup);
-    modem.sendRequest(ModemTaskCommand::ConnectNetwork);
-    modem.sendRequest(ModemTaskCommand::UploadGPSData);
-    modem.sendRequest(ModemTaskCommand::UploadLog);
+    // The nightly flush must not be dropped, so these get no deadline and a
+    // patient enqueue: losing them means losing a day of GPS data and logs.
+    for (const ModemTaskCommand cmd : {
+             ModemTaskCommand::Wakeup, ModemTaskCommand::ConnectNetwork,
+             ModemTaskCommand::UploadGPSData, ModemTaskCommand::UploadLog
+         })
+        modem.sendRequest(cmd, ModemRequest::noDeadline, shutdownEnqueueTimeout);
 
 
     SystemManager::ReportReadyForRestart(m_id);
@@ -66,7 +67,8 @@ void RestartTask::OnCommand(SystemCommand cmd)
     case SystemCommand::None:
         break;
     case SystemCommand::PrepareForHotRestart:
-        xTaskNotify(m_taskHandle, 0, eSetBits);
+        // Broadcast can arrive before this task has been created.
+        if (m_taskHandle != nullptr) xTaskNotify(m_taskHandle, 0, eSetBits);
         break;
     case SystemCommand::EnterLowPower:
         break;

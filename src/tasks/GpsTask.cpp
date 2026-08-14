@@ -38,8 +38,9 @@ void GPSTask::checkGPS()
         return;
     }
 
-    modem.sendRequest(ModemTaskCommand::GetGPSData);
-    const ModemTxMessage* msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, pdMS_TO_TICKS(5000));
+    if (!modem.sendRequest(ModemTaskCommand::GetGPSData, gpsRequestTimeToLive)) return;
+
+    const std::unique_ptr<ModemTxMessage> msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, gpsReplyTimeout);
 
     if (msg == nullptr)
     {
@@ -48,7 +49,6 @@ void GPSTask::checkGPS()
     }
 
     const GPS_DATA_t gpsData = std::get<GPS_DATA_t>(*msg->payload);
-    delete msg;
 
     const GPSAlgPrediction gpsState = gpsAlg.pushData(gpsData);
     gps.writeData(gpsData);

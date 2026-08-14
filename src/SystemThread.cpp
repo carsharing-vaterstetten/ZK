@@ -5,6 +5,9 @@
 
 SystemThread::~SystemThread()
 {
+    // TaskHook clears the handle when the task exits under its own power, so this
+    // only fires when the object outlives a still-running task. Deleting a handle
+    // whose task already called vTaskDelete(nullptr) frees the TCB twice.
     if (m_taskHandle != nullptr) vTaskDelete(m_taskHandle);
 }
 
@@ -13,9 +16,13 @@ SystemThreadId SystemThread::getId() const
     return m_id;
 }
 
-void SystemThread::startTask()
+bool SystemThread::startTask()
 {
-    xTaskCreatePinnedToCore(TaskHook, name, stackDepth, this, prio, &m_taskHandle, xCoreID);
+    if (xTaskCreatePinnedToCore(TaskHook, name, stackDepth, this, prio, &m_taskHandle, xCoreID) == pdPASS)
+        return true;
+
+    m_taskHandle = nullptr;
+    return false;
 }
 
 TaskHandle_t SystemThread::getTaskHandle() const
@@ -39,5 +46,6 @@ void SystemThread::TaskHook(void* pvParams)
 
     fileLog.debugln("Task " + String(instance->name) + " ended");
 
+    instance->m_taskHandle = nullptr;
     vTaskDelete(nullptr);
 }

@@ -23,5 +23,5 @@ protected:
 
     const KeySequenceManager& keySequenceManager;
 
-    std::optional<SequencePlayer> openSequencePlayer, closeSequencePlayer;
+    static void playSequence(const std::shared_ptr<const std::vector<SequencePoint>>& sequence);
 };

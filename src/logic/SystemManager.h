@@ -21,7 +21,6 @@ public:
     static void ReportReadyForRestart(SystemThreadId id);
     static void ReportUnReadyForRestart(SystemThreadId id);
 
-    static std::array<TaskHandle_t, taskCount> getAllTaskHandles();
     static std::array<SystemThread*, taskCount> getAllTasks();
 
 private:

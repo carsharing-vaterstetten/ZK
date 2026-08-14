@@ -23,6 +23,4 @@ private:
     static void log();
 
     constexpr static TickType_t reportingFrequency = pdMS_TO_TICKS(5 * 60 * 1000);
-    constexpr static TickType_t minCheckingFreq = pdMS_TO_TICKS(100);
-    constexpr static TickType_t checkingFreq = std::min(reportingFrequency, minCheckingFreq);
 };

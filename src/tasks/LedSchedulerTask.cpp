@@ -21,6 +21,7 @@ void LedSchedulerTask::OnCommand(SystemCommand cmd)
         break;
     case SystemCommand::PrepareForHotRestart:
         m_running = false;
+        if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle); // don't sit out the idle wait
         break;
     case SystemCommand::EnterLowPower:
         break;
@@ -31,9 +32,18 @@ void LedSchedulerTask::OnCommand(SystemCommand cmd)
 
 uint LedSchedulerTask::queueCommand(LedCmd cmd)
 {
-    std::lock_guard lock(mtx);
-    const uint id = cmd.getId();
-    pendingCommands.emplace(id, std::move(cmd));
+    uint id;
+
+    {
+        std::lock_guard lock(mtx);
+        id = cmd.getId();
+        pendingCommands.emplace(id, std::move(cmd));
+    }
+
+    // Wake the scheduler so a queued command lights up immediately instead of
+    // waiting out the idle sleep.
+    if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
+
     return id;
 }
 
@@ -99,8 +109,6 @@ std::optional<uint> LedSchedulerTask::pickHighestPriorityPendingId() const
 
 void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
 {
-    std::lock_guard lock(mtx);
-
     const TickType_t now = xTaskGetTickCount();
 
     // Drop anything that was cancelled/completed while it sat in the pending
@@ -165,6 +173,12 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
 
 void LedSchedulerTask::updateLed(TickType_t& nextSequenceTime)
 {
+    // Held across advancing the sequence, not just across scheduling. nextState()
+    // mutates the very same StatefulSequencePlayer that markCommandAsCompleted()
+    // and updateProgressOfCommand() touch from other tasks — locking only one
+    // side of that leaves a plain data race on idx/repeat/completed.
+    std::lock_guard lock(mtx);
+
     schedule(nextSequenceTime);
 
     if (!activeCommand.has_value())
@@ -180,9 +194,14 @@ void LedSchedulerTask::run()
     while (m_running)
     {
         if (nothingToDo())
-            nextSequenceTime = pdMS_TO_TICKS(10);
-        else
-            updateLed(nextSequenceTime);
+        {
+            // Nothing on the strip: sleep until someone queues work rather than
+            // waking a hundred times a second to find the same empty map.
+            ulTaskNotifyTake(pdTRUE, idleWait);
+            continue;
+        }
+
+        updateLed(nextSequenceTime);
 
         vTaskDelay(nextSequenceTime);
     }

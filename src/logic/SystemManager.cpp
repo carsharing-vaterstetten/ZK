@@ -11,11 +11,17 @@ void SystemManager::Init()
 void SystemManager::Start()
 {
     for (SystemThread* t : m_registry)
-        if (t != nullptr)
+    {
+        if (t == nullptr) continue;
+
+        if (!t->startTask())
         {
-            serialOnlyLog.debugln("Task " + String((uint8_t)t->getId()) + " started");
-            t->startTask();
+            fileLog.criticalln("Failed to start task " + String(t->getName()));
+            continue;
         }
+
+        serialOnlyLog.debugln("Task " + String(t->getName()) + " started");
+    }
 }
 
 void SystemManager::RegisterThread(SystemThread* thread)
@@ -29,8 +35,20 @@ void SystemManager::RegisterThread(SystemThread* thread)
 {
     BroadCastCommand(SystemCommand::PrepareForHotRestart);
 
+    // The task that triggered the restart is parked right here and can never
+    // reach the end of its own run loop to report in. Without this it would wait
+    // out the full timeout on itself every time — which is what made an OTA
+    // restart always take the slow path.
+    for (const SystemThread* t : m_registry)
+        if (t != nullptr && t->getTaskHandle() == xTaskGetCurrentTaskHandle())
+            ReportReadyForRestart(t->getId());
+
     constexpr EventBits_t expectedBits = (1 << static_cast<uint8_t>(SystemThreadId::Count)) - 1;
     EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, timeout);
+
+    if ((receivedBits & expectedBits) != expectedBits)
+        fileLog.warningln("Restart timed out waiting for tasks. Missing: " +
+            String(expectedBits & ~receivedBits, 2));
 
     fileLog.debugln("Ended tasks: " + String(receivedBits, 2));
 
@@ -60,16 +78,6 @@ void SystemManager::ReportReadyForRestart(SystemThreadId id)
 void SystemManager::ReportUnReadyForRestart(SystemThreadId id)
 {
     xEventGroupClearBits(m_lifecycleEventGroup, 1 << static_cast<uint8_t>(id));
-}
-
-std::array<TaskHandle_t, SystemManager::taskCount> SystemManager::getAllTaskHandles()
-{
-    std::array<TaskHandle_t, taskCount> handles{};
-
-    for (uint i = 0; i < taskCount; ++i)
-        handles[i] = m_registry[i]->getTaskHandle();
-
-    return handles;
 }
 
 std::array<SystemThread*, SystemManager::taskCount> SystemManager::getAllTasks()

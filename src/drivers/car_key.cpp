@@ -16,26 +16,20 @@ void CarKeyDriver::begin() const
         pinMode(keyPowerPin, OUTPUT);
 }
 
+void CarKeyDriver::playSequence(const std::shared_ptr<const std::vector<SequencePoint>>& sequence)
+{
+    if (sequence == nullptr) return;
+
+    const SequencePlayer player{*sequence};
+    player.play();
+}
+
 void CarKeyDriver::playOpenSequence()
 {
-    if (!openSequencePlayer.has_value())
-    {
-        const auto loadedSeq = keySequenceManager.getOpenSequence();
-        if (loadedSeq == nullptr) return;
-        openSequencePlayer.emplace(*loadedSeq);
-    }
-
-    openSequencePlayer->play();
+    playSequence(keySequenceManager.getOpenSequence());
 }
 
 void CarKeyDriver::playCloseSequence()
 {
-    if (!closeSequencePlayer.has_value())
-    {
-        const auto loadedSeq = keySequenceManager.getCloseSequence();
-        if (loadedSeq == nullptr) return;
-        closeSequencePlayer.emplace(*loadedSeq);
-    }
-
-    closeSequencePlayer->play();
+    playSequence(keySequenceManager.getCloseSequence());
 }

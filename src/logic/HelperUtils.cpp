@@ -191,7 +191,7 @@ void HelperUtils::dateTimeToString(char* buf, const int year, const int month, c
 /// Same as millis() if system time is not initialized
 uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
 {
-    static timeval now{};
+    timeval now{};
     gettimeofday(&now, nullptr);
     return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
 }
@@ -322,15 +322,21 @@ void HelperUtils::performConnectionSpeedTest(ApiClient& api, const size_t fileSi
         return;
     }
 
-    const uint32_t estimatedUploadSpeed = fileSize * 1000 / resp.uploadTimeMs;
-    fileLog.infoln("Upload test complete. Estimated speed: " + String(estimatedUploadSpeed) + " B/s");
+    if (resp.uploadTimeMs == 0)
+        fileLog.warningln("Upload completed too fast to measure");
+    else
+        fileLog.infoln("Upload test complete. Estimated speed: " +
+            String(static_cast<uint64_t>(fileSize) * 1000 / resp.uploadTimeMs) + " B/s");
 
     const ulong downloadStartMs = millis();
     const uint downloadedBytes = api.fetch(resp, emptyStream);
-    const uint downloadTimeMs = millis() - downloadStartMs;
+    const ulong downloadTimeMs = millis() - downloadStartMs;
 
-    const uint estimatedDownloadSpeed = downloadedBytes * 1000 / downloadTimeMs;
-    fileLog.infoln("Download test complete. Estimated speed: " + String(estimatedDownloadSpeed) + " B/s");
+    if (downloadTimeMs == 0)
+        fileLog.warningln("Download completed too fast to measure");
+    else
+        fileLog.infoln("Download test complete. Estimated speed: " +
+            String(static_cast<uint64_t>(downloadedBytes) * 1000 / downloadTimeMs) + " B/s");
 }
 
 void HelperUtils::syncSystemTime(const time_t unixTimestamp)

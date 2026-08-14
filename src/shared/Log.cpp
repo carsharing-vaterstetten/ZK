@@ -32,7 +32,15 @@ void Log::logInfoOrLevelln(const bool success, const String& ifSuccess, const St
 
 void Log::logMsgln(const String& msg, const LoggingLevel level) const
 {
+    TaskHandle_t self = xTaskGetCurrentTaskHandle();
+
+    // Reached only via esp_log firing from inside our own write path. Dropping
+    // the nested line is the only safe option: re-taking `mtx` on this task
+    // deadlocks, and recursing loops until the stack runs out.
+    if (writerTask.load(std::memory_order_acquire) == self) return;
+
     std::lock_guard lock(mtx);
+    writerTask.store(self, std::memory_order_release);
 
     // = millis() if modem is not initialized
     const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
@@ -45,6 +53,8 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
             appendMsgToSink(s, timestampStr, level, msg);
         }
     }
+
+    writerTask.store(nullptr, std::memory_order_release);
 }
 
 void Log::flush() const
@@ -61,6 +71,9 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
     Print& p = sink.print.get();
 
     String line;
+    // One allocation for the whole line instead of a realloc per fragment — this
+    // runs on every log call from every task and is a steady source of heap churn.
+    line.reserve(timestampStr.length() + text.length() + 48);
 
     if (sink.timestamps) line += timestampStr;
 
@@ -79,11 +92,16 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
     line += text;
     if (sink.colorize && level >= LoggingLevel::ERROR) line += COLOR_RESET;
 
-    const size_t written = p.print(line + "\n");
+    line += "\n";
 
-    if (written - 1 != line.length())
+    const size_t written = p.print(line);
+
+    if (written != line.length())
     {
-        Serial.println(COLOR_GRAY "Failed to write '" + line + "' to sink '" + sink.name + "'" COLOR_RESET);
+        // Deliberately not routed back through the logger: the sink we would log
+        // to is the one that just failed.
+        Serial.print(COLOR_GRAY "Failed to write '" + line.substring(0, line.length() - 1) + "' to sink '" + sink.name +
+            "'" COLOR_RESET "\n");
     }
 
     if (sink.flushOnEveryLine || (sink.flushOnError && level >= LoggingLevel::ERROR)) p.flush();
@@ -103,9 +121,11 @@ String Log::getLoggingLevelChar(const LoggingLevel level)
         return "E";
     case LoggingLevel::CRITICAL:
         return "C";
-    default:
-        throw std::invalid_argument("Invalid logging level");
     }
+
+    // Unreachable for a valid enum. Throwing here would abort the firmware over a
+    // log line, which is never the right trade on this device.
+    return "?";
 }
 
 String Log::getLoggingLevelColor(const LoggingLevel level)
@@ -122,7 +142,7 @@ String Log::getLoggingLevelColor(const LoggingLevel level)
         return COLOR_RED;
     case LoggingLevel::CRITICAL:
         return COLOR_MAGENTA;
-    default:
-        throw std::invalid_argument("Invalid logging level");
     }
+
+    return COLOR_RESET;
 }

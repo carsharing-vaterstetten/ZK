@@ -1,6 +1,7 @@
 #include "KeyControlService.h"
 
 #include "modules/KeyControl.h"
+#include "shared/Globals.h"
 
 
 void KeyControlService::OnCommand(const SystemCommand cmd)
@@ -19,16 +20,23 @@ void KeyControlService::OnCommand(const SystemCommand cmd)
     }
 }
 
-void KeyControlService::lock() const
+bool KeyControlService::send(const KeyControlCommand cmd)
 {
-    constexpr auto cmd = KeyControlCommand::Lock;
-    xQueueSend(cmdQueue, &cmd, portMAX_DELAY);
+    if (xQueueSend(cmdQueue, &cmd, enqueueTimeout) == pdTRUE)
+        return true;
+
+    fileLog.errorln("Key control queue full, command dropped");
+    return false;
 }
 
-void KeyControlService::unlock() const
+bool KeyControlService::lock()
 {
-    constexpr auto cmd = KeyControlCommand::Unlock;
-    xQueueSend(cmdQueue, &cmd, portMAX_DELAY);
+    return send(KeyControlCommand::Lock);
+}
+
+bool KeyControlService::unlock()
+{
+    return send(KeyControlCommand::Unlock);
 }
 
 void KeyControlService::setup() {}
