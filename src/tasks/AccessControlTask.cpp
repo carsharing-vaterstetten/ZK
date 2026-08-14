@@ -67,6 +67,28 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
     }
 }
 
+ProgressState AccessControlTask::cardRemovalFeedback(const bool prompting, const bool cardStillOnReader,
+                                                     const TickType_t absentFor)
+{
+    // Claimed but with nothing to say yet: still deciding whether this was a tap
+    // or a card left behind. An empty bar renders dark.
+    if (!prompting)
+        return ProgressState{.progress = 0.0f, .colorHex = cardRemovalIndicatorColor, .effect = LedEffect::Bar};
+
+    // Card is still sitting there. Pulsing is an instruction to the user, and it
+    // has to look unlike the boot sequence's bars, which mean "wait".
+    if (cardStillOnReader)
+        return ProgressState{.progress = 0.0f, .colorHex = cardRemovalIndicatorColor, .effect = LedEffect::Pulse};
+
+    // Card is off. Drain the bar to show the reader coming back up, so the dead
+    // time reads as "nearly ready" instead of as nothing happening.
+    return ProgressState{
+        .progress = 1.0f - static_cast<float>(absentFor) / cardRemovalCooldown,
+        .colorHex = cardRemovalIndicatorColor,
+        .effect = LedEffect::Bar,
+    };
+}
+
 void AccessControlTask::waitForCardRemoval()
 {
     constexpr TickType_t pollInterval = pdMS_TO_TICKS(50);
@@ -99,18 +121,12 @@ void AccessControlTask::waitForCardRemoval()
         const bool cardStillOnReader = absentFor < cardPresenceWindow;
         const bool heldPastGracePeriod = now - enteredAt >= cardHeldGracePeriod;
 
-        // Latched: once the card is confirmed to be resting on the reader the
-        // countdown stays up, so the user sees it drain as they lift the card off
-        // rather than having it vanish the instant the reader loses contact.
+        // Latched: once the card is confirmed to be resting on the reader we keep
+        // showing feedback, so the user sees the result of lifting it off rather
+        // than having the LED go blank the instant the reader loses contact.
         countdownVisible = countdownVisible || (cardStillOnReader && heldPastGracePeriod);
 
-        const ProgressState state{
-            // Drains as the card comes off: a full bar means "still reading your
-            // card", empty means the reader is about to re-arm.
-            .progress = countdownVisible ? 1.0f - static_cast<float>(absentFor) / cardRemovalCooldown : 0.0f,
-            .colorHex = cardRemovalIndicatorColor,
-        };
-        led.updateProgressOfCommand(progressId, state);
+        led.updateProgressOfCommand(progressId, cardRemovalFeedback(countdownVisible, cardStillOnReader, absentFor));
     }
 
     led.markCommandAsCompleted(progressId);

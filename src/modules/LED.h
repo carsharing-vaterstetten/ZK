@@ -3,6 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 
 #include "abstract/SequencePlayer.h"
 
@@ -48,10 +49,24 @@ inline uint32_t getStatusColorValue(const StatusColor color)
     }
 }
 
+/// How a driven LED command paints the strip.
+enum class LedEffect : uint8_t
+{
+    /// `progress` as a bar filling across the strip. Reads as "the device is
+    /// working, wait" — it is what the boot sequence uses for transfers.
+    Bar,
+
+    /// The whole strip breathing. Reads as "waiting on you", which is what an
+    /// instruction to the user needs to look like; a steady light reads as
+    /// status and gets ignored. Ignores `progress`.
+    Pulse,
+};
+
 struct ProgressState
 {
     float progress = 0;
     uint32_t colorHex = 0xFFFFFF;
+    LedEffect effect = LedEffect::Bar;
 };
 
 inline uint32_t scaleColorBrightness(const uint32_t colorHex, const float factor)
@@ -117,7 +132,7 @@ public:
         return StatefulSequencePlayer{sequence, [this] { clear(); }, 0, true, true, pdMS_TO_TICKS(100)};
     }
 
-    void renderProgress(const float progress, const uint32_t colorHex) const
+    void renderProgressBar(const float progress, const uint32_t colorHex) const
     {
         const uint16_t pixelCount = neo.numPixels();
         const float filled = std::clamp(progress, 0.0f, 1.0f) * static_cast<float>(pixelCount);
@@ -135,11 +150,47 @@ public:
         neo.show();
     }
 
+    /// Breathes the whole strip. Self-timed off the tick count so it animates at
+    /// the sequence's own refresh rate rather than depending on how often the
+    /// task driving it happens to push new state.
+    void renderPulse(const uint32_t colorHex) const
+    {
+        // Slow enough to read as breathing rather than blinking, and never fully
+        // dark — going to black would read as a fault indicator.
+        constexpr uint32_t periodMs = 1400;
+        constexpr float floorBrightness = 0.15f;
+
+        // Integer modulo before converting: a float holds the tick count exactly
+        // for only a few hours at 1kHz, after which the phase would quantise.
+        const uint32_t phaseMs = xTaskGetTickCount() * portTICK_PERIOD_MS % periodMs;
+        const float phase = static_cast<float>(phaseMs) / periodMs;
+
+        // Raised cosine, so the turning points at both ends are gentle.
+        const float wave = 0.5f * (1.0f - cosf(2.0f * static_cast<float>(PI) * phase));
+
+        neo.setBrightness(255);
+        neo.fill(scaleColorBrightness(colorHex, floorBrightness + (1.0f - floorBrightness) * wave));
+        neo.show();
+    }
+
+    void renderState(const ProgressState& state) const
+    {
+        switch (state.effect)
+        {
+        case LedEffect::Bar:
+            renderProgressBar(state.progress, state.colorHex);
+            break;
+        case LedEffect::Pulse:
+            renderPulse(state.colorHex);
+            break;
+        }
+    }
+
     StatefulSequencePlayer progressIndicator(std::shared_ptr<ProgressState> state) const
     {
         return StatefulSequencePlayer({
             SequencePoint{
-                0, [this, state] { renderProgress(state->progress, state->colorHex); }
+                0, [this, state] { renderState(*state); }
             }
         }, [this] { clear(); }, 0, true, true, pdMS_TO_TICKS(20));
     }

@@ -81,7 +81,12 @@ private:
     void doThings(uint32_t rfidUid);
 
     /// Blocks until the card has been away from the reader for
-    /// `cardRemovalCooldown`, showing a countdown once it is clear the user has
-    /// left it there.
+    /// `cardRemovalCooldown`, prompting once it is clear the user has left it
+    /// there.
     void waitForCardRemoval();
+
+    /// The three phases of removal feedback: silent while it is still unclear
+    /// whether this was a tap, pulsing while the card is being left on the
+    /// reader, then draining while the reader re-arms.
+    static ProgressState cardRemovalFeedback(bool prompting, bool cardStillOnReader, TickType_t absentFor);
 };
