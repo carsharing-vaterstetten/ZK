@@ -74,7 +74,14 @@ void AccessControlTask::waitForCardRemoval()
     const TickType_t enteredAt = xTaskGetTickCount();
     TickType_t lastSeen = enteredAt;
 
-    std::optional<uint> progressId;
+    // Claimed up front, at the same priority as the lock/unlock flashes, so that
+    // for as long as a card is on the reader the strip belongs to access control
+    // and nothing else — a startup progress bar, a loading circle — can take it
+    // over. It renders dark until there is actually something to say, which is
+    // why it can be claimed this early without giving a plain tap a cyan tail.
+    const uint progressId = led.queueProgressIndicator(cardFeedbackPriority);
+
+    bool countdownVisible = false;
 
     while (m_running)
     {
@@ -86,23 +93,27 @@ void AccessControlTask::waitForCardRemoval()
 
         if (absentFor >= cardRemovalCooldown) break;
 
-        // Only start asking for the card back once the user has clearly left it
-        // on the reader — a normal tap is over long before this.
-        if (!progressId.has_value() && now - enteredAt >= cardHeldGracePeriod)
-            progressId = led.queueProgressIndicator();
+        // Both conditions matter. The grace period alone is not enough: after a
+        // normal tap the card is already gone, and asking for it back would just
+        // light the LED at someone holding nothing.
+        const bool cardStillOnReader = absentFor < cardPresenceWindow;
+        const bool heldPastGracePeriod = now - enteredAt >= cardHeldGracePeriod;
 
-        if (progressId.has_value())
-        {
-            const ProgressState state{
-                .progress = static_cast<float>(absentFor) / cardRemovalCooldown,
-                .colorHex = cardRemovalIndicatorColor,
-            };
-            led.updateProgressOfCommand(progressId.value(), state);
-        }
+        // Latched: once the card is confirmed to be resting on the reader the
+        // countdown stays up, so the user sees it drain as they lift the card off
+        // rather than having it vanish the instant the reader loses contact.
+        countdownVisible = countdownVisible || (cardStillOnReader && heldPastGracePeriod);
+
+        const ProgressState state{
+            // Drains as the card comes off: a full bar means "still reading your
+            // card", empty means the reader is about to re-arm.
+            .progress = countdownVisible ? 1.0f - static_cast<float>(absentFor) / cardRemovalCooldown : 0.0f,
+            .colorHex = cardRemovalIndicatorColor,
+        };
+        led.updateProgressOfCommand(progressId, state);
     }
 
-    if (progressId.has_value())
-        led.markCommandAsCompleted(progressId.value());
+    led.markCommandAsCompleted(progressId);
 }
 
 void AccessControlTask::OnCommand(SystemCommand cmd)

@@ -39,14 +39,28 @@ private:
 
     /// The card has to be off the reader this long before another tap counts.
     /// Without it, a card left lying on the reader re-triggers every cycle and
-    /// toggles the car open/closed indefinitely.
-    static constexpr TickType_t cardRemovalCooldown = pdMS_TO_TICKS(3000);
+    /// toggles the car open/closed indefinitely. It doubles as the debounce after
+    /// a clean tap, so keeping it short is what stops the reader from feeling
+    /// dead right after it reacted.
+    static constexpr TickType_t cardRemovalCooldown = pdMS_TO_TICKS(1000);
+
+    /// A card seen more recently than this counts as still lying on the reader.
+    /// Has to clear more than one reader poll (the PN532 read blocks for up to
+    /// 200ms) so a missed beat isn't mistaken for the card being taken away.
+    static constexpr TickType_t cardPresenceWindow = pdMS_TO_TICKS(500);
 
     /// How long the card may rest on the reader before the LED starts asking for
-    /// it back. Covers the normal case of a user holding it a moment too long.
+    /// it back. Must exceed cardPresenceWindow, otherwise a card that was already
+    /// removed still looks present when the grace period expires.
     static constexpr TickType_t cardHeldGracePeriod = pdMS_TO_TICKS(1000);
 
     static constexpr uint32_t cardRemovalIndicatorColor = 0x3fd0d4;
+
+    /// Anything to do with a card physically on the reader outranks ambient
+    /// status output. Must match the lock/unlock flashes so those still play in
+    /// order ahead of the countdown rather than being pushed aside by it — equal
+    /// priority is FIFO, and the flash is always queued first.
+    static constexpr LedPriority cardFeedbackPriority = LedPriority::High;
 
     /// GPS wakeup is a nice-to-have on the unlock path. If the modem is busy
     /// enough that this goes stale, dropping it is correct — the trip is still
