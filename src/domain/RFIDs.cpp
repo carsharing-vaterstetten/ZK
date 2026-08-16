@@ -1,3 +1,5 @@
+#include "net/ApiClient.h"
+#include "util/Digest.h"
 #include "domain/RFIDs.h"
 
 #include <mbedtls/md5.h>
@@ -5,7 +7,6 @@
 
 #include "config/Backend.h"
 #include "logging/Loggers.h"
-#include "util/HelperUtils.h"
 #include "util/Files.h"
 
 
@@ -140,7 +141,7 @@ void RFIDs::generateChecksum(uint8_t* out) const
     }
 
     File f = LittleFS.open(filePath, FILE_READ);
-    HelperUtils::md5File(f, out);
+    Digest::md5File(f, out);
     f.close();
 }
 
@@ -150,7 +151,7 @@ void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 
     uint8_t md5Checksum[16];
     generateChecksum(md5Checksum);
-    String base64Checksum = HelperUtils::toBase64(md5Checksum, 16);
+    String base64Checksum = Digest::toBase64(md5Checksum, 16);
 
     const HttpRequest req = HttpRequest::get(REMOTE_RFID_PATH, {{"if-none-match", base64Checksum}});
     const ApiResponse resp = api.makeRequest(req, true);

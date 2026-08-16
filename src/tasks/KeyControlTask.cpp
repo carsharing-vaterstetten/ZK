@@ -1,6 +1,5 @@
 #include "tasks/KeyControlTask.h"
 
-#include "hal/KeyControl.h"
 #include "logging/Loggers.h"
 
 bool KeyControlTask::send(const KeyControlCommand cmd)
@@ -36,10 +35,10 @@ void KeyControlTask::run()
         switch (cmd)
         {
         case KeyControlCommand::Lock:
-            keyControl.lock();
+            carKey.lock();
             break;
         case KeyControlCommand::Unlock:
-            keyControl.unlock();
+            carKey.unlock();
             break;
         }
     }

@@ -1,6 +1,6 @@
+#include "util/Time.h"
 #include "logging/Log.h"
 
-#include "util/HelperUtils.h"
 #include "hal/Modem.h"
 
 #define COLOR_RESET   "\033[0m"
@@ -43,13 +43,13 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
     writerTask.store(self, std::memory_order_release);
 
     // = millis() if modem is not initialized
-    const uint64_t timestampMs = HelperUtils::systemTimeMillisecondsSinceEpoche();
+    const uint64_t timestampMs = Time::millisSinceEpoch();
 
     for (const LogSink& s : sinks)
     {
         if (level >= s.minLevel)
         {
-            const String timestampStr = s.timestamps ? "[" + HelperUtils::millisToIsoString(timestampMs) + "]" : "";
+            const String timestampStr = s.timestamps ? "[" + Time::toIsoString(timestampMs) + "]" : "";
             appendMsgToSink(s, timestampStr, level, msg);
         }
     }

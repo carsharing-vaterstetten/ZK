@@ -1,7 +1,7 @@
+#include "util/Time.h"
 #include "StartupTask.h"
 
 #include "config/user_config.h"
-#include "util/HelperUtils.h"
 #include "system/SystemManager.h"
 #include "logging/Loggers.h"
 
@@ -144,7 +144,7 @@ void StartupTask::run()
             {
                 // Sync time
                 if (const auto result = modem.waitFor(ModemResult::UnixTimestamp, pdMS_TO_TICKS(20000)))
-                    HelperUtils::syncSystemTime(std::get<time_t>(*result));
+                    Time::syncSystemTime(std::get<time_t>(*result));
                 break;
             }
         default:

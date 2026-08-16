@@ -2,10 +2,9 @@
 #include <Arduino.h>
 
 CarKey::CarKey(const uint8_t openKeyPin, const uint8_t closeKeyPin, const uint8_t keyPowerPin,
-                           const bool hasPowerKey, const KeySequences& keySequences) :
+               const bool hasPowerKey, const KeySequences& keySequences) :
     openKeyPin(openKeyPin), closeKeyPin(closeKeyPin), keyPowerPin(keyPowerPin), hasPowerKey(hasPowerKey),
     keySequences(keySequences) {}
-
 
 void CarKey::begin() const
 {
@@ -24,12 +23,12 @@ void CarKey::playSequence(const std::shared_ptr<const std::vector<SequencePoint>
     player.play();
 }
 
-void CarKey::playOpenSequence()
-{
-    playSequence(keySequences.getOpenSequence());
-}
-
-void CarKey::playCloseSequence()
+void CarKey::lock()
 {
     playSequence(keySequences.getCloseSequence());
+}
+
+void CarKey::unlock()
+{
+    playSequence(keySequences.getOpenSequence());
 }

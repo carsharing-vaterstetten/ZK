@@ -30,6 +30,12 @@ public:
 
     static std::optional<LocalConfig> fromStorage(const char* prefsName);
 
+    /// Parses the `key=value;` form produced by toString().
+    static std::optional<LocalConfig> parse(const String& inputString);
+
+    /// Blocks on Serial until a parseable config is entered. Boot-time only.
+    static LocalConfig promptOverSerial();
+
     [[nodiscard]] String toString() const;
 };
 

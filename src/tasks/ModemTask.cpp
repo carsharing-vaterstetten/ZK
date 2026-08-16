@@ -1,9 +1,10 @@
+#include "net/ConnectionTest.h"
+#include "logging/LogUploader.h"
 #include "tasks/ModemTask.h"
 
 #include "logging/Loggers.h"
 #include "config/user_config.h"
 #include "net/FirmwareUpdater.h"
-#include "util/HelperUtils.h"
 #include "domain/RFIDs.h"
 #include "hal/Modem.h"
 
@@ -172,7 +173,7 @@ void ModemTask::handleRequest(const ModemCommand cmd)
     switch (cmd)
     {
     case ModemCommand::PerformConnectionSpeedTest:
-        HelperUtils::performConnectionSpeedTest(api, CONNECTION_SPEED_TEST_FILE_SIZE);
+        ConnectionTest::run(api, CONNECTION_SPEED_TEST_FILE_SIZE);
         break;
     case ModemCommand::DoFirmwareUpdateIfAvailable:
         FirmwareUpdater::doUpdateIfAvailable(api);
@@ -184,7 +185,7 @@ void ModemTask::handleRequest(const ModemCommand cmd)
         rfidsManager.downloadGPSTrackingConsentedRFIDs(api);
         break;
     case ModemCommand::UploadLog:
-        HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(api, swLog);
+        LogUploader::uploadAndRotate(api, swLog);
         break;
     case ModemCommand::DisconnectNetwork:
         modem.disconnectNetwork();

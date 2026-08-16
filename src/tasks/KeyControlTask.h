@@ -3,8 +3,8 @@
 #include <atomic>
 
 #include "system/SystemThread.h"
+#include "hal/CarKey.h"
 #include "system/SystemManager.h"
-#include "hal/KeyControl.h"
 
 enum class KeyControlCommand
 {
@@ -15,8 +15,8 @@ enum class KeyControlCommand
 class KeyControlTask : public SystemThread
 {
 public:
-    explicit KeyControlTask(KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlTask, "KEYCTRL", 4096,
-                                                                      ThreadPriority::KeyControlTask, 0), keyControl(keyControl)
+    explicit KeyControlTask(CarKey& carKey) : SystemThread(SystemThreadId::KeyControlTask, "KEYCTRL", 4096,
+                                                                      ThreadPriority::KeyControlTask, 0), carKey(carKey)
     {
         SystemManager::RegisterThread(this);
     }
@@ -33,7 +33,7 @@ protected:
 private:
     static constexpr TickType_t enqueueTimeout = pdMS_TO_TICKS(1000);
 
-    KeyControl& keyControl;
+    CarKey& carKey;
 
     QueueHandle_t cmdQueue = xQueueCreate(10, sizeof(KeyControlCommand));
 

@@ -1,12 +1,12 @@
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_T_PCIE
 #define TINY_GSM_RX_BUFFER 1024 // 1 KiB
+#include "util/ResetReason.h"
 #include <esp32-hal.h>
 
 #include "config/Config.h"
 #include "hal/Modem.h"
 #include "hal/NfcReader.h"
-#include "util/HelperUtils.h"
 #include "esp_log.h"
 #include "net/ApiClient.h"
 #include "logging/Loggers.h"
@@ -70,7 +70,6 @@ std::optional<SPIClass> nfcSpiDriver;
 
 // Modules
 std::optional<NfcReader> nfcReader;
-std::optional<KeyControl> keyControlModule;
 std::optional<Led> ledModule;
 std::optional<Modem> modemModule;
 std::optional<GpsLog> gpsModule;
@@ -108,7 +107,7 @@ void loadConfig()
     else
     {
         serialLogger.warningln("No or outdated config found. Requesting new config.");
-        config.emplace(HelperUtils::requestConfig());
+        config.emplace(LocalConfig::promptOverSerial());
         const bool configSaveSuccess = StorableConfig{config.value(), CONFIG_PREFS_NAME}.save();
         logger.logInfoOrErrorln(configSaveSuccess, "Successfully saved config", "Failed to save config");
     }
@@ -168,8 +167,8 @@ void setup()
     esp_log_set_vprintf(&espLogHandler); // Redirect ESP logs to file
     logger.infoln("Running firmware version " FIRMWARE_VERSION);
     const RESET_REASON cpu0ResetReason = rtc_get_reset_reason(0);
-    logger.infoln("CPU0 reset reason: " + HelperUtils::getResetReasonHumanReadable(cpu0ResetReason));
-    logger.infoln("CPU1 reset reason: " + HelperUtils::getResetReasonHumanReadable(rtc_get_reset_reason(1)));
+    logger.infoln("CPU0 reset reason: " + ResetReason::describe(cpu0ResetReason));
+    logger.infoln("CPU1 reset reason: " + ResetReason::describe(rtc_get_reset_reason(1)));
 
     // Now that critical system hardware has been initialized when can begin initializing external hardware
     // First we start the LED to communicate the system status
@@ -220,7 +219,6 @@ void setup()
 
     // Modules
     nfcReader.emplace(pn532Driver.value());
-    keyControlModule.emplace(carKey.value());
     ledModule.emplace(ledDriver.value());
     modemModule.emplace(modemDriver.value(), modemSerialDriver.value(), MODEM_SERIAL_BAUD, modemHardware.value());
     gpsModule.emplace("/gps.bin", GPS_FILE_UPLOAD_ENDPOINT);
@@ -228,7 +226,7 @@ void setup()
 
     // Services
     cardReaderTask.emplace(nfcReader.value());
-    keyControlTask.emplace(keyControlModule.value());
+    keyControlTask.emplace(carKey.value());
     modemTask.emplace(config.value(), rfidsManager, swLog, modemModule.value(),
                          gpsModule.value(), apiDriver.value(), imeiStore);
 

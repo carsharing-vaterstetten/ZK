@@ -1,7 +1,7 @@
+#include "util/Time.h"
 #include <algorithm>
 #include <esp_system.h>
 
-#include "util/HelperUtils.h"
 #include "hal/Modem.h"
 #include "net/ApiClient.h"
 #include "logging/Loggers.h"
@@ -456,7 +456,7 @@ time_t Modem::getUnixTimestamp() const
     int year, month, day, hour, minute, second;
     float timezone;
     gsmModem.getNetworkTime(&year, &month, &day, &hour, &minute, &second, &timezone);
-    return HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, timezone);
+    return Time::toUnixTimestamp(year, month, day, hour, minute, second, timezone);
 }
 
 bool Modem::getGPS(GPS_DATA_t& out) const
@@ -482,7 +482,7 @@ bool Modem::getGPS(GPS_DATA_t& out) const
     out.accuracy = accuracy;
     out.vsat = static_cast<uint8_t>(std::min(vsat, 255));
     out.usat = static_cast<uint8_t>(std::min(usat, 255));
-    out.unixTimestamp = HelperUtils::dateTimeToUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
+    out.unixTimestamp = Time::toUnixTimestamp(year, month, day, hour, minute, second, 0.0f);
 
     return true;
 }
