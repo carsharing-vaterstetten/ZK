@@ -10,7 +10,7 @@
 
 #include "system/SystemThread.h"
 #include "system/SystemManager.h"
-#include "hal/LED.h"
+#include "hal/Led.h"
 
 /// Relative importance of a queued LED command. Higher value == more important.
 /// A command can only preempt whatever is currently on the strip if its priority
@@ -69,7 +69,7 @@ private:
 class LedSchedulerTask : public SystemThread
 {
 public:
-    explicit LedSchedulerTask(StatefulLed& statusLed) : SystemThread(SystemThreadId::LedScheduler, "LEDSCHED", 4096,
+    explicit LedSchedulerTask(Led& statusLed) : SystemThread(SystemThreadId::LedScheduler, "LEDSCHED", 4096,
                                                                      ThreadPriority::LedScheduler, 0),
                                                         statusLed(statusLed)
     {
@@ -155,7 +155,7 @@ private:
     // they change atomically as one scheduling decision.
     std::mutex mtx;
 
-    StatefulLed& statusLed;
+    Led& statusLed;
 
     static constexpr TickType_t sequenceTransitionDelay = pdMS_TO_TICKS(100);
 

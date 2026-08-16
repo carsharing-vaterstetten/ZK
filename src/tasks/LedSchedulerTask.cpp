@@ -1,6 +1,6 @@
 #include "LedSchedulerTask.h"
 
-#include "hal/LED.h"
+#include "hal/Led.h"
 
 namespace
 {
@@ -25,7 +25,7 @@ uint LedSchedulerTask::queueCommand(LedCmd cmd)
 
     // Wake the scheduler so a queued command lights up immediately instead of
     // waiting out the idle sleep.
-    if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
+    notifySelf();
 
     return id;
 }
@@ -141,7 +141,6 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
             const uint pickedId = *pickHighestPriorityPendingId();
             auto node = pendingCommands.extract(pickedId);
             activeCommand = std::move(node.mapped());
-            statusLed.loadSequence(activeCommand->getSequence());
         }
         else
         {
@@ -156,18 +155,16 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
 
 void LedSchedulerTask::updateLed(TickType_t& nextSequenceTime)
 {
-    // Held across advancing the sequence, not just across scheduling. nextState()
-    // mutates the very same StatefulSequencePlayer that markCommandAsCompleted()
-    // and updateProgressOfCommand() touch from other tasks — locking only one
-    // side of that leaves a plain data race on idx/repeat/completed.
+    // Held across advancing the sequence, not just across scheduling: the player
+    // mutated here is the same object markCommandAsCompleted() and
+    // updateProgressOfCommand() touch from other tasks.
     std::lock_guard lock(mtx);
 
     schedule(nextSequenceTime);
 
-    if (!activeCommand.has_value())
-        return;
+    if (!activeCommand.has_value()) return;
 
-    statusLed.nextState(nextSequenceTime);
+    activeCommand->getSequence()->moveToNextState(nextSequenceTime);
 }
 
 void LedSchedulerTask::run()
@@ -189,6 +186,5 @@ void LedSchedulerTask::run()
         vTaskDelay(nextSequenceTime);
     }
 
-    statusLed.stopActiveSequence();
     statusLed.clear();
 }

@@ -71,7 +71,7 @@ std::optional<SPIClass> nfcSpiDriver;
 // Modules
 std::optional<NfcReader> nfcReader;
 std::optional<KeyControl> keyControlModule;
-std::optional<StatefulLed> ledModule;
+std::optional<Led> ledModule;
 std::optional<Modem> modemModule;
 std::optional<GpsLog> gpsModule;
 
