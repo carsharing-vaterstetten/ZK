@@ -2,11 +2,11 @@
 
 #include <atomic>
 
-#include "SystemThread.h"
+#include "system/SystemThread.h"
 #include "config/user_config.h"
-#include "services/ModemService.h"
-#include "shared/AccessStatus.h"
-#include "shared/GPSAlg.h"
+#include "tasks/ModemService.h"
+#include "domain/AccessStatus.h"
+#include "domain/GPSAlg.h"
 
 
 class GPSTask : public SystemThread

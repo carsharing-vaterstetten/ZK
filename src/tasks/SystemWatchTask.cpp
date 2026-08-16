@@ -4,7 +4,7 @@
 #include <LittleFS.h>
 #include <esp_system.h>
 
-#include "shared/Globals.h"
+#include "logging/Loggers.h"
 
 void SystemWatchTask::OnCommand(SystemCommand cmd)
 {

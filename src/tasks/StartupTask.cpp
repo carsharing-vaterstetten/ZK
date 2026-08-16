@@ -1,9 +1,9 @@
 #include "StartupTask.h"
 
 #include "config/user_config.h"
-#include "logic/HelperUtils.h"
-#include "logic/SystemManager.h"
-#include "shared/Globals.h"
+#include "util/HelperUtils.h"
+#include "system/SystemManager.h"
+#include "logging/Loggers.h"
 
 void StartupTask::OnCommand(const SystemCommand cmd)
 {

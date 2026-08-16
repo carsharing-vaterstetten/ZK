@@ -1,7 +1,7 @@
 #include "AccessControlTask.h"
 
-#include "services/CardReaderService.h"
-#include "shared/Globals.h"
+#include "tasks/CardReaderService.h"
+#include "logging/Loggers.h"
 
 void AccessControlTask::doThings(const uint32_t rfidUid)
 {

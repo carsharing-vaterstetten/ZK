@@ -1,11 +1,11 @@
 #pragma once
-#include "logic/SystemManager.h"
-#include "services/CardReaderService.h"
-#include "services/KeyControlService.h"
+#include "system/SystemManager.h"
+#include "tasks/CardReaderService.h"
+#include "tasks/KeyControlService.h"
 #include "LedSchedulerTask.h"
-#include "services/ModemService.h"
-#include "shared/GPSAlg.h"
-#include "shared/RFIDs.h"
+#include "tasks/ModemService.h"
+#include "domain/GPSAlg.h"
+#include "domain/RFIDs.h"
 
 struct ScanResult;
 

@@ -1,8 +1,8 @@
 #pragma once
 #include <atomic>
 
-#include "logic/SystemManager.h"
-#include "services/ModemService.h"
+#include "system/SystemManager.h"
+#include "tasks/ModemService.h"
 
 class RestartTask : public SystemThread
 {

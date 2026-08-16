@@ -1,6 +1,6 @@
 #include "LedSchedulerTask.h"
 
-#include "modules/LED.h"
+#include "hal/LED.h"
 
 namespace
 {

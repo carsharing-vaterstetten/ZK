@@ -1,8 +1,8 @@
 #pragma once
 #include <atomic>
 
-#include "SystemThread.h"
-#include "services/ModemService.h"
+#include "system/SystemThread.h"
+#include "tasks/ModemService.h"
 #include "LedSchedulerTask.h"
 
 class StartupTask : public SystemThread

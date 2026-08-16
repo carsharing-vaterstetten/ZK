@@ -1,8 +1,8 @@
 #include "RestartTask.h"
 
-#include "shared/Globals.h"
-#include "logic/SystemManager.h"
-#include "services/ModemService.h"
+#include "logging/Loggers.h"
+#include "system/SystemManager.h"
+#include "tasks/ModemService.h"
 
 void RestartTask::setup()
 {

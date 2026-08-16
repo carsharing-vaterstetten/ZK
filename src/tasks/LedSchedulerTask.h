@@ -8,9 +8,9 @@
 #include <optional>
 #include <utility>
 
-#include "SystemThread.h"
-#include "logic/SystemManager.h"
-#include "modules/LED.h"
+#include "system/SystemThread.h"
+#include "system/SystemManager.h"
+#include "hal/LED.h"
 
 /// Relative importance of a queued LED command. Higher value == more important.
 /// A command can only preempt whatever is currently on the strip if its priority

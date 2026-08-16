@@ -1,8 +1,8 @@
 #pragma once
 #include <atomic>
 
-#include "SystemThread.h"
-#include "logic/SystemManager.h"
+#include "system/SystemThread.h"
+#include "system/SystemManager.h"
 
 class SystemWatchTask : public SystemThread
 {

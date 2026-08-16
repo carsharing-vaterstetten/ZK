@@ -7,9 +7,9 @@
 #include <LittleFS.h>
 
 #include "config/user_config.h"
-#include "logic/SystemManager.h"
-#include "services/ModemService.h"
-#include "shared/Globals.h"
+#include "system/SystemManager.h"
+#include "tasks/ModemService.h"
+#include "logging/Loggers.h"
 
 enum class GPSAlgPrediction;
 
