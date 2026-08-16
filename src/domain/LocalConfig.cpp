@@ -40,7 +40,7 @@ std::optional<LocalConfig> LocalConfig::fromStorage(const char* prefsName)
     {
         if (!prefs.isKey(key))
         {
-            fileLog.warningln("Couldnt find required key '" + String(key) + "'");
+            logger.warningln("Couldnt find required key '" + String(key) + "'");
             prefs.end();
             return std::nullopt;
         }

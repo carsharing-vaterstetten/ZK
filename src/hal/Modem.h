@@ -7,7 +7,7 @@
 #include <TinyGsmClient.h>
 
 #include "net/ApiStreams.h"
-#include "domain/GPS.h"
+#include "domain/GpsLog.h"
 #include "hal/ModemHardware.h"
 
 #define BASE_UPLOAD_RESULTS SUCCESS, FAILED
@@ -49,7 +49,7 @@ protected:
 
     const char *gprsUser = "", *gprsPassword = "", *apn = "";
 
-    const ModemHardwareDriver& driver;
+    const ModemHardware& driver;
 
     bool beginSleep();
     std::tuple<bool, ulong> autoBaud(uint32_t timeoutMs);
@@ -64,7 +64,7 @@ protected:
                                                    size_t streamLen, uint retries);
 
 public:
-    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemHardwareDriver& driver);
+    Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemHardware& driver);
 
     void powerOn() const;
     SleepRequestResult requestSleep();

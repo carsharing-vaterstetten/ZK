@@ -1,10 +1,10 @@
-#include "tasks/KeyControlService.h"
+#include "tasks/KeyControlTask.h"
 
 #include "hal/KeyControl.h"
 #include "logging/Loggers.h"
 
 
-void KeyControlService::OnCommand(const SystemCommand cmd)
+void KeyControlTask::OnCommand(const SystemCommand cmd)
 {
     switch (cmd)
     {
@@ -20,28 +20,28 @@ void KeyControlService::OnCommand(const SystemCommand cmd)
     }
 }
 
-bool KeyControlService::send(const KeyControlCommand cmd)
+bool KeyControlTask::send(const KeyControlCommand cmd)
 {
     if (xQueueSend(cmdQueue, &cmd, enqueueTimeout) == pdTRUE)
         return true;
 
-    fileLog.errorln("Key control queue full, command dropped");
+    logger.errorln("Key control queue full, command dropped");
     return false;
 }
 
-bool KeyControlService::lock()
+bool KeyControlTask::lock()
 {
     return send(KeyControlCommand::Lock);
 }
 
-bool KeyControlService::unlock()
+bool KeyControlTask::unlock()
 {
     return send(KeyControlCommand::Unlock);
 }
 
-void KeyControlService::setup() {}
+void KeyControlTask::setup() {}
 
-void KeyControlService::run()
+void KeyControlTask::run()
 {
     KeyControlCommand cmd;
 

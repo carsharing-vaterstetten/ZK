@@ -16,11 +16,11 @@ void SystemManager::Start()
 
         if (!t->startTask())
         {
-            fileLog.criticalln("Failed to start task " + String(t->getName()));
+            logger.criticalln("Failed to start task " + String(t->getName()));
             continue;
         }
 
-        serialOnlyLog.debugln("Task " + String(t->getName()) + " started");
+        serialLogger.debugln("Task " + String(t->getName()) + " started");
     }
 }
 
@@ -47,15 +47,15 @@ void SystemManager::RegisterThread(SystemThread* thread)
     EventBits_t receivedBits = xEventGroupWaitBits(m_lifecycleEventGroup, expectedBits, pdFALSE, pdTRUE, timeout);
 
     if ((receivedBits & expectedBits) != expectedBits)
-        fileLog.warningln("Restart timed out waiting for tasks. Missing: " +
+        logger.warningln("Restart timed out waiting for tasks. Missing: " +
             String(expectedBits & ~receivedBits, 2));
 
-    fileLog.debugln("Ended tasks: " + String(receivedBits, 2));
+    logger.debugln("Ended tasks: " + String(receivedBits, 2));
 
-    fileLog.infoln("Restarting now");
+    logger.infoln("Restarting now");
 
-    fileLog.flush();
-    serialOnlyLog.flush();
+    logger.flush();
+    serialLogger.flush();
     swLog.end(); // NO MORE FILE LOGGING FROM HERE
 
     ExecuteHotRestart();

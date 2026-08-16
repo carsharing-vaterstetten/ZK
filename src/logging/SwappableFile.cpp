@@ -3,7 +3,7 @@
 #include <LittleFS.h>
 
 #include "logging/Loggers.h"
-#include "util/LittleFSHelper.h"
+#include "util/Files.h"
 
 bool SwappableFile::begin(const bool moveBOverToA)
 {
@@ -58,7 +58,7 @@ bool SwappableFile::appendBToA(const bool deleteBAfterwards)
 
     if (!LittleFS.exists(fileBPath))
     {
-        serialOnlyLog.infoln(fileBPath + " doesn't exist. Nothing to append to " + fileAPath);
+        serialLogger.infoln(fileBPath + " doesn't exist. Nothing to append to " + fileAPath);
         return true;
     }
 
@@ -67,10 +67,10 @@ bool SwappableFile::appendBToA(const bool deleteBAfterwards)
     if (!fileB) return false;
     if (fileB.size() <= 0)
     {
-        serialOnlyLog.infoln(fileBPath + " is empty. Nothing to append to " + fileAPath);
+        serialLogger.infoln(fileBPath + " is empty. Nothing to append to " + fileAPath);
         fileB.close();
         if (deleteBAfterwards)
-            serialOnlyLog.logInfoOrErrorln(LittleFS.remove(fileBPath), "Deleted " + fileBPath,
+            serialLogger.logInfoOrErrorln(LittleFS.remove(fileBPath), "Deleted " + fileBPath,
                                            "Failed to delete " + fileBPath);
         return true;
     }
@@ -83,7 +83,7 @@ bool SwappableFile::appendBToA(const bool deleteBAfterwards)
         return false;
     }
 
-    serialOnlyLog.debugln("Appending " + String(fileB.size()) + " B from " + fileB.path() + " to " + fileA.path());
+    serialLogger.debugln("Appending " + String(fileB.size()) + " B from " + fileB.path() + " to " + fileA.path());
 
     constexpr size_t bufSize = 512;
     uint8_t buf[bufSize];
@@ -98,7 +98,7 @@ bool SwappableFile::appendBToA(const bool deleteBAfterwards)
     fileB.close();
 
     if (deleteBAfterwards)
-        serialOnlyLog.logInfoOrErrorln(LittleFS.remove(fileBPath), "Deleted " + fileBPath,
+        serialLogger.logInfoOrErrorln(LittleFS.remove(fileBPath), "Deleted " + fileBPath,
                                        "Failed to delete " + fileBPath);
 
     return true;

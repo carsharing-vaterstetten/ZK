@@ -1,10 +1,10 @@
-#include "hal/KeySequenceManager.h"
+#include "hal/KeySequences.h"
 
 #include <Arduino.h>
 
-KeySequenceManager::KeySequenceManager() {}
+KeySequences::KeySequences() {}
 
-void KeySequenceManager::loadSequenceInRAM(const BoardConfig& board)
+void KeySequences::loadSequenceInRAM(const BoardConfig& board)
 {
     std::lock_guard lock(mtx);
 
@@ -48,13 +48,13 @@ void KeySequenceManager::loadSequenceInRAM(const BoardConfig& board)
     }
 }
 
-std::shared_ptr<const std::vector<SequencePoint>> KeySequenceManager::getOpenSequence() const
+std::shared_ptr<const std::vector<SequencePoint>> KeySequences::getOpenSequence() const
 {
     std::lock_guard lock(mtx);
     return openSequence;
 }
 
-std::shared_ptr<const std::vector<SequencePoint>> KeySequenceManager::getCloseSequence() const
+std::shared_ptr<const std::vector<SequencePoint>> KeySequences::getCloseSequence() const
 {
     std::lock_guard lock(mtx);
     return closeSequence;

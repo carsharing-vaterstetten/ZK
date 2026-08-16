@@ -2,25 +2,25 @@
 
 #include <Arduino.h>
 
-void ModemHardwareDriver::begin() const
+void ModemHardware::begin() const
 {
     pinMode(board.modemPowerOn, OUTPUT);
     pinMode(board.modemPwrKey, OUTPUT);
     pinMode(board.modemDtr, OUTPUT);
 }
 
-void ModemHardwareDriver::providePower() const
+void ModemHardware::providePower() const
 {
     // give power to VBAT (on SIM7000)
     digitalWrite(board.modemPowerOn, HIGH);
 }
 
-void ModemHardwareDriver::cutPower() const
+void ModemHardware::cutPower() const
 {
     digitalWrite(board.modemPowerOn, LOW);
 }
 
-void ModemHardwareDriver::powerOn() const
+void ModemHardware::powerOn() const
 {
     // pwr key is active low on modem, but pcie board connects it via npn, so its active high here
     digitalWrite(board.modemPwrKey, HIGH);
@@ -28,11 +28,11 @@ void ModemHardwareDriver::powerOn() const
     digitalWrite(board.modemPwrKey, LOW);
 }
 
-void ModemHardwareDriver::wakeup() const
+void ModemHardware::wakeup() const
 {
     digitalWrite(board.modemDtr, LOW);
 }
-void ModemHardwareDriver::sleep() const
+void ModemHardware::sleep() const
 {
     digitalWrite(board.modemDtr, HIGH);
 }

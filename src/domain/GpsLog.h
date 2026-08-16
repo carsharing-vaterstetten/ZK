@@ -4,7 +4,7 @@
 #include <FS.h>
 #include <sys/types.h>
 
-#include "net/Api.h"
+#include "net/ApiClient.h"
 
 #pragma pack(push, 1)
 struct GPS_DATA_t
@@ -20,10 +20,10 @@ struct GPS_DATA_t
 };
 #pragma pack(pop)
 
-class GPS
+class GpsLog
 {
 public:
-    GPS(const char* localFilePath, const char* uploadEndpoint);
+    GpsLog(const char* localFilePath, const char* uploadEndpoint);
 
     bool writeData(const GPS_DATA_t& data);
     void uploadFileAndBeginNew(ApiClient& api, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);

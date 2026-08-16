@@ -1,11 +1,11 @@
 #pragma once
 
-#include "hal/car_key.h"
+#include "hal/CarKey.h"
 
 class KeyControl
 {
 public:
-    explicit KeyControl(CarKeyDriver& driver) : driver(driver) {}
+    explicit KeyControl(CarKey& driver) : driver(driver) {}
 
     // Not const: driving the key is a stateful hardware action. Marking these
     // const only worked because constness does not propagate through a reference
@@ -14,5 +14,5 @@ public:
     void unlock();
 
 protected:
-    CarKeyDriver& driver;
+    CarKey& driver;
 };

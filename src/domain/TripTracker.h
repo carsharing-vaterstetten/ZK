@@ -3,15 +3,15 @@
 #include <mutex>
 #include <optional>
 
-#include "domain/GPS.h"
+#include "domain/GpsLog.h"
 
-enum class GPSAlgPrediction
+enum class MotionState
 {
     Standing,
     Moving,
 };
 
-class GPSAlg
+class TripTracker
 {
 protected:
     std::vector<GPS_DATA_t> data_buffer;
@@ -33,33 +33,33 @@ protected:
     static constexpr float MOVING_VOTE_THRESHOLD = 0.4f;
     static constexpr float STANDING_VOTE_THRESHOLD = 0.7f;
 
-    GPSAlgPrediction last_prediction = GPSAlgPrediction::Standing;
+    MotionState last_prediction = MotionState::Standing;
 
     mutable std::recursive_mutex algMutex;
 
     static float haversineDistance(float lat1, float lon1, float lat2, float lon2);
-    GPSAlgPrediction evaluateWindow() const;
+    MotionState evaluateWindow() const;
     static bool isSampleReliable(const GPS_DATA_t& sample);
     void accumulateTripDistance(const GPS_DATA_t& sample);
 
 public:
     // eval_window_secs : how many seconds of history to evaluate (default 10s)
-    explicit GPSAlg(float eval_window_secs = 10.0f);
+    explicit TripTracker(float eval_window_secs = 10.0f);
 
-    GPSAlgPrediction pushData(const GPS_DATA_t& data);
+    MotionState pushData(const GPS_DATA_t& data);
 
     void startTrip();
     float endTrip();
 
     bool isTripActive() const { return trip_active; }
 
-    static String gpsAlgPredictionToStr(const GPSAlgPrediction pred)
+    static String motionStateToString(const MotionState pred)
     {
         switch (pred)
         {
-        case GPSAlgPrediction::Standing:
+        case MotionState::Standing:
             return "Standing";
-        case GPSAlgPrediction::Moving:
+        case MotionState::Moving:
             return "Moving";
         }
 

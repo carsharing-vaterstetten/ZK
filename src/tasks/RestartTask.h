@@ -2,12 +2,12 @@
 #include <atomic>
 
 #include "system/SystemManager.h"
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 
 class RestartTask : public SystemThread
 {
 public:
-    explicit RestartTask(const ulong targetRestartTimeMs, ModemService& modem)
+    explicit RestartTask(const ulong targetRestartTimeMs, ModemTask& modem)
         : SystemThread(SystemThreadId::RestartTask, "RSTRT", 4096, ThreadPriority::RestartTask, 0), targetRestartTimeMs(targetRestartTimeMs),
           modem(modem)
     {
@@ -32,7 +32,7 @@ private:
 
     ulong targetRestartTimeMs;
 
-    ModemService& modem;
+    ModemTask& modem;
 
     ulong calculateTimeTillRestart(int hour, int minute, int second) const;
 };

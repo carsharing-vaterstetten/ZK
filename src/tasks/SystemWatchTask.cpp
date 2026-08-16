@@ -24,7 +24,7 @@ void SystemWatchTask::OnCommand(SystemCommand cmd)
     }
 }
 
-void SystemWatchTask::log()
+void SystemWatchTask::report()
 {
     auto tasks = SystemManager::getAllTasks();
 
@@ -94,7 +94,7 @@ void SystemWatchTask::log()
         line += "B";
     }
 
-    fileLog.infoln(line);
+    logger.infoln(line);
 }
 
 void SystemWatchTask::setup() {}
@@ -103,7 +103,7 @@ void SystemWatchTask::run()
 {
     while (m_running)
     {
-        log();
+        report();
         ulTaskNotifyTake(pdTRUE, reportingFrequency);
     }
 

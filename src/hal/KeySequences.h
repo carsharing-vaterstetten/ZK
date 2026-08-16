@@ -5,10 +5,10 @@
 #include "util/SequencePlayer.h"
 #include "config/hw_config.h"
 
-class KeySequenceManager
+class KeySequences
 {
 public:
-    KeySequenceManager();
+    KeySequences();
     void loadSequenceInRAM(const BoardConfig& board);
     std::shared_ptr<const std::vector<SequencePoint>> getOpenSequence() const;
     std::shared_ptr<const std::vector<SequencePoint>> getCloseSequence() const;

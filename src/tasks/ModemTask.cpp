@@ -1,4 +1,4 @@
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 
 #include <atomic>
 
@@ -9,7 +9,7 @@
 #include "domain/RFIDs.h"
 #include "hal/Modem.h"
 
-ModemService::~ModemService()
+ModemTask::~ModemTask()
 {
     std::lock_guard lock(m_shelfMutex);
 
@@ -19,7 +19,7 @@ ModemService::~ModemService()
     m_shelvedMessages.clear();
 }
 
-void ModemService::OnCommand(const SystemCommand cmd)
+void ModemTask::OnCommand(const SystemCommand cmd)
 {
     switch (cmd)
     {
@@ -37,7 +37,7 @@ void ModemService::OnCommand(const SystemCommand cmd)
     }
 }
 
-bool ModemService::sendRequest(const ModemTaskCommand cmd, const TickType_t timeToLive,
+bool ModemTask::sendRequest(const ModemTaskCommand cmd, const TickType_t timeToLive,
                                const TickType_t enqueueTimeout)
 {
     const ModemRequest request{
@@ -55,11 +55,11 @@ bool ModemService::sendRequest(const ModemTaskCommand cmd, const TickType_t time
         return true;
 
     --m_outstandingRequests;
-    fileLog.warningln("Modem request queue full, dropped command " + String(static_cast<int>(cmd)));
+    logger.warningln("Modem request queue full, dropped command " + String(static_cast<int>(cmd)));
     return false;
 }
 
-void ModemService::publish(const ModemTxDataType dataType, const ModemFlexibleTxPayload& payload)
+void ModemTask::publish(const ModemTxDataType dataType, const ModemFlexibleTxPayload& payload)
 {
     auto msg = std::make_unique<ModemTxMessage>(ModemTxMessage{
         .dataType = dataType,
@@ -73,14 +73,14 @@ void ModemService::publish(const ModemTxDataType dataType, const ModemFlexibleTx
     {
         // Better to lose a reply than to park the modem task on a queue that
         // nobody is draining — everything else waits behind this task.
-        fileLog.warningln("Modem reply queue full, dropped reply " + String(static_cast<int>(dataType)));
+        logger.warningln("Modem reply queue full, dropped reply " + String(static_cast<int>(dataType)));
         return;
     }
 
     msg.release(); // ownership passed to the receiving task
 }
 
-void ModemService::dropStaleShelvedLocked()
+void ModemTask::dropStaleShelvedLocked()
 {
     const TickType_t now = xTaskGetTickCount();
 
@@ -97,7 +97,7 @@ void ModemService::dropStaleShelvedLocked()
     }
 }
 
-std::unique_ptr<ModemTxMessage> ModemService::takeShelved(const ModemTxDataType dataType)
+std::unique_ptr<ModemTxMessage> ModemTask::takeShelved(const ModemTxDataType dataType)
 {
     std::lock_guard lock(m_shelfMutex);
     dropStaleShelvedLocked();
@@ -110,14 +110,14 @@ std::unique_ptr<ModemTxMessage> ModemService::takeShelved(const ModemTxDataType 
     return msg;
 }
 
-void ModemService::shelve(std::unique_ptr<ModemTxMessage> msg)
+void ModemTask::shelve(std::unique_ptr<ModemTxMessage> msg)
 {
     std::lock_guard lock(m_shelfMutex);
     dropStaleShelvedLocked();
     m_shelvedMessages.emplace(msg->dataType, msg.release());
 }
 
-std::unique_ptr<ModemTxMessage> ModemService::waitForSpecificMessage(const ModemTxDataType dataType,
+std::unique_ptr<ModemTxMessage> ModemTask::waitForSpecificMessage(const ModemTxDataType dataType,
                                                                     const TickType_t timeout)
 {
     const TickType_t deadline = xTaskGetTickCount() + timeout;
@@ -141,23 +141,23 @@ std::unique_ptr<ModemTxMessage> ModemService::waitForSpecificMessage(const Modem
     }
 }
 
-bool ModemService::isWorkingOnTasks() const
+bool ModemTask::isWorkingOnTasks() const
 {
     return m_outstandingRequests > 0;
 }
 
-ModemState ModemService::getCurrentState() const
+ModemState ModemTask::getCurrentState() const
 {
-    return currentSate;
+    return currentState;
 }
 
-void ModemService::setup()
+void ModemTask::setup()
 {
-    currentSate = ModemState::InitializeModem;
+    currentState = ModemState::InitializeModem;
     modem.connect(config.simPin.c_str(), config.gprsUser.c_str(), config.gprsPassword.c_str(), config.apn.c_str());
 }
 
-void ModemService::run()
+void ModemTask::run()
 {
     while (m_running)
     {
@@ -165,7 +165,7 @@ void ModemService::run()
 
         if (xQueueReceive(modemTaskRxQueue, &request, idlePollInterval) != pdTRUE)
         {
-            currentSate = ModemState::READY;
+            currentState = ModemState::READY;
             continue;
         }
 
@@ -173,22 +173,22 @@ void ModemService::run()
         {
             // The modem was busy for longer than this request was useful for.
             // Running it now would only delay whatever is queued behind it.
-            serialOnlyLog.debugln("Dropped expired modem command " + String(static_cast<int>(request.cmd)));
+            serialLogger.debugln("Dropped expired modem command " + String(static_cast<int>(request.cmd)));
             --m_outstandingRequests;
             continue;
         }
 
-        currentSate = modemCmdToState(request.cmd);
+        currentState = modemCmdToState(request.cmd);
         handleRequest(request.cmd);
         --m_outstandingRequests;
     }
 
-    currentSate = ModemState::NONE;
+    currentState = ModemState::NONE;
 
     SystemManager::ReportReadyForRestart(m_id);
 }
 
-void ModemService::handleRequest(const ModemTaskCommand cmd)
+void ModemTask::handleRequest(const ModemTaskCommand cmd)
 {
     switch (cmd)
     {
@@ -248,13 +248,13 @@ void ModemService::handleRequest(const ModemTaskCommand cmd)
 
             for (uint i = 0; i < 100 && t < 0; ++i)
             {
-                serialOnlyLog.debugln("Got invalid unix timestamp " + String(t));
+                serialLogger.debugln("Got invalid unix timestamp " + String(t));
                 vTaskDelay(pdMS_TO_TICKS(10));
                 t = modem.getUnixTimestamp();
             }
 
             if (t < 0)
-                fileLog.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
+                logger.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
             else
                 publish(ModemTxDataType::UnixTimestamp, t);
 
@@ -274,11 +274,11 @@ void ModemService::handleRequest(const ModemTaskCommand cmd)
 
             if (year <= 0 || year > 2060)
             {
-                fileLog.errorln("Got invalid network time: Year " + String(year));
+                logger.errorln("Got invalid network time: Year " + String(year));
             }
             else
             {
-                serialOnlyLog.debugln("Got time");
+                serialLogger.debugln("Got time");
                 ModemTimestamp ts{
                     .hour = hour,
                     .minute = minute,
@@ -295,7 +295,7 @@ void ModemService::handleRequest(const ModemTaskCommand cmd)
             // FIXME: where does +CPIN  READY: come from?????????
             String imei = modem.getIMEI();
             imeiStore.setIMEI(imei);
-            serialOnlyLog.debugln("Got imei: " + imei + " | " + imeiStore.getIMEI().value_or("AAAA"));
+            serialLogger.debugln("Got imei: " + imei + " | " + imeiStore.getIMEI().value_or("AAAA"));
             break;
         }
     case ModemTaskCommand::NONE:

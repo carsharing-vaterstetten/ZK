@@ -100,7 +100,7 @@ void StartupTask::setup()
     if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
         modem.sendRequest(ModemTaskCommand::DoFirmwareUpdateIfAvailable);
     else
-        fileLog.infoln("Skipped firmware update check");
+        logger.infoln("Skipped firmware update check");
 
     modem.sendRequest(ModemTaskCommand::DownloadRfidIfChanged);
     modem.sendRequest(ModemTaskCommand::DownloadGPSRfids);

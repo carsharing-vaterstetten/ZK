@@ -9,7 +9,7 @@
 #include "system/SystemThread.h"
 #include "util/SequencePlayer.h"
 #include "config/hw_config.h"
-#include "domain/GPS.h"
+#include "domain/GpsLog.h"
 #include "system/SystemManager.h"
 #include "domain/AccessStatus.h"
 #include "domain/ImeiStore.h"
@@ -83,19 +83,19 @@ struct ModemRequest
     }
 };
 
-class ModemService : public SystemThread
+class ModemTask : public SystemThread
 {
 public:
-    ModemService(const LocalConfig& config, RFIDs& rfidsManager, SwappableFile& swLog, Modem& modem,
-                 GPS& gps, ApiClient& api, ImeiStore& imeiStore)
-        : SystemThread(SystemThreadId::ModemService, "MODEMSER", 8192, ThreadPriority::ModemService, 1),
+    ModemTask(const LocalConfig& config, RFIDs& rfidsManager, SwappableFile& swLog, Modem& modem,
+                 GpsLog& gps, ApiClient& api, ImeiStore& imeiStore)
+        : SystemThread(SystemThreadId::ModemTask, "MODEMTSK", 8192, ThreadPriority::ModemTask, 1),
           config(config), modem(modem), rfidsManager(rfidsManager),
           gps(gps), swLog(swLog), api(api), imeiStore(imeiStore)
     {
         SystemManager::RegisterThread(this);
     }
 
-    ~ModemService() override;
+    ~ModemTask() override;
 
     void OnCommand(SystemCommand cmd) override;
 
@@ -140,7 +140,7 @@ private:
     static constexpr TickType_t idlePollInterval = pdMS_TO_TICKS(500);
 
     std::atomic<bool> m_running = true;
-    std::atomic<ModemState> currentSate = ModemState::NONE;
+    std::atomic<ModemState> currentState = ModemState::NONE;
 
     /// Queued but not yet completed requests. Backs isWorkingOnTasks(), which
     /// other tasks use to tell whether the boot sequence has drained.
@@ -156,7 +156,7 @@ private:
     const LocalConfig& config;
     Modem& modem;
     RFIDs& rfidsManager;
-    GPS& gps;
+    GpsLog& gps;
     SwappableFile& swLog;
     ApiClient& api;
     ImeiStore& imeiStore;

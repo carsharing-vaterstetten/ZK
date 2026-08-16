@@ -3,10 +3,10 @@
 #include <optional>
 #include <Adafruit_PN532.h>
 
-class NFCCardReader
+class NfcReader
 {
 public:
-    explicit NFCCardReader(Adafruit_PN532& nfcDriver) : nfc(nfcDriver){}
+    explicit NfcReader(Adafruit_PN532& nfcDriver) : nfc(nfcDriver){}
 
     bool connect() const;
 

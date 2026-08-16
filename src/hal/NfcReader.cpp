@@ -1,25 +1,25 @@
-#include "hal/NFCCardReader.h"
+#include "hal/NfcReader.h"
 
 #include "logging/Loggers.h"
 
-bool NFCCardReader::connect() const
+bool NfcReader::connect() const
 {
-    fileLog.debugln("Connecting to NFC board...");
+    logger.debugln("Connecting to NFC board...");
 
     if (!nfc.getFirmwareVersion())
     {
-        fileLog.criticalln("Failed to connect to NFC board. No RFID scanning possible");
+        logger.criticalln("Failed to connect to NFC board. No RFID scanning possible");
         return false;
     }
 
     nfc.SAMConfig();
 
-    fileLog.infoln("NFC board connected successfully");
+    logger.infoln("NFC board connected successfully");
 
     return true;
 }
 
-std::optional<uint32_t> NFCCardReader::scan() const
+std::optional<uint32_t> NfcReader::scan() const
 {
     uint8_t uidArr[7] = {};
     uint8_t uidLen = 0;

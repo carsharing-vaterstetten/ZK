@@ -16,11 +16,11 @@ enum class SystemThreadId : uint8_t
 {
     RestartTask,
     AccessControlTask,
-    CardReaderService,
-    KeyControlService,
+    CardReaderTask,
+    KeyControlTask,
     LedScheduler,
-    ModemService,
-    GPSTask,
+    ModemTask,
+    GpsTask,
     StartupTask,
     SystemWatchTask,
 
@@ -31,16 +31,16 @@ enum class ThreadPriority : UBaseType_t
 {
     // Unimportant
     RestartTask = 1,
-    GPSTask = 1,
+    GpsTask = 1,
     StartupTask = 1,
     SystemWatchTask = 1,
 
     // User experience
-    ModemService = 2,
+    ModemTask = 2,
     AccessControlTask = 3,
-    CardReaderService = 3,
+    CardReaderTask = 3,
     LedScheduler = 3,
 
     // Critical timing
-    KeyControlService = 4,
+    KeyControlTask = 4,
 };

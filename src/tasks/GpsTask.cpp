@@ -8,12 +8,12 @@
 
 #include "config/user_config.h"
 #include "system/SystemManager.h"
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 #include "logging/Loggers.h"
 
-enum class GPSAlgPrediction;
+enum class MotionState;
 
-void GPSTask::OnCommand(SystemCommand cmd)
+void GpsTask::OnCommand(SystemCommand cmd)
 {
     switch (cmd)
     {
@@ -29,12 +29,12 @@ void GPSTask::OnCommand(SystemCommand cmd)
     }
 }
 
-void GPSTask::checkGPS()
+void GpsTask::checkGPS()
 {
     if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
     {
         // GPS is logging to flash and storage is low
-        serialOnlyLog.warningln("Low on flash storage. Not logging GPS");
+        serialLogger.warningln("Low on flash storage. Not logging GPS");
         return;
     }
 
@@ -44,29 +44,29 @@ void GPSTask::checkGPS()
 
     if (msg == nullptr)
     {
-        //serialOnlyLog.debugln("No gps data");
+        //serialLogger.debugln("No gps data");
         return;
     }
 
     const GPS_DATA_t gpsData = std::get<GPS_DATA_t>(*msg->payload);
 
-    const GPSAlgPrediction gpsState = gpsAlg.pushData(gpsData);
+    const MotionState gpsState = tripTracker.pushData(gpsData);
     gps.writeData(gpsData);
 
     if (gpsState != lastGpsState)
     {
-        fileLog.infoln("Car state changed to " + GPSAlg::gpsAlgPredictionToStr(gpsState));
+        logger.infoln("Car state changed to " + TripTracker::motionStateToString(gpsState));
         lastGpsState = gpsState;
     }
 }
 
-void GPSTask::setup()
+void GpsTask::setup()
 {
     while (modem.isWorkingOnTasks())
         vTaskDelay(pdMS_TO_TICKS(100));
 }
 
-void GPSTask::run()
+void GpsTask::run()
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 

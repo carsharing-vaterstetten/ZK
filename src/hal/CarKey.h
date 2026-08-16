@@ -1,16 +1,16 @@
 #pragma once
 
 #include "util/SequencePlayer.h"
-#include "hal/KeySequenceManager.h"
+#include "hal/KeySequences.h"
 
 
 struct SequencePoint;
 
-class CarKeyDriver
+class CarKey
 {
 public:
-    CarKeyDriver(uint8_t openKeyPin, uint8_t closeKeyPin, uint8_t keyPowerPin,
-                 bool hasPowerKey, const KeySequenceManager& keySequenceManager);
+    CarKey(uint8_t openKeyPin, uint8_t closeKeyPin, uint8_t keyPowerPin,
+                 bool hasPowerKey, const KeySequences& keySequences);
 
     void begin() const;
 
@@ -21,7 +21,7 @@ protected:
     uint8_t openKeyPin, closeKeyPin, keyPowerPin;
     bool hasPowerKey;
 
-    const KeySequenceManager& keySequenceManager;
+    const KeySequences& keySequences;
 
     static void playSequence(const std::shared_ptr<const std::vector<SequencePoint>>& sequence);
 };

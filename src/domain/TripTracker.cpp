@@ -1,18 +1,18 @@
-#include "domain/GPSAlg.h"
+#include "domain/TripTracker.h"
 #include <cmath>
 #include <stdexcept>
 
 static constexpr float EARTH_RADIUS_M = 6'371'000.0f;
 
 
-GPSAlg::GPSAlg(const float eval_window_secs)
+TripTracker::TripTracker(const float eval_window_secs)
     : eval_window_secs(eval_window_secs)
 {
     if (eval_window_secs <= 0.0f)
-        throw std::invalid_argument("GPSAlg: eval_window_secs must be > 0.");
+        throw std::invalid_argument("TripTracker: eval_window_secs must be > 0.");
 }
 
-float GPSAlg::haversineDistance(const float lat1, const float lon1, const float lat2, const float lon2)
+float TripTracker::haversineDistance(const float lat1, const float lon1, const float lat2, const float lon2)
 {
     const float dLat = (lat2 - lat1) * DEG_TO_RAD;
     const float dLon = (lon2 - lon1) * DEG_TO_RAD;
@@ -24,7 +24,7 @@ float GPSAlg::haversineDistance(const float lat1, const float lon1, const float 
     return EARTH_RADIUS_M * 2.0f * std::atan2(std::sqrt(a), std::sqrt(1.0f - a));
 }
 
-bool GPSAlg::isSampleReliable(const GPS_DATA_t& sample)
+bool TripTracker::isSampleReliable(const GPS_DATA_t& sample)
 {
     if (sample.accuracy > MAX_ACCEPTABLE_ACCURACY) return false;
     if (sample.accuracy < 0.0f) return false;
@@ -40,7 +40,7 @@ bool GPSAlg::isSampleReliable(const GPS_DATA_t& sample)
     return true;
 }
 
-GPSAlgPrediction GPSAlg::evaluateWindow() const
+MotionState TripTracker::evaluateWindow() const
 {
     std::lock_guard lock(algMutex);
     if (data_buffer.empty()) return last_prediction;
@@ -97,15 +97,15 @@ GPSAlgPrediction GPSAlg::evaluateWindow() const
     const float movingRatio = movingVotes / total;
 
     if (movingRatio >= MOVING_VOTE_THRESHOLD)
-        return GPSAlgPrediction::Moving;
+        return MotionState::Moving;
 
     if (movingRatio <= (1.0f - STANDING_VOTE_THRESHOLD))
-        return GPSAlgPrediction::Standing;
+        return MotionState::Standing;
 
     return last_prediction;
 }
 
-void GPSAlg::accumulateTripDistance(const GPS_DATA_t& sample)
+void TripTracker::accumulateTripDistance(const GPS_DATA_t& sample)
 {
     // No lock because this function only gets called from pushData
 
@@ -124,14 +124,14 @@ void GPSAlg::accumulateTripDistance(const GPS_DATA_t& sample)
         }
 
         const float dist = haversineDistance(prev.lat, prev.lon, sample.lat, sample.lon);
-        if (last_prediction == GPSAlgPrediction::Moving && dist >= DISPLACEMENT_THRESHOLD_M)
+        if (last_prediction == MotionState::Moving && dist >= DISPLACEMENT_THRESHOLD_M)
             trip_distance_m += dist;
     }
 
     last_trip_sample = sample;
 }
 
-GPSAlgPrediction GPSAlg::pushData(const GPS_DATA_t& data)
+MotionState TripTracker::pushData(const GPS_DATA_t& data)
 {
     std::lock_guard lock(algMutex);
     data_buffer.push_back(data);
@@ -146,22 +146,22 @@ GPSAlgPrediction GPSAlg::pushData(const GPS_DATA_t& data)
     return last_prediction;
 }
 
-void GPSAlg::startTrip()
+void TripTracker::startTrip()
 {
     std::lock_guard lock(algMutex);
     if (trip_active)
-        throw std::logic_error("GPSAlg: cannot start a trip - one is already active.");
+        throw std::logic_error("TripTracker: cannot start a trip - one is already active.");
 
     trip_active = true;
     trip_distance_m = 0.0f;
     last_trip_sample = std::nullopt;
 }
 
-float GPSAlg::endTrip()
+float TripTracker::endTrip()
 {
     std::lock_guard lock(algMutex);
     if (!trip_active)
-        throw std::logic_error("GPSAlg: cannot end a trip - no trip is active.");
+        throw std::logic_error("TripTracker: cannot end a trip - no trip is active.");
 
     trip_active = false;
     last_trip_sample = std::nullopt;

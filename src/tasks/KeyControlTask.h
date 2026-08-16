@@ -13,11 +13,11 @@ enum class KeyControlCommand
 };
 
 
-class KeyControlService : public SystemThread
+class KeyControlTask : public SystemThread
 {
 public:
-    explicit KeyControlService(KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlService, "KEYCTRL", 4096,
-                                                                      ThreadPriority::KeyControlService, 0), keyControl(keyControl)
+    explicit KeyControlTask(KeyControl& keyControl) : SystemThread(SystemThreadId::KeyControlTask, "KEYCTRL", 4096,
+                                                                      ThreadPriority::KeyControlTask, 0), keyControl(keyControl)
     {
         SystemManager::RegisterThread(this);
     }

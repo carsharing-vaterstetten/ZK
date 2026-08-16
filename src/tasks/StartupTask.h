@@ -2,13 +2,13 @@
 #include <atomic>
 
 #include "system/SystemThread.h"
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 #include "LedSchedulerTask.h"
 
 class StartupTask : public SystemThread
 {
 public:
-    StartupTask(ModemService& modem, const AccessStatus& accessStatus, LedSchedulerTask& led, const ApiClient& api)
+    StartupTask(ModemTask& modem, const AccessStatus& accessStatus, LedSchedulerTask& led, const ApiClient& api)
         : SystemThread(SystemThreadId::StartupTask, "STARTUP", 4096, ThreadPriority::StartupTask, 0),
           modem(modem), accessStatus(accessStatus), led(led), api(api)
     {
@@ -31,7 +31,7 @@ private:
 
     std::atomic<bool> m_running = true;
 
-    ModemService& modem;
+    ModemTask& modem;
     LedSchedulerTask& led;
     const ApiClient& api;
     const AccessStatus& accessStatus;

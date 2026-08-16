@@ -4,17 +4,17 @@
 
 #include "system/SystemThread.h"
 #include "config/user_config.h"
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 #include "domain/AccessStatus.h"
-#include "domain/GPSAlg.h"
+#include "domain/TripTracker.h"
 
 
-class GPSTask : public SystemThread
+class GpsTask : public SystemThread
 {
 public:
-    GPSTask(const AccessStatus& accessStatus, ModemService& modem, GPSAlg& gpsAlg, GPS& gps) : SystemThread(
-            SystemThreadId::GPSTask, "GPSTask", 4096, ThreadPriority::GPSTask, 0), accessStatus(accessStatus), modem(modem), gps(gps),
-        gpsAlg(gpsAlg)
+    GpsTask(const AccessStatus& accessStatus, ModemTask& modem, TripTracker& tripTracker, GpsLog& gps) : SystemThread(
+            SystemThreadId::GpsTask, "GpsTask", 4096, ThreadPriority::GpsTask, 0), accessStatus(accessStatus), modem(modem), gps(gps),
+        tripTracker(tripTracker)
     {
         SystemManager::RegisterThread(this);
     }
@@ -40,10 +40,10 @@ private:
     TickType_t currentGPSPollingTime = 0;
 
     const AccessStatus& accessStatus;
-    ModemService& modem;
-    GPS& gps;
-    GPSAlg& gpsAlg;
-    GPSAlgPrediction lastGpsState = GPSAlgPrediction::Standing;
+    ModemTask& modem;
+    GpsLog& gps;
+    TripTracker& tripTracker;
+    MotionState lastGpsState = MotionState::Standing;
 
     void checkGPS();
 };

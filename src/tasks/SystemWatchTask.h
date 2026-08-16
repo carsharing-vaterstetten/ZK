@@ -20,7 +20,7 @@ protected:
 
 private:
     std::atomic<bool> m_running = true;
-    static void log();
+    static void report();
 
     constexpr static TickType_t reportingFrequency = pdMS_TO_TICKS(5 * 60 * 1000);
 };

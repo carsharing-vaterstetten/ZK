@@ -37,7 +37,7 @@ std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputStr
         const int eqIndex = token.indexOf('=');
         if (eqIndex == -1)
         {
-            fileLog.warningln("Invalid config token (missing '='): '" + token + "'");
+            logger.warningln("Invalid config token (missing '='): '" + token + "'");
             start = end + 1;
             continue;
         }
@@ -68,7 +68,7 @@ std::optional<LocalConfig> HelperUtils::parseConfigString(const String& inputStr
         else if (key == LocalConfig::simPinKey)
             simPin = value;
         else
-            fileLog.warningln("Unknown config key: '" + key + "'");
+            logger.warningln("Unknown config key: '" + key + "'");
 
         start = end + 1;
     }
@@ -262,29 +262,29 @@ void HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(ApiClient& api,
 
 void HelperUtils::performConnectionSpeedTest(ApiClient& api, const size_t fileSize)
 {
-    fileLog.infoln("Performing connection speed test");
+    logger.infoln("Performing connection speed test");
 
     const HttpRequest req = HttpRequest::post(CONNECTION_SPEED_TEST_ENDPOINT, randomStream, fileSize);
     const ApiResponse resp = api.makeRequest(req, true);
 
     if (!resp.valid)
     {
-        fileLog.errorln("Request failed");
+        logger.errorln("Request failed");
         return;
     }
 
-    fileLog.infoln("Response code: " + String(resp.responseCode));
+    logger.infoln("Response code: " + String(resp.responseCode));
 
     if (resp.responseCode != 200)
     {
-        fileLog.errorln("Unexpected status code");
+        logger.errorln("Unexpected status code");
         return;
     }
 
     if (resp.uploadTimeMs == 0)
-        fileLog.warningln("Upload completed too fast to measure");
+        logger.warningln("Upload completed too fast to measure");
     else
-        fileLog.infoln("Upload test complete. Estimated speed: " +
+        logger.infoln("Upload test complete. Estimated speed: " +
             String(static_cast<uint64_t>(fileSize) * 1000 / resp.uploadTimeMs) + " B/s");
 
     const ulong downloadStartMs = millis();
@@ -292,9 +292,9 @@ void HelperUtils::performConnectionSpeedTest(ApiClient& api, const size_t fileSi
     const ulong downloadTimeMs = millis() - downloadStartMs;
 
     if (downloadTimeMs == 0)
-        fileLog.warningln("Download completed too fast to measure");
+        logger.warningln("Download completed too fast to measure");
     else
-        fileLog.infoln("Download test complete. Estimated speed: " +
+        logger.infoln("Download test complete. Estimated speed: " +
             String(static_cast<uint64_t>(downloadedBytes) * 1000 / downloadTimeMs) + " B/s");
 }
 

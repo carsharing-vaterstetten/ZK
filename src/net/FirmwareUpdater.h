@@ -1,5 +1,5 @@
 #pragma once
-#include "net/Api.h"
+#include "net/ApiClient.h"
 
 namespace FirmwareUpdater
 {

@@ -7,7 +7,7 @@
 #include <WString.h>
 #include <rom/rtc.h>
 
-#include "net/Api.h"
+#include "net/ApiClient.h"
 #include "logging/Log.h"
 #include "TinyGsmGPRS.tpp"
 

@@ -2,11 +2,11 @@
 
 #include "logging/Loggers.h"
 #include "system/SystemManager.h"
-#include "tasks/ModemService.h"
+#include "tasks/ModemTask.h"
 
 void RestartTask::setup()
 {
-    fileLog.debugln("Restart task started");
+    logger.debugln("Restart task started");
 }
 
 
@@ -22,7 +22,7 @@ void RestartTask::run()
     if (msg == nullptr)
     {
         restartTargetTimeMs = dayMillis;
-        fileLog.warningln("Failed to get network time in time. Next restart in 24h");
+        logger.warningln("Failed to get network time in time. Next restart in 24h");
     }
     else
     {
@@ -30,7 +30,7 @@ void RestartTask::run()
         restartTargetTimeMs = calculateTimeTillRestart(time.hour, time.minute, time.second);
     }
 
-    fileLog.infoln("Next restart planned in " + String(restartTargetTimeMs / 60000) + " minutes");
+    logger.infoln("Next restart planned in " + String(restartTargetTimeMs / 60000) + " minutes");
 
     SystemManager::ReportReadyForRestart(m_id);
 
@@ -44,7 +44,7 @@ void RestartTask::run()
 
     SystemManager::ReportUnReadyForRestart(m_id);
 
-    fileLog.infoln("Time reached to upload log and restart ESP32");
+    logger.infoln("Time reached to upload log and restart ESP32");
 
     // The nightly flush must not be dropped, so these get no deadline and a
     // patient enqueue: losing them means losing a day of GPS data and logs.

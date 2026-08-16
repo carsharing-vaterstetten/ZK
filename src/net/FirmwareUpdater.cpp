@@ -3,7 +3,7 @@
 #include <Update.h>
 
 #include "system/SystemManager.h"
-#include "net/Api.h"
+#include "net/ApiClient.h"
 #include "config/Backend.h"
 #include "hal/Modem.h"
 #include "config/Intern.h"
@@ -17,7 +17,7 @@ void onDownloadProgress(const size_t progress, const size_t total)
 {
     if (progress >= nextDownloadProgressPrint)
     {
-        fileLog.debugln("Downloaded " + String(progress) + " B of the Update");
+        logger.debugln("Downloaded " + String(progress) + " B of the Update");
 
         nextDownloadProgressPrint = progress + total / 10;
     }
@@ -25,38 +25,38 @@ void onDownloadProgress(const size_t progress, const size_t total)
 
 ApiResponse checkForUpdate(ApiClient& api)
 {
-    fileLog.infoln("Checking for firmware update");
+    logger.infoln("Checking for firmware update");
     const HttpRequest req = HttpRequest::get(LATEST_FIRMWARE_DOWNLOAD_PATH "?fm_version=" FIRMWARE_VERSION);
     const ApiResponse resp = api.makeRequest(req);
-    if (!resp.valid) fileLog.errorln("Request failed");
+    if (!resp.valid) logger.errorln("Request failed");
     return resp;
 }
 
 bool isUpdateAvailable(const ApiResponse& resp)
 {
-    fileLog.infoln("Response code: " + String(resp.responseCode));
+    logger.infoln("Response code: " + String(resp.responseCode));
     if (resp.responseCode == 204)
     {
-        fileLog.infoln("Already running latest firmware");
+        logger.infoln("Already running latest firmware");
         return false;
     }
     if (resp.responseCode != 200)
     {
-        fileLog.errorln("Unexpected status code. Failed to check for update");
+        logger.errorln("Unexpected status code. Failed to check for update");
         return false;
     }
-    fileLog.infoln("Newer version available");
+    logger.infoln("Newer version available");
     return true;
 }
 
 bool prepareUpdate(const ApiResponse& resp)
 {
     const size_t updateSize = resp.bodyLength;
-    fileLog.infoln("Update size: " + String(updateSize) + " B");
+    logger.infoln("Update size: " + String(updateSize) + " B");
 
     if (!Update.begin(updateSize))
     {
-        fileLog.errorln("Not enough space for OTA");
+        logger.errorln("Not enough space for OTA");
         return false;
     }
 
@@ -64,13 +64,13 @@ bool prepareUpdate(const ApiResponse& resp)
     {
         if (!Update.setMD5(resp.headers.at("x-md5").c_str()))
         {
-            fileLog.errorln("Failed to set MD5. Update canceled");
+            logger.errorln("Failed to set MD5. Update canceled");
             return false;
         }
     }
     else
     {
-        fileLog.warningln("MD5 header not found. Skipping MD5 verification.");
+        logger.warningln("MD5 header not found. Skipping MD5 verification.");
     }
 
     nextDownloadProgressPrint = 0;
@@ -83,7 +83,7 @@ bool writeFirmware(const ApiResponse& resp)
     const size_t written = Update.writeStream(resp.body);
     if (written != resp.bodyLength)
     {
-        fileLog.errorln("Write failed. Written " + String(written) + " B / " + String(resp.bodyLength) + " B");
+        logger.errorln("Write failed. Written " + String(written) + " B / " + String(resp.bodyLength) + " B");
         return false;
     }
     return true;
@@ -93,12 +93,12 @@ bool finalizeUpdate()
 {
     if (!Update.end())
     {
-        fileLog.errorln("Update failed: " + String(Update.getError()));
+        logger.errorln("Update failed: " + String(Update.getError()));
         return false;
     }
     if (!Update.isFinished())
     {
-        fileLog.errorln("Update not finished?");
+        logger.errorln("Update not finished?");
         return false;
     }
     return true;
@@ -109,12 +109,12 @@ void FirmwareUpdater::doUpdateIfAvailable(ApiClient& api)
 {
     const ApiResponse resp = checkForUpdate(api);
     if (!resp.valid || !isUpdateAvailable(resp)) return;
-    fileLog.infoln("Performing OTA update");
+    logger.infoln("Performing OTA update");
 
     if (!prepareUpdate(resp)) return;
     if (!writeFirmware(resp)) return;
     if (!finalizeUpdate()) return;
 
-    fileLog.infoln("Update complete. Requesting restart");
+    logger.infoln("Update complete. Requesting restart");
     SystemManager::TriggerSystemHotRestart();
 }

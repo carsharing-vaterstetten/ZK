@@ -1,4 +1,4 @@
-#include "net/Api.h"
+#include "net/ApiClient.h"
 
 #include <utility>
 
@@ -38,7 +38,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     if (err != 0)
     {
-        fileLog.errorln("Request failed with code " + String(err));
+        logger.errorln("Request failed with code " + String(err));
         return ApiResponse::failed();
     }
 
@@ -64,7 +64,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
     {
         if (hasTimedOut())
         {
-            fileLog.errorln("Timeout during body upload");
+            logger.errorln("Timeout during body upload");
             state = ApiClientState::None;
             return ApiResponse::failed();
         }
@@ -82,7 +82,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
         {
             if (hasTimedOut())
             {
-                fileLog.errorln("Timeout during write retry");
+                logger.errorln("Timeout during write retry");
                 state = ApiClientState::None;
                 return ApiResponse::failed();
             }
@@ -111,7 +111,7 @@ ApiResponse ApiClient::makeRequest(const HttpRequest& request, const bool ignore
 
     if (responseCode <= 0)
     {
-        fileLog.errorln("Response code " + String(responseCode));
+        logger.errorln("Response code " + String(responseCode));
         return ApiResponse::failed();
     }
 
@@ -156,7 +156,7 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
     {
         if (millis() - start > timeout * 1000)
         {
-            fileLog.errorln("Timeout during fetch");
+            logger.errorln("Timeout during fetch");
             break;
         }
 

@@ -1,10 +1,10 @@
 #pragma once
 #include "system/SystemManager.h"
-#include "tasks/CardReaderService.h"
-#include "tasks/KeyControlService.h"
+#include "tasks/CardReaderTask.h"
+#include "tasks/KeyControlTask.h"
 #include "LedSchedulerTask.h"
-#include "tasks/ModemService.h"
-#include "domain/GPSAlg.h"
+#include "tasks/ModemTask.h"
+#include "domain/TripTracker.h"
 #include "domain/RFIDs.h"
 
 struct ScanResult;
@@ -12,12 +12,12 @@ struct ScanResult;
 class AccessControlTask : public SystemThread
 {
 public:
-    AccessControlTask(const RFIDs& rfidsManager, GPSAlg& gpsAlg,
-                      KeyControlService& keyControlService, AccessStatus& accessStatus,
-                      LedSchedulerTask& led, ModemService& modem, const CardReaderService& cardReader)
+    AccessControlTask(const RFIDs& rfidsManager, TripTracker& tripTracker,
+                      KeyControlTask& keyControlTask, AccessStatus& accessStatus,
+                      LedSchedulerTask& led, ModemTask& modem, const CardReaderTask& cardReader)
         : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask, 0),
           rfidsManager(rfidsManager),
-          gpsAlg(gpsAlg), keyControlService(keyControlService), accessStatus(accessStatus), led(led), modem(modem),
+          tripTracker(tripTracker), keyControlTask(keyControlTask), accessStatus(accessStatus), led(led), modem(modem),
           cardReader(cardReader)
     {
         SystemManager::RegisterThread(this);
@@ -76,14 +76,14 @@ private:
     std::atomic<bool> m_running = true;
 
     const RFIDs& rfidsManager;
-    GPSAlg& gpsAlg;
-    KeyControlService& keyControlService;
+    TripTracker& tripTracker;
+    KeyControlTask& keyControlTask;
     AccessStatus& accessStatus;
     LedSchedulerTask& led;
-    ModemService& modem;
-    const CardReaderService& cardReader;
+    ModemTask& modem;
+    const CardReaderTask& cardReader;
 
-    void doThings(uint32_t rfidUid);
+    void handleScannedCard(uint32_t rfidUid);
 
     /// Blocks until the card has been away from the reader for
     /// `cardRemovalCooldown`, prompting once it is clear the user has left it

@@ -1,28 +1,28 @@
 #include "AccessControlTask.h"
 
-#include "tasks/CardReaderService.h"
+#include "tasks/CardReaderTask.h"
 #include "logging/Loggers.h"
 
-void AccessControlTask::doThings(const uint32_t rfidUid)
+void AccessControlTask::handleScannedCard(const uint32_t rfidUid)
 {
     if (!rfidsManager.isRegisteredRFID(rfidUid))
     {
-        fileLog.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
+        logger.infoln("Scanned unknown RFID card: '" + String(rfidUid, 16) + "'");
         led.queueCardDeclinedFlash();
         return;
     }
 
-    fileLog.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
+    logger.infoln("Scanned known RFID card: '" + String(rfidUid, 16) + "'");
 
     if (!accessStatus.isLoggedIn())
     {
         // Don't signal success for a key command that never made it to the key
         // task — the LED is the only thing telling the user whether the car
         // actually reacted. (This still only proves it was queued; see note in
-        // KeyControlService about confirming the sequence itself.)
-        if (!keyControlService.unlock())
+        // KeyControlTask about confirming the sequence itself.)
+        if (!keyControlTask.unlock())
         {
-            fileLog.errorln("Failed to queue unlock");
+            logger.errorln("Failed to queue unlock");
             led.queueCardDeclinedFlash();
             return;
         }
@@ -30,25 +30,25 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
         led.queueUnlockFlash();
         accessStatus.setLoginData(rfidUid);
 
-        fileLog.infoln("Car unlocked");
+        logger.infoln("Car unlocked");
 
         if (rfidsManager.RFIDConsentsToGPSTrackingTest(rfidUid))
         {
             modem.sendRequest(ModemTaskCommand::Wakeup, gpsWakeupTimeToLive);
             modem.sendRequest(ModemTaskCommand::EnableGPS, gpsWakeupTimeToLive);
 
-            if (!gpsAlg.isTripActive())
+            if (!tripTracker.isTripActive())
             {
-                gpsAlg.startTrip();
-                fileLog.infoln("Trip started");
+                tripTracker.startTrip();
+                logger.infoln("Trip started");
             }
         }
     }
     else
     {
-        if (!keyControlService.lock())
+        if (!keyControlTask.lock())
         {
-            fileLog.errorln("Failed to queue lock");
+            logger.errorln("Failed to queue lock");
             led.queueCardDeclinedFlash();
             return;
         }
@@ -56,12 +56,12 @@ void AccessControlTask::doThings(const uint32_t rfidUid)
         led.queueLockFlash();
         accessStatus.clrLoginData();
 
-        fileLog.infoln("Car locked");
+        logger.infoln("Car locked");
 
-        if (gpsAlg.isTripActive())
+        if (tripTracker.isTripActive())
         {
-            const float traveledDistance = gpsAlg.endTrip();
-            fileLog.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
+            const float traveledDistance = tripTracker.endTrip();
+            logger.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
         }
     }
 }
@@ -153,7 +153,7 @@ void AccessControlTask::OnCommand(SystemCommand cmd)
 
 void AccessControlTask::setup()
 {
-    fileLog.debugln("Card scanner task started");
+    logger.debugln("Card scanner task started");
 }
 
 void AccessControlTask::run()
@@ -165,12 +165,12 @@ void AccessControlTask::run()
 
         if (xTaskGetTickCount() - scan->ts > scanFreshnessWindow) continue;
 
-        doThings(scan->uid);
+        handleScannedCard(scan->uid);
 
         waitForCardRemoval();
     }
 
-    fileLog.debugln("Card scanner task ended");
+    logger.debugln("Card scanner task ended");
 
     SystemManager::ReportReadyForRestart(m_id);
 }

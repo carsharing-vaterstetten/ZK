@@ -1,6 +1,6 @@
-#include "tasks/CardReaderService.h"
+#include "tasks/CardReaderTask.h"
 
-void CardReaderService::OnCommand(const SystemCommand cmd)
+void CardReaderTask::OnCommand(const SystemCommand cmd)
 {
     switch (cmd)
     {
@@ -16,7 +16,7 @@ void CardReaderService::OnCommand(const SystemCommand cmd)
     }
 }
 
-std::optional<ScanResult> CardReaderService::waitForScanResult(const TickType_t timeout) const
+std::optional<ScanResult> CardReaderTask::waitForScanResult(const TickType_t timeout) const
 {
     ScanResult result{};
     if (xQueueReceive(scanResultQueue, &result, timeout) == pdTRUE)
@@ -24,12 +24,12 @@ std::optional<ScanResult> CardReaderService::waitForScanResult(const TickType_t 
     return std::nullopt;
 }
 
-void CardReaderService::setup()
+void CardReaderTask::setup()
 {
     cardReader.connect();
 }
 
-void CardReaderService::run()
+void CardReaderTask::run()
 {
     ScanResult scanResult{};
 

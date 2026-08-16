@@ -39,12 +39,12 @@ void SystemThread::TaskHook(void* pvParams)
 {
     auto* instance = static_cast<SystemThread*>(pvParams);
 
-    fileLog.debugln("Task " + String(instance->name) + " started");
+    logger.debugln("Task " + String(instance->name) + " started");
 
     instance->setup();
     instance->run();
 
-    fileLog.debugln("Task " + String(instance->name) + " ended");
+    logger.debugln("Task " + String(instance->name) + " ended");
 
     instance->m_taskHandle = nullptr;
     vTaskDelete(nullptr);

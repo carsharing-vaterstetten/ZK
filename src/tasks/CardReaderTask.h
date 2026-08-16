@@ -3,7 +3,7 @@
 
 #include "system/SystemThread.h"
 #include "system/SystemManager.h"
-#include "hal/NFCCardReader.h"
+#include "hal/NfcReader.h"
 
 struct ScanResult
 {
@@ -11,11 +11,11 @@ struct ScanResult
     uint32_t uid;
 };
 
-class CardReaderService : public SystemThread
+class CardReaderTask : public SystemThread
 {
 public:
-    explicit CardReaderService(NFCCardReader& cardReader) : SystemThread(SystemThreadId::CardReaderService, "CRS", 4096,
-                                                                         ThreadPriority::CardReaderService, 0),
+    explicit CardReaderTask(NfcReader& cardReader) : SystemThread(SystemThreadId::CardReaderTask, "CRS", 4096,
+                                                                         ThreadPriority::CardReaderTask, 0),
                                                             cardReader(cardReader)
     {
         SystemManager::RegisterThread(this);
@@ -31,7 +31,7 @@ protected:
 private:
     std::atomic<bool> m_running = true;
 
-    NFCCardReader& cardReader;
+    NfcReader& cardReader;
 
     QueueHandle_t scanResultQueue = xQueueCreate(1, sizeof(ScanResult));
 };

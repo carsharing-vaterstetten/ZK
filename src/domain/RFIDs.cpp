@@ -6,7 +6,7 @@
 #include "config/Backend.h"
 #include "logging/Loggers.h"
 #include "util/HelperUtils.h"
-#include "util/LittleFSHelper.h"
+#include "util/Files.h"
 
 
 RFIDs::RFIDs(const char* filePath, const char* tmpFilePath, const char* gpsFilePath, const char* tmpGpsFilePath) :
@@ -46,7 +46,7 @@ bool RFIDs::loadFromFileToRam()
 {
     if (!LittleFS.exists(filePath))
     {
-        fileLog.errorln("Failed to load UIDs to RAM, file does not exist");
+        logger.errorln("Failed to load UIDs to RAM, file does not exist");
         return false;
     }
 
@@ -54,7 +54,7 @@ bool RFIDs::loadFromFileToRam()
 
     if (!f)
     {
-        fileLog.errorln("Failed to open rfid file for reading");
+        logger.errorln("Failed to open rfid file for reading");
         return false;
     }
 
@@ -67,7 +67,7 @@ bool RFIDs::loadFromFileToRam()
     f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
     f.close();
 
-    fileLog.debugln("Sorting RFIDs...");
+    logger.debugln("Sorting RFIDs...");
 
     std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
 
@@ -77,7 +77,7 @@ bool RFIDs::loadFromFileToRam()
         rfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
     }
 
-    fileLog.infoln(
+    logger.infoln(
         "Loaded and sorted " + String(rfids->size()) + " UIDs (consumes " + rfids->capacity() * uidSize + " B)");
 
     return true;
@@ -87,7 +87,7 @@ bool RFIDs::loadFromGpsFileToRam()
 {
     if (!LittleFS.exists(gpsFilePath))
     {
-        fileLog.errorln("Failed to load GPS UIDs to RAM, file does not exist");
+        logger.errorln("Failed to load GPS UIDs to RAM, file does not exist");
         return false;
     }
 
@@ -95,7 +95,7 @@ bool RFIDs::loadFromGpsFileToRam()
 
     if (!f)
     {
-        fileLog.errorln("Failed to open rfid gps file for reading");
+        logger.errorln("Failed to open rfid gps file for reading");
         return false;
     }
 
@@ -108,7 +108,7 @@ bool RFIDs::loadFromGpsFileToRam()
     f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
     f.close();
 
-    fileLog.debugln("Sorting RFIDs...");
+    logger.debugln("Sorting RFIDs...");
 
     std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
 
@@ -118,7 +118,7 @@ bool RFIDs::loadFromGpsFileToRam()
         gpsRfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
     }
 
-    fileLog.infoln(
+    logger.infoln(
         "Loaded and sorted " + String(gpsRfids->size()) + " UIDs (consumes " + gpsRfids->capacity() * uidSize + " B)");
 
     return true;
@@ -128,7 +128,7 @@ void RFIDs::generateChecksum(uint8_t* out) const
 {
     if (!LittleFS.exists(filePath))
     {
-        fileLog.infoln("Local RFIDs file does not exist");
+        logger.infoln("Local RFIDs file does not exist");
         constexpr uint8_t empty_md5[16] = {
             0xd4, 0x1d, 0x8c, 0xd9,
             0x8f, 0x00, 0xb2, 0x04,
@@ -146,7 +146,7 @@ void RFIDs::generateChecksum(uint8_t* out) const
 
 void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 {
-    fileLog.infoln("Downloading remote RFIDs JSON");
+    logger.infoln("Downloading remote RFIDs JSON");
 
     uint8_t md5Checksum[16];
     generateChecksum(md5Checksum);
@@ -157,21 +157,21 @@ void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 
     if (!resp.valid)
     {
-        fileLog.errorln("Request failed");
+        logger.errorln("Request failed");
         return;
     }
 
-    fileLog.infoln("Response code: " + String(resp.responseCode));
+    logger.infoln("Response code: " + String(resp.responseCode));
 
     if (resp.responseCode == 304)
     {
-        fileLog.infoln("Server and local RFID UIDs are the same");
+        logger.infoln("Server and local RFID UIDs are the same");
         return;
     }
 
     if (resp.responseCode != 200)
     {
-        fileLog.errorln("Unexpected response code. Using old RFID UIDs");
+        logger.errorln("Unexpected response code. Using old RFID UIDs");
         return;
     }
 
@@ -180,28 +180,28 @@ void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 
     if (!file)
     {
-        fileLog.warningln("Failed to open temp RFIDs file. Download canceled");
+        logger.warningln("Failed to open temp RFIDs file. Download canceled");
         return;
     }
 
     resp.body.setTimeout(100000); // [ms] = 100s. Necessary for JSON parsing
 
     // Parse JSON from stream
-    fileLog.infoln("Parsing JSON stream");
+    logger.infoln("Parsing JSON stream");
     JsonDocument doc;
     const DeserializationError error = deserializeJson(doc, resp.body);
 
     if (error)
     {
-        fileLog.errorln("JSON parsing failed: " + String(error.c_str()));
+        logger.errorln("JSON parsing failed: " + String(error.c_str()));
         file.close();
-        LittleFSHelper::remove(tmpFilePath);
+        Files::remove(tmpFilePath);
         return;
     }
 
     const auto rfidsArr = doc.as<JsonArray>();
 
-    fileLog.infoln("Writing " + String(rfidsArr.size()) + " RFIDs to file");
+    logger.infoln("Writing " + String(rfidsArr.size()) + " RFIDs to file");
     for (const JsonVariant rfidVariant : rfidsArr)
     {
         const auto rfid = rfidVariant.as<uint32_t>();
@@ -210,25 +210,25 @@ void RFIDs::downloadRfidsIfChanged(ApiClient& api)
 
     file.close();
 
-    fileLog.infoln("Successfully downloaded and parsed RFIDs file");
+    logger.infoln("Successfully downloaded and parsed RFIDs file");
 
-    const bool moveSuccess = LittleFSHelper::move(tmpFilePath, filePath, true);
+    const bool moveSuccess = Files::move(tmpFilePath, filePath, true);
 
     if (moveSuccess)
         loadFromFileToRam();
 
-    fileLog.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
+    logger.logInfoOrErrorln(moveSuccess, "RFID UIDs updated successfully", "RFID UIDs not updated");
 }
 
 bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
 {
-    fileLog.infoln("Downloading remote RFIDs that consent to GPS tracking file");
+    logger.infoln("Downloading remote RFIDs that consent to GPS tracking file");
 
     File file = LittleFS.open(tmpGpsFilePath, FILE_WRITE, true);
 
     if (!file)
     {
-        fileLog.warningln("Failed to open temp RFIDs file. Download canceled");
+        logger.warningln("Failed to open temp RFIDs file. Download canceled");
         return false;
     }
 
@@ -237,15 +237,15 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
 
     if (!resp.valid)
     {
-        fileLog.warningln("Request failed");
+        logger.warningln("Request failed");
         return false;
     }
 
-    fileLog.infoln("Response code: " + String(resp.responseCode));
+    logger.infoln("Response code: " + String(resp.responseCode));
 
     if (resp.responseCode != 200)
     {
-        fileLog.errorln("Unexpected response code " + String(resp.responseCode));
+        logger.errorln("Unexpected response code " + String(resp.responseCode));
         return false;
     }
 
@@ -255,17 +255,17 @@ bool RFIDs::downloadGPSTrackingConsentedRFIDs(ApiClient& api)
 
     if (bytesDownloaded != resp.bodyLength)
     {
-        fileLog.errorln(
+        logger.errorln(
             "Downloaded size (" + String(bytesDownloaded) + " B) does not match content size (" +
             String(resp.bodyLength) + " B). GPS UIDs not updated");
-        LittleFSHelper::remove(tmpGpsFilePath);
+        Files::remove(tmpGpsFilePath);
         return false;
     }
 
-    fileLog.infoln("Successfully downloaded file");
+    logger.infoln("Successfully downloaded file");
 
-    const bool moveSuccess = LittleFSHelper::move(tmpGpsFilePath, gpsFilePath, true);
-    fileLog.logInfoOrErrorln(moveSuccess, "GPS RFID UIDs updated successfully", "GPS RFID UIDs not updated");
+    const bool moveSuccess = Files::move(tmpGpsFilePath, gpsFilePath, true);
+    logger.logInfoOrErrorln(moveSuccess, "GPS RFID UIDs updated successfully", "GPS RFID UIDs not updated");
 
     if (moveSuccess)
         loadFromGpsFileToRam();

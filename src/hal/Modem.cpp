@@ -3,12 +3,12 @@
 
 #include "util/HelperUtils.h"
 #include "hal/Modem.h"
-#include "net/Api.h"
+#include "net/ApiClient.h"
 #include "logging/Loggers.h"
-#include "util/LittleFSHelper.h"
+#include "util/Files.h"
 
 Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud,
-             const ModemHardwareDriver& driver) :
+             const ModemHardware& driver) :
     serialBaud(serialBaud), serial(hwSerial), gsmModem(gsmModem), driver(driver) {}
 
 void Modem::powerOn() const
@@ -16,29 +16,29 @@ void Modem::powerOn() const
     // The hardware design guide doesnt specify a delay between VBAT and PWRKEY.
     // PWRKEY rises when VBAT (modem internal pull up) is provided, then theoretically the power on sequence can be started immediately
     driver.powerOn();
-    fileLog.infoln("Modem turned on");
+    logger.infoln("Modem turned on");
 }
 
 void Modem::forcePowerCycle() const
 {
-    fileLog.warningln("Forcing Modem Power Cycle...");
+    logger.warningln("Forcing Modem Power Cycle...");
 
     driver.cutPower(); // Cut power completely (Mimic Hard Reset)
     delay(2000); // Wait for capacitors to discharge
     driver.providePower(); // Restore power
     delay(500); // Wait for voltage to stabilize
 
-    fileLog.infoln("Modem power restored");
+    logger.infoln("Modem power restored");
 }
 
 
 void Modem::wakeup()
 {
-    fileLog.debugln("Waking up modem");
+    logger.debugln("Waking up modem");
 
     if (modemIsAwake)
     {
-        fileLog.infoln("Modem already awake");
+        logger.infoln("Modem already awake");
         return;
     }
 
@@ -46,14 +46,14 @@ void Modem::wakeup()
     // delay(2000);
     gsmModem.sleepEnable(false);
     modemIsAwake = true;
-    fileLog.debugln("Modem wakeup sent");
+    logger.debugln("Modem wakeup sent");
 }
 
 bool Modem::wakeupAndWait(const uint32_t timeoutMs)
 {
     wakeup();
     const bool active = gsmModem.testAT(timeoutMs);
-    fileLog.logInfoOrErrorln(active, "Modem awake and responsive", "Modem not waking up");
+    logger.logInfoOrErrorln(active, "Modem awake and responsive", "Modem not waking up");
     return active;
 }
 
@@ -61,7 +61,7 @@ bool Modem::beginSleep()
 {
     driver.sleep();
     const bool success = gsmModem.sleepEnable(true);
-    fileLog.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
+    logger.logInfoOrWarningln(success, "Modem sent to sleep successfully", "Failed to send modem to sleep");
     if (success)
     {
         modemIsAwake = false;
@@ -84,18 +84,18 @@ SleepRequestResult Modem::requestSleep()
 
 bool Modem::enableGPS()
 {
-    fileLog.debugln("Enabling GPS...");
+    logger.debugln("Enabling GPS...");
 
     if (gsmModem.isEnableGPS()) // not necessary?
     {
         gpsIsEnabled = true;
-        fileLog.debugln("GPS already enabled");
+        logger.debugln("GPS already enabled");
         return true;
     }
 
     const bool success = gsmModem.enableGPS(48, 1); // TODO: set pins in hw config
 
-    fileLog.logInfoOrCriticalErrorln(success, "Enabled GPS", "Failed to enable GPS");
+    logger.logInfoOrCriticalErrorln(success, "Enabled GPS", "Failed to enable GPS");
 
     if (success)
     {
@@ -125,14 +125,14 @@ bool Modem::connect(const char* simPin, const char* user, const char* password, 
     // Check if we are coming from a soft restart or a hard power-up
     if (reason == ESP_RST_SW)
     {
-        fileLog.infoln("Modem Hot Start");
+        logger.infoln("Modem Hot Start");
         if (beginHot(simPin)) return true;
 
-        fileLog.warningln("Hot Start failed, attempting Cold Start fallback...");
+        logger.warningln("Hot Start failed, attempting Cold Start fallback...");
     }
     else
     {
-        fileLog.infoln("Modem Cold Start");
+        logger.infoln("Modem Cold Start");
     }
 
     return beginCold(simPin, retries);
@@ -145,7 +145,7 @@ bool Modem::beginHot(const char* simPin)
 
     if (success)
     {
-        fileLog.infoln("Modem already active at " + String(detectedBaud) + " baud.");
+        logger.infoln("Modem already active at " + String(detectedBaud) + " baud.");
         successfulHotstart = finishInit(simPin, detectedBaud);
     }
     else
@@ -158,7 +158,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
 {
     for (uint attempt = 0; attempt <= retries; ++attempt)
     {
-        fileLog.infoln("Cold Start Attempt " + String(attempt + 1));
+        logger.infoln("Cold Start Attempt " + String(attempt + 1));
 
         // If the modem was already running, turnOff() ensures a clean start.
         // If it was already off, this pulse might be ignored or act as a toggle.
@@ -167,21 +167,21 @@ bool Modem::beginCold(const char* simPin, const uint retries)
         // delay(1000);
         powerOn(); // Pulse PWRKEY to boot
 
-        serialOnlyLog.debugln("Waiting for RDY");
+        serialLogger.debugln("Waiting for RDY");
         bool a = waitForRDY(10000); // TODO: also needed for hot start?
-        serialOnlyLog.debugln("Got " + String(a));
+        serialLogger.debugln("Got " + String(a));
         /*
-        serialOnlyLog.debugln("Waiting for CFUN");
+        serialLogger.debugln("Waiting for CFUN");
         a = gsmModem.waitResponse(10000, "CFUN");
-        serialOnlyLog.debugln("Got " + String(a));
+        serialLogger.debugln("Got " + String(a));
 
-        serialOnlyLog.debugln("Waiting for CPIN");
+        serialLogger.debugln("Waiting for CPIN");
         a = gsmModem.waitResponse(10000, "CPIN");
-        serialOnlyLog.debugln("Got " + String(a));
+        serialLogger.debugln("Got " + String(a));
 
-        serialOnlyLog.debugln("Waiting for SMS ready");
+        serialLogger.debugln("Waiting for SMS ready");
         a = gsmModem.waitResponse(10000, "SMS Ready");
-        serialOnlyLog.debugln("Got " + String(a));
+        serialLogger.debugln("Got " + String(a));
 */
         // The SIM7000 takes ~4.5s to start its serial interface.
         // We use autoBaud with a 10-second timeout to catch it as it wakes up.
@@ -190,7 +190,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
         if (success)
             return finishInit(simPin, detectedBaud);
 
-        fileLog.errorln("Modem failed to boot. Hard cycling power rail...");
+        logger.errorln("Modem failed to boot. Hard cycling power rail...");
 
         // Physical recovery: Cut VCC rail to the modem
         forcePowerCycle();
@@ -200,7 +200,7 @@ bool Modem::beginCold(const char* simPin, const uint retries)
 
 std::tuple<bool, ulong> Modem::autoBaud(const uint32_t timeoutMs)
 {
-    fileLog.debugln("Baud rate scanning...");
+    logger.debugln("Baud rate scanning...");
 
     // 1. Try the user-defined serialBaud first
     serial.updateBaudRate(serialBaud);
@@ -219,10 +219,10 @@ std::tuple<bool, ulong> Modem::autoBaud(const uint32_t timeoutMs)
 
         if (gsmModem.testAT(500))
         {
-            fileLog.debugln("Baud rate " + String(baud) + " SUCCESS");
+            logger.debugln("Baud rate " + String(baud) + " SUCCESS");
             return {true, baud};
         }
-        fileLog.debugln("Baud rate " + String(baud) + " failed");
+        logger.debugln("Baud rate " + String(baud) + " failed");
     }
 
     return {false, 0};
@@ -233,7 +233,7 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud) const
     // If the modem is at a different baud than our target, move it.
     if (detectedBaud != serialBaud)
     {
-        fileLog.infoln("Switching modem baud from " + String(detectedBaud) + " to " + String(serialBaud));
+        logger.infoln("Switching modem baud from " + String(detectedBaud) + " to " + String(serialBaud));
         gsmModem.setBaud(serialBaud);
         delay(100);
         serial.updateBaudRate(serialBaud);
@@ -242,7 +242,7 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud) const
 
     if (!gsmModem.init(simPin))
     {
-        fileLog.errorln("gsmModem.init() failed");
+        logger.errorln("gsmModem.init() failed");
         return false;
     }
 
@@ -250,13 +250,13 @@ bool Modem::finishInit(const char* simPin, const ulong detectedBaud) const
     gsmModem.setNetworkMode(MODEM_NETWORK_LTE);
     gsmModem.setPreferredMode(MODEM_PREFERRED_CATM);
 
-    fileLog.infoln("Modem successfully initialized.");
+    logger.infoln("Modem successfully initialized.");
     return true;
 }
 
 bool Modem::connectGPRSAndNetwork(const uint retries) const
 {
-    fileLog.infoln("Connecting GPRS and network...");
+    logger.infoln("Connecting GPRS and network...");
 
     // TODO: find out best connection order. According to TinyGSM lib: gprs first. My experience: based on previous modem state
     const bool tryGprsFirst = successfulHotstart;
@@ -265,29 +265,29 @@ bool Modem::connectGPRSAndNetwork(const uint retries) const
 
     if (gprsSuccess && networkSuccess)
     {
-        fileLog.infoln("GPRS and network are already connected");
+        logger.infoln("GPRS and network are already connected");
         return true;
     }
 
     auto gprs = [this]()-> bool
     {
-        fileLog.infoln("Connecting GPRS...");
+        logger.infoln("Connecting GPRS...");
         const bool success = gsmModem.gprsConnect(apn, gprsUser, gprsPassword);
-        fileLog.logInfoOrWarningln(success, "GPRS connected successfully", "Failed to connect GPRS");
+        logger.logInfoOrWarningln(success, "GPRS connected successfully", "Failed to connect GPRS");
         return success;
     };
 
     auto network = [this]()-> bool
     {
-        fileLog.infoln("Connecting network...");
+        logger.infoln("Connecting network...");
         const bool success = gsmModem.waitForNetwork();
-        fileLog.logInfoOrWarningln(success, "Network connected successfully", "Failed to connect network");
+        logger.logInfoOrWarningln(success, "Network connected successfully", "Failed to connect network");
         return success;
     };
 
     for (uint attempt = 0; attempt <= retries; ++attempt)
     {
-        fileLog.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
+        logger.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
         if (tryGprsFirst && !gprsSuccess)
             gprsSuccess = gprs();
@@ -313,35 +313,35 @@ bool Modem::ensureNetworkConnection(const uint maxRetries) const
 
     for (uint attempt = 0; attempt < maxRetries && signalQuality == 99; ++attempt)
     {
-        fileLog.debugln("Waiting for signal...");
+        logger.debugln("Waiting for signal...");
         delay(2000);
         signalQuality = gsmModem.getSignalQuality();
     }
 
     if (signalQuality == 99)
     {
-        fileLog.errorln("Could not get signal");
+        logger.errorln("Could not get signal");
         return false;
     }
 
-    fileLog.debugln("Got signal");
+    logger.debugln("Got signal");
 
     return true;
 }
 
 bool Modem::disconnectNetwork() const
 {
-    fileLog.debugln("Disconnecting GPRS...");
+    logger.debugln("Disconnecting GPRS...");
 
     if (!gsmModem.isGprsConnected())
     {
-        fileLog.infoln("GPRS already disconnected");
+        logger.infoln("GPRS already disconnected");
         return true;
     }
 
     const bool success = gsmModem.gprsDisconnect();
 
-    fileLog.logInfoOrErrorln(success, "GPRS disconnected successfully", "GPRS failed to disconnect");
+    logger.logInfoOrErrorln(success, "GPRS disconnected successfully", "GPRS failed to disconnect");
 
     return success;
 }
@@ -369,7 +369,7 @@ UploadAndRetryResult Modem::uploadDataAndRetry(ApiClient& api, const char* endpo
             return attemptNo == 0 ? UploadAndRetryResult::SUCCESS : UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
         }
 
-        fileLog.errorln(
+        logger.errorln(
             "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
             " failed at uploading to " + endpoint);
 
@@ -386,7 +386,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* 
 {
     if (!f)
     {
-        fileLog.errorln("Failed to open file");
+        logger.errorln("Failed to open file");
         return UploadFileAndRetryResult::FAILED_TO_OPEN_FILE;
     }
 
@@ -395,30 +395,30 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* 
 
     if (fileSize <= 0)
     {
-        fileLog.infoln(filePath + " is empty. Nothing to upload");
+        logger.infoln(filePath + " is empty. Nothing to upload");
         return UploadFileAndRetryResult::FILE_IS_EMPTY;
     }
 
-    fileLog.infoln("Uploading " + filePath + " (" + String(fileSize) + " B)");
+    logger.infoln("Uploading " + filePath + " (" + String(fileSize) + " B)");
 
     const UploadAndRetryResult uploadResult = uploadDataAndRetry(api, endpoint, f, fileSize, retries);
 
     switch (uploadResult)
     {
     case UploadAndRetryResult::FAILED:
-        fileLog.errorln("Failed to upload " + filePath);
+        logger.errorln("Failed to upload " + filePath);
         break;
     case UploadAndRetryResult::SUCCESS_AFTER_RETRYING:
     case UploadAndRetryResult::SUCCESS:
-        fileLog.infoln(filePath + " uploaded successfully");
+        logger.infoln(filePath + " uploaded successfully");
         break;
     }
 
     if (deleteAfterRetrying || (uploadResult == UploadAndRetryResult::SUCCESS && deleteIfSuccess))
     {
         f.close();
-        const bool removeSuccess = LittleFSHelper::remove(filePath);
-        fileLog.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
+        const bool removeSuccess = Files::remove(filePath);
+        logger.logInfoOrErrorln(removeSuccess, "Deleted " + filePath + " successfully",
                                  "Failed to delete " + filePath);
     }
 
@@ -441,7 +441,7 @@ UploadFileAndRetryResult Modem::uploadFileAndDelete(ApiClient& api, const char* 
 {
     if (!LittleFS.exists(filePath))
     {
-        fileLog.errorln(String(filePath) + " does not exist");
+        logger.errorln(String(filePath) + " does not exist");
         return UploadFileAndRetryResult::FILE_DOES_NOT_EXIST;
     }
 
