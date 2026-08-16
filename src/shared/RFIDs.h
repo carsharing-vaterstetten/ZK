@@ -21,8 +21,6 @@ class RFIDs
 {
 public:
     RFIDs(const char* filePath, const char* tmpFilePath, const char* gpsFilePath, const char* tmpGpsFilePath);
-    std::shared_ptr<const std::vector<uint32_t>> getUids() const;
-    std::shared_ptr<const std::vector<uint32_t>> getGPSUids() const;
 
     bool isRegisteredRFID(uint32_t rfid) const;
     void downloadRfidsIfChanged(ApiClient& api);
@@ -32,6 +30,8 @@ public:
     bool loadFromGpsFileToRam();
 
 protected:
+    std::shared_ptr<const std::vector<uint32_t>> getUids() const;
+    std::shared_ptr<const std::vector<uint32_t>> getGPSUids() const;
     void generateChecksum(uint8_t* out) const;
 
     std::shared_ptr<const std::vector<uint32_t>> rfids;

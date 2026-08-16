@@ -86,15 +86,11 @@ struct ModemRequest
 class ModemService : public SystemThread
 {
 public:
-    ModemService(const BoardConfig& board, const LocalConfig& config, RFIDs& rfidsManager,
-                 SwappableFile& swLog, const AccessStatus& accessStatus, Modem& modem,
-                 GPS& gps, ApiClient& api, ImeiStore& imeiStore) : SystemThread(SystemThreadId::ModemService,
-                                                                       "MODEMSER", 8192, ThreadPriority::ModemService,
-                                                                       1), board(board),
-                                                                   config(config), accessStatus(accessStatus),
-                                                                   modem(modem), rfidsManager(rfidsManager),
-                                                                   gps(gps), swLog(swLog), api(api),
-                                                                   imeiStore(imeiStore)
+    ModemService(const LocalConfig& config, RFIDs& rfidsManager, SwappableFile& swLog, Modem& modem,
+                 GPS& gps, ApiClient& api, ImeiStore& imeiStore)
+        : SystemThread(SystemThreadId::ModemService, "MODEMSER", 8192, ThreadPriority::ModemService, 1),
+          config(config), modem(modem), rfidsManager(rfidsManager),
+          gps(gps), swLog(swLog), api(api), imeiStore(imeiStore)
     {
         SystemManager::RegisterThread(this);
     }
@@ -157,9 +153,7 @@ private:
     std::multimap<ModemTxDataType, ModemTxMessage*> m_shelvedMessages;
     std::mutex m_shelfMutex;
 
-    const BoardConfig& board;
     const LocalConfig& config;
-    const AccessStatus& accessStatus;
     Modem& modem;
     RFIDs& rfidsManager;
     GPS& gps;

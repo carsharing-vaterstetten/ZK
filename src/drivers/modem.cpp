@@ -28,13 +28,6 @@ void ModemHardwareDriver::powerOn() const
     digitalWrite(board.modemPwrKey, LOW);
 }
 
-void ModemHardwareDriver::powerOff() const
-{
-    digitalWrite(board.modemPwrKey, HIGH);
-    delay(board.modemPowerOffPulseWidthMs);
-    digitalWrite(board.modemPwrKey, LOW);
-}
-
 void ModemHardwareDriver::wakeup() const
 {
     digitalWrite(board.modemDtr, LOW);

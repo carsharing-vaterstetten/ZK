@@ -1,7 +1,5 @@
 #include "CardReaderService.h"
 
-#include "shared/SharedData.h"
-
 void CardReaderService::OnCommand(const SystemCommand cmd)
 {
     switch (cmd)

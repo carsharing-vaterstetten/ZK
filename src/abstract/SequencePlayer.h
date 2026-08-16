@@ -14,11 +14,6 @@ struct SequencePoint
     std::function<void()> func;
 };
 
-enum SequenceEndStyle
-{
-    ClearOrMoveToNextSequenceAfterDelay
-};
-
 class SequencePlayer
 {
 public:
@@ -44,64 +39,6 @@ public:
 
 private:
     const std::vector<SequencePoint> sequence;
-
-    static void applySequencePoint(const SequencePoint& point)
-    {
-        point.func();
-    }
-};
-
-class AsyncSequencePlayer
-{
-public:
-    explicit AsyncSequencePlayer(std::vector<SequencePoint> sequence)
-        : sequence(std::move(sequence)), currentIndex(0), nextWakeTick(0), isPlaying(false) {}
-
-    void start()
-    {
-        if (sequence.empty()) return;
-
-        applySequencePoint(sequence[0]);
-
-        currentIndex = 1;
-        isPlaying = (sequence.size() > 1);
-
-        if (isPlaying)
-            nextWakeTick = xTaskGetTickCount() + pdMS_TO_TICKS(sequence[1].timestamp - sequence[0].timestamp);
-    }
-
-    void update()
-    {
-        if (!isPlaying) return;
-
-        const TickType_t currentTick = xTaskGetTickCount();
-
-        while (isPlaying && (static_cast<long>(currentTick - nextWakeTick) >= 0))
-        {
-            applySequencePoint(sequence[currentIndex]);
-            currentIndex++;
-
-            if (currentIndex < sequence.size())
-            {
-                const TickType_t idealDelay = pdMS_TO_TICKS(
-                    sequence[currentIndex].timestamp - sequence[currentIndex - 1].timestamp);
-                nextWakeTick += idealDelay;
-            }
-            else
-                isPlaying = false;
-        }
-    }
-
-    [[nodiscard]] bool running() const
-    {
-        return isPlaying;
-    }
-
-private:
-    const std::vector<SequencePoint> sequence;
-    size_t currentIndex;
-    TickType_t nextWakeTick;
-    bool isPlaying;
 
     static void applySequencePoint(const SequencePoint& point)
     {

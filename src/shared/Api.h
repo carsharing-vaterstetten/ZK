@@ -46,8 +46,6 @@ public:
     }
 
 private:
-    mutable std::mutex mtx;
-
     std::atomic<ApiClientState> state;
     std::atomic<ApiClientProgress> progress;
 

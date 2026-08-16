@@ -7,12 +7,6 @@ void AccessStatus::begin()
     prefs.begin(storageName, false);
 }
 
-void AccessStatus::end()
-{
-    std::lock_guard lock(mtx);
-    prefs.end();
-}
-
 void AccessStatus::loadToRAM()
 {
     std::lock_guard lock(mtx);

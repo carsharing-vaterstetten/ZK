@@ -113,25 +113,9 @@ bool SwappableFile::appendBToAAndSwapToA(const bool deleteBAfterwards)
     return appendSuccess;
 }
 
-bool SwappableFile::replaceAwithBAndSwapToA()
-{
-    if (currentLogFile)
-        currentLogFile->close();
-    LittleFSHelper::move(fileBPath, fileAPath, true);
-    return swapToA();
-}
-
 bool SwappableFile::swapToB()
 {
     return swapToPath(fileBPath);
-}
-
-bool SwappableFile::swap()
-{
-    if (isA)
-        return swapToB();
-
-    return swapToA();
 }
 
 std::optional<FileInfo> SwappableFile::getCurrentFileInfo() const {

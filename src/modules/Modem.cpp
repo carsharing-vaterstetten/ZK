@@ -19,36 +19,6 @@ void Modem::powerOn() const
     fileLog.infoln("Modem turned on");
 }
 
-void Modem::powerOff(PowerOffMethod method) const
-{
-    /**
-    the following methods can be used to power off SIM7000.
-    - Method 1: Power off SIM7000 by pulling the PWRKEY pin to ground.
-    - Method 2: Power off SIM7000 by AT command “AT+CPOWD=1”.
-    - Method 3: over-voltage or under-voltage automatic power off. The functioncan be enabled by AT
-    command “AT+CBATCHK=1”. Default is disabled.
-     */
-
-    fileLog.debugln("Powering off modem...");
-
-    switch (method)
-    {
-    case PowerOffMethod::UartCommand:
-        {
-            const bool success = gsmModem.poweroff();
-            fileLog.logInfoOrErrorln(success, "Modem powered off successfully", "Failed to power off modem");
-            break;
-        }
-    case PowerOffMethod::PwrKey:
-        {
-            driver.powerOff();
-            fileLog.infoln("Modem powered off via PWRKEY");
-            break;
-        }
-    }
-}
-
-
 void Modem::forcePowerCycle() const
 {
     fileLog.warningln("Forcing Modem Power Cycle...");
@@ -135,29 +105,6 @@ bool Modem::enableGPS()
     return success;
 }
 
-
-bool Modem::disableGPS()
-{
-    fileLog.debugln("Disabling GPS...");
-
-    if (!gsmModem.isEnableGPS())
-    {
-        gpsIsEnabled = false;
-        fileLog.debugln("GPS already disabled");
-        return true;
-    }
-
-    const bool success = gsmModem.disableGPS(48, 0); // TODO: put 48 and 1 into hw config
-
-    fileLog.logInfoOrErrorln(success, "Disabled GPS", "Failed to disable GPS");
-
-    if (success)
-    {
-        gpsIsEnabled = false;
-    }
-
-    return success;
-}
 
 bool Modem::waitForRDY(uint32_t timeout_ms)
 {

@@ -17,7 +17,6 @@
 #define LOG_FILE_UPLOAD_ENDPOINT LOG_ROUTE "/upload"
 
 // Vehicle/RFIDs router
-#define REMOTE_RFID_MD5_CHECKSUM_PATH RFIDS_ROUTE "/md5-checksum"
 #define REMOTE_RFID_PATH RFIDS_ROUTE "/"
 
 // Vehicle/Other router
@@ -26,7 +25,6 @@
 // Vehicle/Firmware router
 #define LATEST_FIRMWARE_ENDPOINT FIRMWARE_ROUTE "/latest"
 #define LATEST_FIRMWARE_DOWNLOAD_PATH LATEST_FIRMWARE_ENDPOINT
-#define LATEST_FIRMWARE_SIZE_ENDPOINT LATEST_FIRMWARE_ENDPOINT "/size"
 
 // Vehicle/GPS Tracking router
 #define GPS_FILE_UPLOAD_ENDPOINT GPS_TRACKING_ROUTE "/log/upload"

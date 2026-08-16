@@ -8,8 +8,9 @@
 class StartupTask : public SystemThread
 {
 public:
-    StartupTask(ModemService& modem, ImeiStore& imeiStore, const AccessStatus& accessStatus, LedSchedulerTask& led, const ApiClient& api)
-        : SystemThread(SystemThreadId::StartupTask, "STARTUP", 4096, ThreadPriority::StartupTask, 0), modem(modem), imeiStore(imeiStore), accessStatus(accessStatus), led(led), api(api)
+    StartupTask(ModemService& modem, const AccessStatus& accessStatus, LedSchedulerTask& led, const ApiClient& api)
+        : SystemThread(SystemThreadId::StartupTask, "STARTUP", 4096, ThreadPriority::StartupTask, 0),
+          modem(modem), accessStatus(accessStatus), led(led), api(api)
     {
         SystemManager::RegisterThread(this);
     }
@@ -32,7 +33,6 @@ private:
 
     ModemService& modem;
     LedSchedulerTask& led;
-    ImeiStore& imeiStore;
     const ApiClient& api;
     const AccessStatus& accessStatus;
 };

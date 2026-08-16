@@ -2,7 +2,6 @@
 
 #include "services/CardReaderService.h"
 #include "shared/Globals.h"
-#include "shared/SharedData.h"
 
 void AccessControlTask::doThings(const uint32_t rfidUid)
 {

@@ -28,8 +28,6 @@ public:
     bool writeData(const GPS_DATA_t& data);
     void uploadFileAndBeginNew(ApiClient& api, bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
     bool begin();
-    bool flush();
-    void end();
     [[nodiscard]] size_t fileSize() const;
 
 protected:

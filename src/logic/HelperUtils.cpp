@@ -147,18 +147,6 @@ bool HelperUtils::md5File(File file, uint8_t out[16])
     return true;
 }
 
-String HelperUtils::md5ToHex(const uint8_t md5[16])
-{
-    String hex;
-    for (int i = 0; i < 16; i++)
-    {
-        char buf[3];
-        sprintf(buf, "%02x", md5[i]);
-        hex += buf;
-    }
-    return hex;
-}
-
 time_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, const int day, const int hour,
                                             const int minute, const int second, const float timezone)
 {
@@ -181,41 +169,12 @@ time_t HelperUtils::dateTimeToUnixTimestamp(const int year, const int month, con
     return time;
 }
 
-void HelperUtils::dateTimeToString(char* buf, const int year, const int month, const int day, const int hour,
-                                   const int minute, const int second)
-{
-    snprintf(buf, dateTimeStrLength, "%04d-%02d-%02d %02d:%02d:%02d",
-             year, month, day, hour, minute, second);
-}
-
 /// Same as millis() if system time is not initialized
 uint64_t HelperUtils::systemTimeMillisecondsSinceEpoche()
 {
     timeval now{};
     gettimeofday(&now, nullptr);
     return now.tv_sec * 1000ULL + now.tv_usec / 1000ULL;
-}
-
-bool HelperUtils::isSuccessfulResponse(const int statusCode)
-{
-    return statusCode < 300 && statusCode >= 200;
-}
-
-String HelperUtils::simStatusToString(const SimStatus status)
-{
-    switch (status)
-    {
-    case SIM_ERROR:
-        return "ERROR";
-    case SIM_READY:
-        return "READY";
-    case SIM_LOCKED:
-        return "LOCKED";
-    case SIM_ANTITHEFT_LOCKED:
-        return "ANTITHEFT LOCKED";
-    }
-
-    return "UNKNOWN";
 }
 
 String HelperUtils::millisToIsoString(const uint64_t ms)

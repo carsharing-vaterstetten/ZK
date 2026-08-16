@@ -2,7 +2,7 @@
 
 #include "shared/Globals.h"
 
-bool LittleFSHelper::move(const String& oldPath, const String& newPath, const bool deleteIfNewExists = false)
+bool LittleFSHelper::move(const String& oldPath, const String& newPath, const bool deleteIfNewExists)
 {
     fileLog.infoln("Moving " + oldPath + " to " + newPath);
 

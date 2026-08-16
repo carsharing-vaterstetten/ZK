@@ -1,5 +1,4 @@
 #pragma once
-#include "config/hw_config.h"
 #include "logic/SystemManager.h"
 #include "services/CardReaderService.h"
 #include "services/KeyControlService.h"
@@ -13,11 +12,11 @@ struct ScanResult;
 class AccessControlTask : public SystemThread
 {
 public:
-    AccessControlTask(const BoardConfig& board, const RFIDs& rfidsManager, GPSAlg& gpsAlg,
+    AccessControlTask(const RFIDs& rfidsManager, GPSAlg& gpsAlg,
                       KeyControlService& keyControlService, AccessStatus& accessStatus,
-                       LedSchedulerTask& led, ModemService& modem, const CardReaderService& cardReader)
+                      LedSchedulerTask& led, ModemService& modem, const CardReaderService& cardReader)
         : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask, 0),
-          board(board), rfidsManager(rfidsManager),
+          rfidsManager(rfidsManager),
           gpsAlg(gpsAlg), keyControlService(keyControlService), accessStatus(accessStatus), led(led), modem(modem),
           cardReader(cardReader)
     {
@@ -76,7 +75,6 @@ private:
 
     std::atomic<bool> m_running = true;
 
-    const BoardConfig& board;
     const RFIDs& rfidsManager;
     GPSAlg& gpsAlg;
     KeyControlService& keyControlService;

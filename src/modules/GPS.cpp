@@ -37,19 +37,6 @@ bool GPS::writeData(const GPS_DATA_t& data)
     return dataWritten == sizeof(GPS_DATA_t);
 }
 
-bool GPS::flush()
-{
-    if (!gpsFile) return false;
-    gpsFile.flush();
-    return true;
-}
-
-void GPS::end()
-{
-    if (!gpsFile) return;
-    gpsFile.close();
-}
-
 size_t GPS::fileSize() const
 {
     return gpsFile ? gpsFile.size() : 0;

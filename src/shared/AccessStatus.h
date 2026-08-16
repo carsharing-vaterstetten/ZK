@@ -13,8 +13,6 @@ public:
                                                                        rfidsManager(rfidsManager) {}
 
     void begin();
-    void end();
-
     void loadToRAM();
 
     bool isLoggedIn() const;

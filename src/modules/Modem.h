@@ -14,17 +14,6 @@
 
 class ApiClient;
 
-enum class UploadResult
-{
-    BASE_UPLOAD_RESULTS,
-};
-
-enum class UploadFileResult
-{
-    BASE_UPLOAD_RESULTS,
-    FILE_IS_EMPTY
-};
-
 enum class UploadAndRetryResult
 {
     BASE_UPLOAD_RESULTS,
@@ -48,12 +37,6 @@ enum class SleepRequestResult
     AlreadySleeping,
 };
 
-enum class PowerOffMethod
-{
-    UartCommand,
-    PwrKey,
-};
-
 class Modem
 {
 protected:
@@ -66,8 +49,6 @@ protected:
 
     const char *gprsUser = "", *gprsPassword = "", *apn = "";
 
-    static constexpr uint32_t modemPowerOnPulseWidthMs = 1000, modemPowerOffPulseWidthMs = 1300;
-
     const ModemHardwareDriver& driver;
 
     bool beginSleep();
@@ -77,11 +58,14 @@ protected:
     bool beginCold(const char* simPin, uint retries);
     bool finishInit(const char* simPin, ulong detectedBaud) const;
     void forcePowerCycle() const;
+    bool waitForRDY(uint32_t timeout_ms);
+    static ApiResponse uploadData(ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
+    static UploadAndRetryResult uploadDataAndRetry(ApiClient& api, const char* endpoint, Stream& stream,
+                                                   size_t streamLen, uint retries);
 
 public:
     Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, ulong serialBaud, const ModemHardwareDriver& driver);
 
-    void powerOff(PowerOffMethod method) const;
     void powerOn() const;
     SleepRequestResult requestSleep();
 
@@ -89,9 +73,6 @@ public:
     bool ensureNetworkConnection(uint maxRetries = 2) const;
     void wakeup();
     bool wakeupAndWait(uint32_t timeoutMs = 10000);
-    static ApiResponse uploadData(ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
-    static UploadAndRetryResult uploadDataAndRetry(ApiClient& api, const char* endpoint, Stream& stream,
-                                                   size_t streamLen, uint retries);
     static UploadFileAndRetryResult uploadFileAndDelete(ApiClient& api, const char* endpoint, File& f,
                                                         bool deleteIfSuccess, bool deleteAfterRetrying, uint retries);
     static UploadFileAndRetryResult uploadFileAndDelete(ApiClient& api, const char* endpoint,
@@ -100,24 +81,10 @@ public:
 
     bool disconnectNetwork() const;
     bool enableGPS();
-    bool disableGPS();
-    bool waitForRDY(uint32_t timeout_ms);
-
-    // Funktion fragt der locale zeit von GSM Modem ab und gibt sie als String zurück
-    // @result String - Zeitformat "24/11/03,15:01:03+04" (YY/MM/DD,HH:MM:SS+TZ)
-    [[nodiscard]] String getGSMDateTime(const TinyGSMDateTimeFormat format = DATE_FULL) const
-    {
-        return gsmModem.getGSMDateTime(format);
-    }
 
     bool getNetworkTime(int* year, int* month, int* day, int* hour, int* minute, int* second, float* timezone) const
     {
         return gsmModem.getNetworkTime(year, month, day, hour, minute, second, timezone);
-    }
-
-    void getRevision(String& model, String& revision) const
-    {
-        gsmModem.getRevision(model, revision);
     }
 
     [[nodiscard]] time_t getUnixTimestamp() const;
@@ -126,20 +93,5 @@ public:
     [[nodiscard]] String getIMEI() const
     {
         return gsmModem.getIMEI();
-    }
-
-    [[nodiscard]] int16_t getSignalQuality() const
-    {
-        return gsmModem.getSignalQuality();
-    }
-
-    [[nodiscard]] bool isSleeping() const
-    {
-        return !modemIsAwake;
-    }
-
-    [[nodiscard]] bool isGPSEnabled() const
-    {
-        return gpsIsEnabled;
     }
 };

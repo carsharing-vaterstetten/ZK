@@ -7,19 +7,6 @@
 
 #include "abstract/SequencePlayer.h"
 
-enum class StatusColor
-{
-    InitializationPhase,
-    PerformingOTAUpdate,
-    UpdatingRFIDs,
-    UploadingLogs,
-    Error,
-    CarUnlocked,
-    CarLocked,
-    NFCUnknownUIDScanned,
-    WaitingForNFCCardToBeRemoved,
-};
-
 class LED
 {
 public:
@@ -31,23 +18,6 @@ public:
 protected:
     Adafruit_NeoPixel& neo;
 };
-
-inline uint32_t getStatusColorValue(const StatusColor color)
-{
-    switch (color)
-    {
-    case StatusColor::PerformingOTAUpdate: return 0x800080;
-    case StatusColor::Error: return 0xFF0000;
-    case StatusColor::InitializationPhase: return 0xFFFFFF;
-    case StatusColor::UpdatingRFIDs: return 0xFFA500;
-    case StatusColor::UploadingLogs: return 0x0000FF;
-    case StatusColor::CarLocked: return 0xFF0000;
-    case StatusColor::CarUnlocked: return 0x00FF00;
-    case StatusColor::NFCUnknownUIDScanned: return 0xFF0000;
-    case StatusColor::WaitingForNFCCardToBeRemoved: return 0x00FFFF;
-    default: return 0;
-    }
-}
 
 /// How a driven LED command paints the strip.
 enum class LedEffect : uint8_t
@@ -260,13 +230,6 @@ public:
         return StatefulSequencePlayer({
                                           SequencePoint{0, [this] { neo.setBrightness(255);setColor(0xFF0000); }},
                                       }, [this] { clear(); },  pdMS_TO_TICKS(2000), false);
-    }
-
-    [[nodiscard]] StatefulSequencePlayer setColorSeq(uint32_t color) const
-    {
-        return StatefulSequencePlayer({
-                                          SequencePoint{0, [this,color] { neo.setBrightness(255);setColor(color); }},
-                                      }, [this] { clear(); }, 0, true);
     }
 
 private:

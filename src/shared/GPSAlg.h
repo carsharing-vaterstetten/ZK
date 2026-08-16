@@ -52,7 +52,6 @@ public:
     float endTrip();
 
     bool isTripActive() const { return trip_active; }
-    float getTripDistance() const { return trip_distance_m; }
 
     static String gpsAlgPredictionToStr(const GPSAlgPrediction pred)
     {

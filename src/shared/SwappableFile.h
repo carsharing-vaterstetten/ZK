@@ -21,9 +21,7 @@ public:
     bool swapToA();
     bool appendBToA(bool deleteBAfterwards);
     bool appendBToAAndSwapToA(bool deleteBAfterwards = true);
-    bool replaceAwithBAndSwapToA();
     bool swapToB();
-    bool swap();
     [[nodiscard]] std::optional<FileInfo> getCurrentFileInfo() const;
     void flush() override;
     void close();

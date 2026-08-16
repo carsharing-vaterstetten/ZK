@@ -29,8 +29,7 @@ class LedCmd
 public:
     LedCmd(uint id, StatefulSequencePlayer sequence, LedPriority priority = LedPriority::Normal,
            std::shared_ptr<ProgressState> progressState = std::make_shared<ProgressState>())
-        : issuedAt(xTaskGetTickCount()),
-          priority(priority),
+        : priority(priority),
           sequence(std::move(sequence)),
           id(id),
           progressState(std::move(progressState))
@@ -59,7 +58,6 @@ public:
     [[nodiscard]] bool isInterruptable() const { return sequence.isInterruptable(); }
 
 private:
-    TickType_t issuedAt;
     LedPriority priority;
     StatefulSequencePlayer sequence;
     uint id;

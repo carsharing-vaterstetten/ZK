@@ -11,7 +11,6 @@ public:
     void providePower() const;
     void cutPower() const;
     void powerOn() const;
-    void powerOff() const;
     void wakeup() const;
     void sleep() const;
 

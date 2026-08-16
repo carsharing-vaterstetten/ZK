@@ -229,16 +229,16 @@ void setup()
     // Services
     cardReaderService.emplace(cardReaderModule.value());
     keyControlService.emplace(keyControlModule.value());
-    modemService.emplace(*ACTIVE_BOARD, config.value(), rfidsManager, swLog, accessStatus, modemModule.value(),
+    modemService.emplace(config.value(), rfidsManager, swLog, modemModule.value(),
                          gpsModule.value(), apiDriver.value(), imeiStore);
 
     // Tasks
     ledSchedularTask.emplace(ledModule.value());
-    acTask.emplace(*ACTIVE_BOARD, rfidsManager, gpsAlg, keyControlService.value(), accessStatus, ledSchedularTask.value(),
+    acTask.emplace(rfidsManager, gpsAlg, keyControlService.value(), accessStatus, ledSchedularTask.value(),
                    modemService.value(), cardReaderService.value());
     gpsTask.emplace(accessStatus, modemService.value(), gpsAlg, gpsModule.value());
     restartTask.emplace(TARGET_TIME_FOR_ESP_RESTART, modemService.value());
-    startupTask.emplace(modemService.value(), imeiStore, accessStatus, ledSchedularTask.value(), apiDriver.value());
+    startupTask.emplace(modemService.value(), accessStatus, ledSchedularTask.value(), apiDriver.value());
     watchTask.emplace();
 
     SystemManager::Start();
