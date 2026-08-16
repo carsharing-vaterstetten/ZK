@@ -56,6 +56,13 @@ private:
 
     static constexpr uint32_t cardRemovalIndicatorColor = 0x3fd0d4;
 
+    /// How long the strip takes to fade away once the card is lifted. Runs from
+    /// the moment removal can first be detected to the moment the reader
+    /// re-arms, so the light reaching black means "ready for the next card"
+    /// rather than being an arbitrary animation length.
+    static constexpr TickType_t cardFadeOutDuration = cardRemovalCooldown - cardPresenceWindow;
+    static_assert(cardRemovalCooldown > cardPresenceWindow, "fade-out window would be empty or negative");
+
     /// Anything to do with a card physically on the reader outranks ambient
     /// status output. Must match the lock/unlock flashes so those still play in
     /// order ahead of the countdown rather than being pushed aside by it — equal

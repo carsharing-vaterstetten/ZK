@@ -71,21 +71,25 @@ ProgressState AccessControlTask::cardRemovalFeedback(const bool prompting, const
                                                      const TickType_t absentFor)
 {
     // Claimed but with nothing to say yet: still deciding whether this was a tap
-    // or a card left behind. An empty bar renders dark.
+    // or a card left behind.
     if (!prompting)
-        return ProgressState{.progress = 0.0f, .colorHex = cardRemovalIndicatorColor, .effect = LedEffect::Bar};
+        return ProgressState{.progress = 0.0f, .colorHex = cardRemovalIndicatorColor, .effect = LedEffect::Fade};
 
     // Card is still sitting there. Pulsing is an instruction to the user, and it
     // has to look unlike the boot sequence's bars, which mean "wait".
     if (cardStillOnReader)
         return ProgressState{.progress = 0.0f, .colorHex = cardRemovalIndicatorColor, .effect = LedEffect::Pulse};
 
-    // Card is off. Drain the bar to show the reader coming back up, so the dead
-    // time reads as "nearly ready" instead of as nothing happening.
+    // Card is off and the user has nothing left to do, so the light just goes
+    // away. Measured from the moment removal was detected rather than from the
+    // card's last sighting, so the fade starts at full instead of jumping to
+    // whatever fraction of the cooldown had already elapsed.
+    const TickType_t fadedFor = absentFor - cardPresenceWindow;
+
     return ProgressState{
-        .progress = 1.0f - static_cast<float>(absentFor) / cardRemovalCooldown,
+        .progress = 1.0f - static_cast<float>(fadedFor) / cardFadeOutDuration,
         .colorHex = cardRemovalIndicatorColor,
-        .effect = LedEffect::Bar,
+        .effect = LedEffect::Fade,
     };
 }
 
