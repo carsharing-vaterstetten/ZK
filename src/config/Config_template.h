@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLASH_LOGGING_LEVEL LoggingLevel::INFO
+#define FLASH_LOGGING_LEVEL LoggingLevel::DEBUG
 
 // Config override
 #define USE_DEFAULT_CONFIG false // Useful for development or mass deployment
