@@ -2,14 +2,10 @@
 
 #include "logging/Loggers.h"
 
-void SystemManager::Init()
-{
-    m_lifecycleEventGroup = xEventGroupCreate();
-    m_registry.fill(nullptr);
-}
-
 void SystemManager::Start()
 {
+    uint started = 0;
+
     for (SystemThread* t : m_registry)
     {
         if (t == nullptr) continue;
@@ -20,8 +16,14 @@ void SystemManager::Start()
             continue;
         }
 
+        ++started;
         serialLogger.debugln("Task " + String(t->getName()) + " started");
     }
+
+    // A device that starts no tasks looks alive but does nothing at all, so say
+    // so rather than returning quietly.
+    if (started != taskCount)
+        logger.criticalln("Started " + String(started) + " of " + String(taskCount) + " tasks");
 }
 
 void SystemManager::RegisterThread(SystemThread* thread)

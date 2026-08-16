@@ -10,7 +10,6 @@ public:
     SystemManager() = delete;
     static constexpr size_t taskCount = static_cast<size_t>(SystemThreadId::Count);
 
-    static void Init();
     static void Start();
 
     static void RegisterThread(SystemThread* thread);
@@ -25,8 +24,11 @@ public:
 
 private:
 
+    // Both are ready before any constructor runs: m_registry is zero-initialised
+    // at static-init time and tasks register from their own constructors, so
+    // there is no init step that could clear the registry after the fact.
     static inline std::array<SystemThread*, taskCount> m_registry{};
-    static inline EventGroupHandle_t m_lifecycleEventGroup = nullptr;
+    static inline EventGroupHandle_t m_lifecycleEventGroup = xEventGroupCreate();
 
 
     [[noreturn]] static void ExecuteHotRestart();

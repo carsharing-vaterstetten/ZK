@@ -59,6 +59,5 @@ void Device::begin()
     if (m_accessStatus.isLoggedIn())
         logger.infoln("RFID UID " + String(m_accessStatus.getLoggedInUID().value_or(0), 16) + " is logged in");
 
-    SystemManager::Init();
     SystemManager::Start(); // StartupTask drives the boot sequence from here
 }
