@@ -34,8 +34,8 @@ void AccessControlTask::handleScannedCard(const uint32_t rfidUid)
 
         if (rfidsManager.RFIDConsentsToGPSTrackingTest(rfidUid))
         {
-            modem.sendRequest(ModemTaskCommand::Wakeup, gpsWakeupTimeToLive);
-            modem.sendRequest(ModemTaskCommand::EnableGPS, gpsWakeupTimeToLive);
+            modem.sendRequest(ModemCommand::Wakeup, gpsWakeupTimeToLive);
+            modem.sendRequest(ModemCommand::EnableGPS, gpsWakeupTimeToLive);
 
             if (!tripTracker.isTripActive())
             {

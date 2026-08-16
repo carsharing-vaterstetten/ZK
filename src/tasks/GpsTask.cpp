@@ -22,17 +22,12 @@ void GpsTask::checkGPS()
         return;
     }
 
-    if (!modem.sendRequest(ModemTaskCommand::GetGPSData, gpsRequestTimeToLive)) return;
+    if (!modem.sendRequest(ModemCommand::GetGPSData, gpsRequestTimeToLive)) return;
 
-    const std::unique_ptr<ModemTxMessage> msg = modem.waitForSpecificMessage(ModemTxDataType::GPSData, gpsReplyTimeout);
+    const std::optional<ModemPayload> result = modem.waitFor(ModemResult::GPSData, gpsReplyTimeout);
+    if (!result.has_value()) return;
 
-    if (msg == nullptr)
-    {
-        //serialLogger.debugln("No gps data");
-        return;
-    }
-
-    const GPS_DATA_t gpsData = std::get<GPS_DATA_t>(*msg->payload);
+    const GPS_DATA_t gpsData = std::get<GPS_DATA_t>(*result);
 
     const MotionState gpsState = tripTracker.pushData(gpsData);
     gps.writeData(gpsData);
@@ -46,7 +41,7 @@ void GpsTask::checkGPS()
 
 void GpsTask::setup()
 {
-    while (modem.isWorkingOnTasks())
+    while (modem.hasPendingWork())
         vTaskDelay(pdMS_TO_TICKS(100));
 }
 

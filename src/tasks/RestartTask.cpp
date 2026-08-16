@@ -13,20 +13,19 @@ void RestartTask::run()
 {
     constexpr TickType_t waitForSystemTimeTimeout = pdMS_TO_TICKS(5 * 60 * 1000);
 
-    const std::unique_ptr<ModemTxMessage> msg = modem.waitForSpecificMessage(
-        ModemTxDataType::Timestamp, waitForSystemTimeTimeout);
+    const std::optional<ModemPayload> result = modem.waitFor(ModemResult::Timestamp, waitForSystemTimeTimeout);
 
     ulong restartTargetTimeMs;
 
-    if (msg == nullptr)
+    if (result.has_value())
     {
-        restartTargetTimeMs = dayMillis;
-        logger.warningln("Failed to get network time in time. Next restart in 24h");
+        const auto [hour, minute, second] = std::get<ModemTimestamp>(*result);
+        restartTargetTimeMs = calculateTimeTillRestart(hour, minute, second);
     }
     else
     {
-        const ModemTimestamp time = std::get<ModemTimestamp>(*msg->payload);
-        restartTargetTimeMs = calculateTimeTillRestart(time.hour, time.minute, time.second);
+        restartTargetTimeMs = dayMillis;
+        logger.warningln("Failed to get network time in time. Next restart in 24h");
     }
 
     logger.infoln("Next restart planned in " + String(restartTargetTimeMs / 60000) + " minutes");
@@ -47,9 +46,9 @@ void RestartTask::run()
 
     // The nightly flush must not be dropped, so these get no deadline and a
     // patient enqueue: losing them means losing a day of GPS data and logs.
-    for (const ModemTaskCommand cmd : {
-             ModemTaskCommand::Wakeup, ModemTaskCommand::ConnectNetwork,
-             ModemTaskCommand::UploadGPSData, ModemTaskCommand::UploadLog
+    for (const ModemCommand cmd : {
+             ModemCommand::Wakeup, ModemCommand::ConnectNetwork,
+             ModemCommand::UploadGPSData, ModemCommand::UploadLog
          })
         modem.sendRequest(cmd, ModemRequest::noDeadline, shutdownEnqueueTimeout);
 

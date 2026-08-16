@@ -2,6 +2,7 @@
 #include <atomic>
 
 #include "system/SystemThread.h"
+#include "domain/AccessStatus.h"
 #include "tasks/ModemTask.h"
 #include "LedSchedulerTask.h"
 
@@ -15,7 +16,7 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    std::optional<uint> displayApiProgress(ModemState desiredState, uint32_t hexColor, TickType_t timeoutToReachDesiredState, TickType_t
+    std::optional<uint> displayApiProgress(ModemCommand desiredState, uint32_t hexColor, TickType_t timeoutToReachDesiredState, TickType_t
                                            timeToCompleteDesiredState);
 
 protected:

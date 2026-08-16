@@ -5,7 +5,7 @@
 #include "system/SystemManager.h"
 #include "logging/Loggers.h"
 
-std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredState, const uint32_t hexColor,
+std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredState, const uint32_t hexColor,
                                                     TickType_t timeoutToReachDesiredState = pdMS_TO_TICKS(5000),
                                                     const TickType_t timeToCompleteDesiredState = pdMS_TO_TICKS(60 * 1000))
 {
@@ -73,40 +73,40 @@ void StartupTask::setup()
     // The boot sequence must complete even if the modem is slow, so none of these
     // carry a deadline; they are queued once, before anything else can compete
     // for the modem.
-    modem.sendRequest(ModemTaskCommand::GetImei);
-    modem.sendRequest(ModemTaskCommand::ConnectNetwork);
-    modem.sendRequest(ModemTaskCommand::GetUnixTime);
-    modem.sendRequest(ModemTaskCommand::GetTimestamp);
+    modem.sendRequest(ModemCommand::GetImei);
+    modem.sendRequest(ModemCommand::ConnectNetwork);
+    modem.sendRequest(ModemCommand::GetUnixTime);
+    modem.sendRequest(ModemCommand::GetTimestamp);
 
     if constexpr (GIVE_CONNECTION_SPEED_ESTIMATE)
-        modem.sendRequest(ModemTaskCommand::PerformConnectionSpeedTest);
+        modem.sendRequest(ModemCommand::PerformConnectionSpeedTest);
 
     if constexpr (CHECK_FOR_FIRMWARE_UPDATE_ON_BOOT)
-        modem.sendRequest(ModemTaskCommand::DoFirmwareUpdateIfAvailable);
+        modem.sendRequest(ModemCommand::DoFirmwareUpdateIfAvailable);
     else
         logger.infoln("Skipped firmware update check");
 
-    modem.sendRequest(ModemTaskCommand::DownloadRfidIfChanged);
-    modem.sendRequest(ModemTaskCommand::DownloadGPSRfids);
+    modem.sendRequest(ModemCommand::DownloadRfidIfChanged);
+    modem.sendRequest(ModemCommand::DownloadGPSRfids);
 
     if (RECORD_GPS_WHILE_STANDING || (accessStatus.isLoggedIn() && accessStatus.givesGPSTrackingPermission()))
-        modem.sendRequest(ModemTaskCommand::EnableGPS);
+        modem.sendRequest(ModemCommand::EnableGPS);
 
-    modem.sendRequest(ModemTaskCommand::UploadLog);
+    modem.sendRequest(ModemCommand::UploadLog);
 
     // Power saving
-    modem.sendRequest(ModemTaskCommand::DisconnectNetwork);
-    modem.sendRequest(ModemTaskCommand::SleepIfPossible);
+    modem.sendRequest(ModemCommand::DisconnectNetwork);
+    modem.sendRequest(ModemCommand::SleepIfPossible);
 }
 
 void StartupTask::run()
 {
-    ModemState lastState = ModemState::NONE;
+    ModemCommand lastState = ModemCommand::None;
     std::optional<uint> lastLedCommandId = std::nullopt;
 
     while (isRunning())
     {
-        ModemState newState = modem.getCurrentState();
+        ModemCommand newState = modem.getCurrentState();
 
         while (isRunning() && newState == lastState)
         {
@@ -121,32 +121,30 @@ void StartupTask::run()
 
         switch (newState)
         {
-        case ModemState::InitializeModem:
-        case ModemState::ConnectNetwork:
+        case ModemCommand::InitializeModem:
+        case ModemCommand::ConnectNetwork:
             lastLedCommandId = led.queueLoadingCircle(0xFFFFFF);
             break;
-        case ModemState::PerformConnectionSpeedTest:
+        case ModemCommand::PerformConnectionSpeedTest:
             lastLedCommandId = displayApiProgress(newState, 0x00FFFF);
             break;
-        case ModemState::DoFirmwareUpdateIfAvailable:
+        case ModemCommand::DoFirmwareUpdateIfAvailable:
             lastLedCommandId = displayApiProgress(newState, 0xFF00FF);
             break;
-        case ModemState::DownloadRfidIfChanged:
+        case ModemCommand::DownloadRfidIfChanged:
             lastLedCommandId = displayApiProgress(newState, 0xFFA500);
             break;
-        case ModemState::DownloadGPSRfids:
+        case ModemCommand::DownloadGPSRfids:
             lastLedCommandId = displayApiProgress(newState, 0xFFA500);
             break;
-        case ModemState::UploadLog:
+        case ModemCommand::UploadLog:
             lastLedCommandId = displayApiProgress(newState, 0x0000FF);
             break;
-        case ModemState::GetUnixTime:
+        case ModemCommand::GetUnixTime:
             {
                 // Sync time
-                const std::unique_ptr<ModemTxMessage> unixTimestamp = modem.waitForSpecificMessage(
-                    ModemTxDataType::UnixTimestamp, pdMS_TO_TICKS(20000));
-                if (unixTimestamp != nullptr)
-                    HelperUtils::syncSystemTime(std::get<time_t>(*unixTimestamp->payload));
+                if (const auto result = modem.waitFor(ModemResult::UnixTimestamp, pdMS_TO_TICKS(20000)))
+                    HelperUtils::syncSystemTime(std::get<time_t>(*result));
                 break;
             }
         default:

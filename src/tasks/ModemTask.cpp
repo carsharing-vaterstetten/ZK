@@ -1,23 +1,11 @@
 #include "tasks/ModemTask.h"
 
-#include <atomic>
-
 #include "logging/Loggers.h"
 #include "config/user_config.h"
 #include "net/FirmwareUpdater.h"
 #include "util/HelperUtils.h"
 #include "domain/RFIDs.h"
 #include "hal/Modem.h"
-
-ModemTask::~ModemTask()
-{
-    std::lock_guard lock(m_shelfMutex);
-
-    for (const auto& [dataType, msg] : m_shelvedMessages)
-        delete msg;
-
-    m_shelvedMessages.clear();
-}
 
 void ModemTask::OnCommand(const SystemCommand cmd)
 {
@@ -26,10 +14,10 @@ void ModemTask::OnCommand(const SystemCommand cmd)
     switch (cmd)
     {
     case SystemCommand::EnterLowPower:
-        sendRequest(ModemTaskCommand::SleepIfPossible);
+        sendRequest(ModemCommand::SleepIfPossible);
         break;
     case SystemCommand::ResumeNormalOperation:
-        sendRequest(ModemTaskCommand::Wakeup);
+        sendRequest(ModemCommand::Wakeup);
         break;
     case SystemCommand::None:
     case SystemCommand::PrepareForHotRestart:
@@ -37,8 +25,7 @@ void ModemTask::OnCommand(const SystemCommand cmd)
     }
 }
 
-bool ModemTask::sendRequest(const ModemTaskCommand cmd, const TickType_t timeToLive,
-                               const TickType_t enqueueTimeout)
+bool ModemTask::sendRequest(const ModemCommand cmd, const TickType_t timeToLive, const TickType_t enqueueTimeout)
 {
     const ModemRequest request{
         .cmd = cmd,
@@ -47,11 +34,11 @@ bool ModemTask::sendRequest(const ModemTaskCommand cmd, const TickType_t timeToL
                         : xTaskGetTickCount() + timeToLive,
     };
 
-    // Counted before the send so isWorkingOnTasks() can never report idle while a
+    // Counted before the send so hasPendingWork() can never report idle while a
     // request is in flight between here and the run loop.
     ++m_outstandingRequests;
 
-    if (xQueueSend(modemTaskRxQueue, &request, enqueueTimeout) == pdTRUE)
+    if (xQueueSend(m_requests, &request, enqueueTimeout) == pdTRUE)
         return true;
 
     --m_outstandingRequests;
@@ -59,101 +46,53 @@ bool ModemTask::sendRequest(const ModemTaskCommand cmd, const TickType_t timeToL
     return false;
 }
 
-void ModemTask::publish(const ModemTxDataType dataType, const ModemFlexibleTxPayload& payload)
+void ModemTask::publish(const ModemResult type, ModemPayload payload)
 {
-    auto msg = std::make_unique<ModemTxMessage>(ModemTxMessage{
-        .dataType = dataType,
-        .payload = std::make_shared<ModemFlexibleTxPayload>(payload),
-        .queuedAt = xTaskGetTickCount(),
-    });
-
-    ModemTxMessage* raw = msg.get();
-
-    if (xQueueSend(modemTaskTxQueue, &raw, replyEnqueueTimeout) != pdTRUE)
     {
-        // Better to lose a reply than to park the modem task on a queue that
-        // nobody is draining — everything else waits behind this task.
-        logger.warningln("Modem reply queue full, dropped reply " + String(static_cast<int>(dataType)));
-        return;
+        std::lock_guard lock(m_resultsMutex);
+        m_results[static_cast<size_t>(type)] = std::move(payload);
     }
 
-    msg.release(); // ownership passed to the receiving task
+    xEventGroupSetBits(m_resultReady, bitFor(type));
 }
 
-void ModemTask::dropStaleShelvedLocked()
+std::optional<ModemPayload> ModemTask::take(const ModemResult type)
 {
-    const TickType_t now = xTaskGetTickCount();
+    std::lock_guard lock(m_resultsMutex);
 
-    for (auto it = m_shelvedMessages.begin(); it != m_shelvedMessages.end();)
-    {
-        if (static_cast<int32_t>(now - it->second->queuedAt) < static_cast<int32_t>(shelfLifetime))
-        {
-            ++it;
-            continue;
-        }
+    std::optional<ModemPayload>& slot = m_results[static_cast<size_t>(type)];
+    if (!slot.has_value()) return std::nullopt;
 
-        delete it->second;
-        it = m_shelvedMessages.erase(it);
-    }
+    std::optional<ModemPayload> value = std::move(slot);
+    slot.reset();
+
+    // Cleared here rather than on wait exit, so a leftover bit from a result that
+    // has already been consumed cannot cut a later wait short.
+    xEventGroupClearBits(m_resultReady, bitFor(type));
+
+    return value;
 }
 
-std::unique_ptr<ModemTxMessage> ModemTask::takeShelved(const ModemTxDataType dataType)
-{
-    std::lock_guard lock(m_shelfMutex);
-    dropStaleShelvedLocked();
-
-    const auto it = m_shelvedMessages.find(dataType);
-    if (it == m_shelvedMessages.end()) return nullptr;
-
-    std::unique_ptr<ModemTxMessage> msg{it->second};
-    m_shelvedMessages.erase(it);
-    return msg;
-}
-
-void ModemTask::shelve(std::unique_ptr<ModemTxMessage> msg)
-{
-    std::lock_guard lock(m_shelfMutex);
-    dropStaleShelvedLocked();
-    m_shelvedMessages.emplace(msg->dataType, msg.release());
-}
-
-std::unique_ptr<ModemTxMessage> ModemTask::waitForSpecificMessage(const ModemTxDataType dataType,
-                                                                    const TickType_t timeout)
+std::optional<ModemPayload> ModemTask::waitFor(const ModemResult type, const TickType_t timeout)
 {
     const TickType_t deadline = xTaskGetTickCount() + timeout;
 
     while (true)
     {
-        if (std::unique_ptr<ModemTxMessage> shelved = takeShelved(dataType)) return shelved;
+        // Checked before waiting: a result published before the caller got here
+        // is still the answer to its question.
+        if (std::optional<ModemPayload> value = take(type)) return value;
 
         const TickType_t now = xTaskGetTickCount();
-        if (static_cast<int32_t>(now - deadline) >= 0) return nullptr;
+        if (static_cast<int32_t>(now - deadline) >= 0) return std::nullopt;
 
-        ModemTxMessage* received = nullptr;
-        if (xQueueReceive(modemTaskTxQueue, &received, deadline - now) != pdTRUE) return nullptr;
-        if (received == nullptr) continue;
-
-        std::unique_ptr<ModemTxMessage> msg{received};
-
-        if (msg->dataType == dataType) return msg;
-
-        shelve(std::move(msg));
+        xEventGroupWaitBits(m_resultReady, bitFor(type), pdFALSE, pdTRUE, deadline - now);
     }
-}
-
-bool ModemTask::isWorkingOnTasks() const
-{
-    return m_outstandingRequests > 0;
-}
-
-ModemState ModemTask::getCurrentState() const
-{
-    return currentState;
 }
 
 void ModemTask::setup()
 {
-    currentState = ModemState::InitializeModem;
+    m_currentState = ModemCommand::InitializeModem;
     modem.connect(config.simPin.c_str(), config.gprsUser.c_str(), config.gprsPassword.c_str(), config.apn.c_str());
 }
 
@@ -163,140 +102,128 @@ void ModemTask::run()
     {
         ModemRequest request{};
 
-        if (xQueueReceive(modemTaskRxQueue, &request, idlePollInterval) != pdTRUE)
+        if (xQueueReceive(m_requests, &request, idlePollInterval) != pdTRUE)
         {
-            currentState = ModemState::READY;
+            m_currentState = ModemCommand::Ready;
             continue;
         }
 
         if (request.expired(xTaskGetTickCount()))
         {
-            // The modem was busy for longer than this request was useful for.
-            // Running it now would only delay whatever is queued behind it.
+            // The modem was busy for longer than this request was useful for;
+            // running it now would only delay whatever is queued behind it.
             serialLogger.debugln("Dropped expired modem command " + String(static_cast<int>(request.cmd)));
             --m_outstandingRequests;
             continue;
         }
 
-        currentState = modemCmdToState(request.cmd);
+        m_currentState = request.cmd;
         handleRequest(request.cmd);
         --m_outstandingRequests;
     }
 
-    currentState = ModemState::NONE;
+    m_currentState = ModemCommand::None;
 }
 
-void ModemTask::handleRequest(const ModemTaskCommand cmd)
+void ModemTask::publishUnixTime()
+{
+    time_t t = modem.getUnixTimestamp();
+
+    for (uint i = 0; i < 100 && t < 0; ++i)
+    {
+        serialLogger.debugln("Got invalid unix timestamp " + String(t));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        t = modem.getUnixTimestamp();
+    }
+
+    if (t < 0)
+    {
+        logger.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
+        return;
+    }
+
+    publish(ModemResult::UnixTimestamp, t);
+}
+
+void ModemTask::publishNetworkTime()
+{
+    int hour = 0, minute = 0, second = 0, year = 0;
+
+    modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
+
+    for (uint i = 0; (year <= 0 || year > 2060) && i < 100; ++i)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
+    }
+
+    if (year <= 0 || year > 2060)
+    {
+        logger.errorln("Got invalid network time: Year " + String(year));
+        return;
+    }
+
+    serialLogger.debugln("Got time");
+    publish(ModemResult::Timestamp, ModemTimestamp{.hour = hour, .minute = minute, .second = second});
+}
+
+void ModemTask::handleRequest(const ModemCommand cmd)
 {
     switch (cmd)
     {
-    case ModemTaskCommand::InitializeModem:
-        break;
-    case ModemTaskCommand::PerformConnectionSpeedTest:
+    case ModemCommand::PerformConnectionSpeedTest:
         HelperUtils::performConnectionSpeedTest(api, CONNECTION_SPEED_TEST_FILE_SIZE);
         break;
-    case ModemTaskCommand::DoFirmwareUpdateIfAvailable:
+    case ModemCommand::DoFirmwareUpdateIfAvailable:
         FirmwareUpdater::doUpdateIfAvailable(api);
         break;
-    case ModemTaskCommand::DownloadRfidIfChanged:
+    case ModemCommand::DownloadRfidIfChanged:
         rfidsManager.downloadRfidsIfChanged(api);
         break;
-    case ModemTaskCommand::DownloadGPSRfids:
+    case ModemCommand::DownloadGPSRfids:
         rfidsManager.downloadGPSTrackingConsentedRFIDs(api);
         break;
-    case ModemTaskCommand::UploadLog:
+    case ModemCommand::UploadLog:
         HelperUtils::uploadLogAndDeleteAfterRetryingIfLogIsTooLarge(api, swLog);
         break;
-    case ModemTaskCommand::DisconnectNetwork:
+    case ModemCommand::DisconnectNetwork:
         modem.disconnectNetwork();
         break;
-    case ModemTaskCommand::SleepIfPossible:
+    case ModemCommand::SleepIfPossible:
         modem.requestSleep();
         break;
-    case ModemTaskCommand::ConnectNetwork:
+    case ModemCommand::ConnectNetwork:
         modem.ensureNetworkConnection();
         break;
-    case ModemTaskCommand::Wakeup:
-        publish(ModemTxDataType::WakeupSuccess, modem.wakeupAndWait());
+    case ModemCommand::Wakeup:
+        publish(ModemResult::WakeupSuccess, modem.wakeupAndWait());
         break;
-
-    case ModemTaskCommand::EnableGPS:
+    case ModemCommand::EnableGPS:
         modem.enableGPS();
         break;
-    case ModemTaskCommand::GetGPSData:
+    case ModemCommand::GetGPSData:
         {
             GPS_DATA_t data;
-            if (modem.getGPS(data))
-                publish(ModemTxDataType::GPSData, data);
+            if (modem.getGPS(data)) publish(ModemResult::GPSData, data);
             break;
         }
-    case ModemTaskCommand::UploadGPSData:
-        {
-            gps.uploadFileAndBeginNew(api, true, true, 2);
-            break;
-        }
-    case ModemTaskCommand::GetAccessControlSequences:
-        {
-            // TODO: implement once feature on server
-            break;
-        }
-    case ModemTaskCommand::GetUnixTime:
-        {
-            time_t t = modem.getUnixTimestamp();
-
-            for (uint i = 0; i < 100 && t < 0; ++i)
-            {
-                serialLogger.debugln("Got invalid unix timestamp " + String(t));
-                vTaskDelay(pdMS_TO_TICKS(10));
-                t = modem.getUnixTimestamp();
-            }
-
-            if (t < 0)
-                logger.errorln("Failed to get unix timestamp (t=" + String(t) + ")");
-            else
-                publish(ModemTxDataType::UnixTimestamp, t);
-
-            break;
-        }
-    case ModemTaskCommand::GetTimestamp:
-        {
-            int hour, minute, second, year;
-
-            modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
-
-            for (uint i = 0; (year <= 0 || year > 2060) && i < 100; ++i)
-            {
-                vTaskDelay(pdMS_TO_TICKS(10));
-                modem.getNetworkTime(&year, nullptr, nullptr, &hour, &minute, &second, nullptr);
-            }
-
-            if (year <= 0 || year > 2060)
-            {
-                logger.errorln("Got invalid network time: Year " + String(year));
-            }
-            else
-            {
-                serialLogger.debugln("Got time");
-                ModemTimestamp ts{
-                    .hour = hour,
-                    .minute = minute,
-                    .second = second,
-                };
-
-                publish(ModemTxDataType::Timestamp, ts);
-            }
-
-            break;
-        }
-    case ModemTaskCommand::GetImei:
-        {
-            // FIXME: where does +CPIN  READY: come from?????????
-            String imei = modem.getIMEI();
-            imeiStore.setIMEI(imei);
-            serialLogger.debugln("Got imei: " + imei + " | " + imeiStore.getIMEI().value_or("AAAA"));
-            break;
-        }
-    case ModemTaskCommand::NONE:
+    case ModemCommand::UploadGPSData:
+        gps.uploadFileAndBeginNew(api, true, true, 2);
+        break;
+    case ModemCommand::GetUnixTime:
+        publishUnixTime();
+        break;
+    case ModemCommand::GetTimestamp:
+        publishNetworkTime();
+        break;
+    case ModemCommand::GetImei:
+        // FIXME: where does +CPIN  READY: come from?????????
+        imeiStore.setIMEI(modem.getIMEI());
+        break;
+    case ModemCommand::GetAccessControlSequences: // TODO: implement once feature on server
+    case ModemCommand::InitializeModem: // handled once in setup()
+    case ModemCommand::None:
+    case ModemCommand::Ready:
         break;
     }
 }

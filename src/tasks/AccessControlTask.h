@@ -5,6 +5,7 @@
 #include "LedSchedulerTask.h"
 #include "tasks/ModemTask.h"
 #include "domain/TripTracker.h"
+#include "domain/AccessStatus.h"
 #include "domain/RFIDs.h"
 
 struct ScanResult;
