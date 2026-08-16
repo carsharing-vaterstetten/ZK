@@ -12,10 +12,8 @@
 #include "system/SystemManager.h"
 #include "hal/Led.h"
 
-/// Relative importance of a queued LED command. Higher value == more important.
-/// A command can only preempt whatever is currently on the strip if its priority
-/// is strictly higher than the active command's priority — equal priority never
-/// preempts, it just waits its turn (FIFO).
+/// A command preempts the active one only if its priority is strictly higher.
+/// Equal priority waits its turn, oldest first.
 enum class LedPriority : uint8_t
 {
     Background = 0, // ambient / idle indications
@@ -52,9 +50,8 @@ public:
     [[nodiscard]] uint getId() const { return id; }
     [[nodiscard]] LedPriority getPriority() const { return priority; }
 
-    // Delegates to the underlying sequence's own flag rather than storing a
-    // second copy — a flash sequence built as non-interruptable should never
-    // be treated as interruptable regardless of how it's queued.
+    // Delegates rather than storing a second copy, so a sequence built as
+    // non-interruptable stays that way however it is queued.
     [[nodiscard]] bool isInterruptable() const { return sequence.isInterruptable(); }
 
 private:
@@ -62,7 +59,6 @@ private:
     StatefulSequencePlayer sequence;
     uint id;
 
-    // Optional extra data
     std::shared_ptr<ProgressState> progressState;
 };
 
@@ -128,31 +124,23 @@ private:
     /// pending command, preferring the oldest one (lowest id) on ties.
     [[nodiscard]] std::optional<uint> pickHighestPriorityPendingId() const;
 
-    /// Must be called with mtx held. One scheduling decision: retires a finished active command, preempts
-    /// it in favor of a higher priority pending command if it's interruptable,
-    /// and promotes a pending command into the active slot if nothing is
-    /// currently active and the transition gap has elapsed.
+    /// One scheduling decision: retire, preempt, promote. Call with mtx held.
     void schedule(TickType_t& nextSequenceTime);
 
     void updateLed(TickType_t& nextSequenceTime);
 
     std::atomic<uint> m_nextId = 1;
 
-    // Commands waiting for their first turn, OR paused mid-sequence after
-    // being preempted by something higher priority. Either way they resume
-    // automatically — the underlying StatefulSequencePlayer's idx just picks
-    // back up where it stopped — once they're the best candidate again.
+    // Waiting for a first turn, or paused mid-sequence after preemption. Either
+    // way they resume where they stopped once they are the best candidate again.
     std::map<uint, LedCmd> pendingCommands{};
     std::optional<LedCmd> activeCommand;
 
-    // Earliest tick at which a new command may be promoted into the active
-    // slot. Bumped forward by sequenceTransitionDelay every time a command
-    // is retired or preempted, so there's always a clean gap between one
-    // command ending and the next one lighting up.
+    // Earliest tick a command may be promoted, giving a dark gap between one
+    // command ending and the next lighting up.
     TickType_t transitionReadyAt = 0;
 
-    // Guards pendingCommands, activeCommand and transitionReadyAt together —
-    // they change atomically as one scheduling decision.
+    // Guards pendingCommands, activeCommand and transitionReadyAt together.
     std::mutex mtx;
 
     Led& statusLed;

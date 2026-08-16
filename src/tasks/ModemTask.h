@@ -63,11 +63,10 @@ using ModemPayload = std::variant<bool, ModemTimestamp, GPS_DATA_t, time_t>;
 
 /// One unit of work for the modem task.
 ///
-/// `deadline` is the tick after which running the command is no longer worth
-/// doing, and the task drops it instead. The modem serialises everything behind
-/// operations that can take minutes (an OTA, a log upload), so without this a
-/// poller like the GPS task fills the queue with work that is already stale, and
-/// every other caller — including the unlock path — waits behind it.
+/// `deadline` is the tick after which the work is no longer worth doing and the
+/// task drops it. The modem serialises everything behind operations that can run
+/// for minutes (an OTA, a log upload), so without it a poller fills the queue
+/// with stale work and every other caller waits behind it.
 struct ModemRequest
 {
     /// For work that must run whenever the modem gets around to it.
@@ -96,24 +95,19 @@ public:
 
     void OnCommand(SystemCommand cmd) override;
 
-    /// How long a caller waits for room in the request queue. A full queue means
-    /// the modem is badly backed up; callers get `false` and decide for
-    /// themselves rather than being parked indefinitely.
+    /// A full queue means the modem is badly backed up; callers get `false` and
+    /// decide for themselves rather than being parked indefinitely.
     static constexpr TickType_t defaultEnqueueTimeout = pdMS_TO_TICKS(100);
 
-    /// Queues modem work. Never blocks indefinitely.
-    ///
-    /// `timeToLive` is how long the request stays worth running once queued; use
-    /// `ModemRequest::noDeadline` for work that must always happen. Returns false
-    /// if it could not be queued, so time-critical callers can carry on.
+    /// Queues modem work. Never blocks indefinitely. `timeToLive` is how long
+    /// the request stays worth running; use noDeadline for work that must happen.
     bool sendRequest(ModemCommand cmd, TickType_t timeToLive = ModemRequest::noDeadline,
                      TickType_t enqueueTimeout = defaultEnqueueTimeout);
 
     /// Waits for a result, consuming it. Returns nullopt on timeout.
     ///
-    /// Results are kept in a slot per type rather than a shared queue, so it does
-    /// not matter which task asked for the work: whoever waits on the type gets
-    /// it. StartupTask requests the timestamp that RestartTask consumes.
+    /// One slot per type, not a shared queue, so it does not matter which task
+    /// asked: StartupTask requests the timestamp that RestartTask consumes.
     std::optional<ModemPayload> waitFor(ModemResult type, TickType_t timeout);
 
     /// True while there is queued or in-flight work.

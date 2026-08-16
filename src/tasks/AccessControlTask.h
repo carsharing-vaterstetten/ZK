@@ -29,48 +29,40 @@ protected:
     void run() override;
 
 private:
-    /// A scan older than this is a leftover from a previous tap rather than a new
-    /// one. It has to comfortably exceed the reader's poll period (the PN532 read
-    /// blocks for up to 200ms) plus scheduling jitter, or taps get dropped
-    /// whenever something else on core 0 holds the CPU for a moment.
+    // The card timings are interdependent; see the static_asserts below.
+
+    /// Older than this and the scan is a leftover from a previous tap. Must clear
+    /// the PN532's 200ms blocking read plus scheduling jitter, or taps get lost.
     static constexpr TickType_t scanFreshnessWindow = pdMS_TO_TICKS(500);
 
-    /// The card has to be off the reader this long before another tap counts.
-    /// Without it, a card left lying on the reader re-triggers every cycle and
-    /// toggles the car open/closed indefinitely. It doubles as the debounce after
-    /// a clean tap, so keeping it short is what stops the reader from feeling
-    /// dead right after it reacted.
+    /// How long the card must be gone before another tap counts. Doubles as the
+    /// post-tap debounce, so a long value makes the reader feel dead.
     static constexpr TickType_t cardRemovalCooldown = pdMS_TO_TICKS(1000);
 
-    /// A card seen more recently than this counts as still lying on the reader.
-    /// Has to clear more than one reader poll (the PN532 read blocks for up to
-    /// 200ms) so a missed beat isn't mistaken for the card being taken away.
+    /// A card seen this recently still counts as present. Must clear more than
+    /// one reader poll so a missed beat is not read as removal.
     static constexpr TickType_t cardPresenceWindow = pdMS_TO_TICKS(500);
 
-    /// How long the card may rest on the reader before the LED starts asking for
-    /// it back. Must exceed cardPresenceWindow, otherwise a card that was already
-    /// removed still looks present when the grace period expires.
+    /// How long a card may rest on the reader before the LED asks for it back.
     static constexpr TickType_t cardHeldGracePeriod = pdMS_TO_TICKS(1000);
 
     static constexpr uint32_t cardRemovalIndicatorColor = 0x3fd0d4;
 
-    /// How long the strip takes to fade away once the card is lifted. Runs from
-    /// the moment removal can first be detected to the moment the reader
-    /// re-arms, so the light reaching black means "ready for the next card"
-    /// rather than being an arbitrary animation length.
+    /// Fade runs from the moment removal is detectable to the moment the reader
+    /// re-arms, so reaching black means "ready for the next card".
     static constexpr TickType_t cardFadeOutDuration = cardRemovalCooldown - cardPresenceWindow;
-    static_assert(cardRemovalCooldown > cardPresenceWindow, "fade-out window would be empty or negative");
 
-    /// Anything to do with a card physically on the reader outranks ambient
-    /// status output. Must match the lock/unlock flashes so those still play in
-    /// order ahead of the countdown rather than being pushed aside by it — equal
-    /// priority is FIFO, and the flash is always queued first.
+    /// Card feedback outranks ambient status output. Equal priority is FIFO and
+    /// the flash is queued first, so matching the flashes keeps them in order.
     static constexpr LedPriority cardFeedbackPriority = LedPriority::High;
 
-    /// GPS wakeup is a nice-to-have on the unlock path. If the modem is busy
-    /// enough that this goes stale, dropping it is correct — the trip is still
-    /// recorded, and the user is not left waiting at the car.
+    /// GPS wakeup is a nice-to-have on the unlock path; dropping it when the
+    /// modem is busy beats making the user wait at the car.
     static constexpr TickType_t gpsWakeupTimeToLive = pdMS_TO_TICKS(30000);
+
+    static_assert(cardRemovalCooldown > cardPresenceWindow, "fade-out window would be empty or negative");
+    static_assert(cardHeldGracePeriod > cardPresenceWindow,
+                  "an already-removed card would still look present when the grace period expires");
 
     const RFIDs& rfidsManager;
     TripTracker& tripTracker;
@@ -82,13 +74,11 @@ private:
 
     void handleScannedCard(uint32_t rfidUid);
 
-    /// Blocks until the card has been away from the reader for
-    /// `cardRemovalCooldown`, prompting once it is clear the user has left it
-    /// there.
+    /// Blocks until the card has been away for `cardRemovalCooldown`, prompting
+    /// once it is clear the user has left it on the reader.
     void waitForCardRemoval();
 
-    /// The three phases of removal feedback: silent while it is still unclear
-    /// whether this was a tap, pulsing while the card is being left on the
-    /// reader, then draining while the reader re-arms.
+    /// Three phases: dark while it is still unclear whether this was a tap,
+    /// pulsing while the card is left on the reader, fading once it is lifted.
     static ProgressState cardRemovalFeedback(bool prompting, bool cardStillOnReader, TickType_t absentFor);
 };

@@ -461,11 +461,10 @@ time_t Modem::getUnixTimestamp() const
 
 bool Modem::getGPS(GPS_DATA_t& out) const
 {
-    // GPS_DATA_t is the on-flash/on-wire layout and is byte-packed, so its members
-    // are not naturally aligned — vsat sits at offset 16, usat at 17, accuracy at
-    // 18. TinyGSM writes whole ints and floats through the pointers it is given,
-    // and a 32-bit store to an odd address raises LoadStoreAlignment on the ESP32.
-    // Read into properly aligned locals first, then narrow into the packed struct.
+    // GPS_DATA_t is byte-packed for flash, so usat sits at offset 17 and accuracy
+    // at 18. TinyGSM writes whole ints and floats through the pointers it is
+    // given, and a 32-bit store to an odd address traps on the ESP32. Read into
+    // aligned locals first, then narrow.
     uint8_t status;
     int year, month, day, hour, minute, second;
     int vsat = 0, usat = 0;

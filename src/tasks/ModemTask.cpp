@@ -35,7 +35,7 @@ bool ModemTask::sendRequest(const ModemCommand cmd, const TickType_t timeToLive,
                         : xTaskGetTickCount() + timeToLive,
     };
 
-    // Counted before the send so hasPendingWork() can never report idle while a
+    // Counted before the send, so hasPendingWork() cannot report idle while a
     // request is in flight between here and the run loop.
     ++m_outstandingRequests;
 
@@ -67,8 +67,8 @@ std::optional<ModemPayload> ModemTask::take(const ModemResult type)
     std::optional<ModemPayload> value = std::move(slot);
     slot.reset();
 
-    // Cleared here rather than on wait exit, so a leftover bit from a result that
-    // has already been consumed cannot cut a later wait short.
+    // Cleared here rather than on wait exit, so a leftover bit cannot cut a
+    // later wait short.
     xEventGroupClearBits(m_resultReady, bitFor(type));
 
     return value;
@@ -80,8 +80,7 @@ std::optional<ModemPayload> ModemTask::waitFor(const ModemResult type, const Tic
 
     while (true)
     {
-        // Checked before waiting: a result published before the caller got here
-        // is still the answer to its question.
+        // A result published before the caller got here still answers it.
         if (std::optional<ModemPayload> value = take(type)) return value;
 
         const TickType_t now = xTaskGetTickCount();
@@ -111,8 +110,7 @@ void ModemTask::run()
 
         if (request.expired(xTaskGetTickCount()))
         {
-            // The modem was busy for longer than this request was useful for;
-            // running it now would only delay whatever is queued behind it.
+            // Running it now would only delay whatever is queued behind it.
             serialLogger.debugln("Dropped expired modem command " + String(static_cast<int>(request.cmd)));
             --m_outstandingRequests;
             continue;

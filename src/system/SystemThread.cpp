@@ -6,9 +6,9 @@
 
 SystemThread::~SystemThread()
 {
-    // TaskHook clears the handle when the task exits under its own power, so this
-    // only fires when the object outlives a still-running task. Deleting a handle
-    // whose task already called vTaskDelete(nullptr) frees the TCB twice.
+    // TaskHook clears the handle on a normal exit, so this only fires when the
+    // object outlives a running task. Deleting a already-deleted task's handle
+    // would free the TCB twice.
     if (m_taskHandle != nullptr) vTaskDelete(m_taskHandle);
 }
 
@@ -67,8 +67,7 @@ void SystemThread::TaskHook(void* pvParams)
 
     logger.debugln("Task " + String(instance->name) + " ended");
 
-    // Reported here rather than at the end of every run() so no task can forget
-    // and stall the restart handshake until it times out.
+    // Here rather than at the end of every run(), so no task can forget.
     SystemManager::ReportReadyForRestart(instance->m_id);
 
     instance->m_taskHandle = nullptr;

@@ -4,9 +4,7 @@
 
 namespace
 {
-    // TickType_t is an unsigned counter that wraps around, so a deadline
-    // check has to use a signed difference rather than a plain `now >=
-    // deadline` comparison, or it'll misbehave once the tick count wraps.
+    // Signed difference, so the check survives the tick counter wrapping.
     bool tickHasPassed(TickType_t now, TickType_t deadline)
     {
         return static_cast<int32_t>(now - deadline) >= 0;
@@ -23,8 +21,7 @@ uint LedSchedulerTask::queueCommand(LedCmd cmd)
         pendingCommands.emplace(id, std::move(cmd));
     }
 
-    // Wake the scheduler so a queued command lights up immediately instead of
-    // waiting out the idle sleep.
+    // So a queued command lights up without waiting out the idle sleep.
     notifySelf();
 
     return id;
@@ -94,8 +91,7 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
 {
     const TickType_t now = xTaskGetTickCount();
 
-    // Drop anything that was cancelled/completed while it sat in the pending
-    // pool (e.g. cancelled while paused), so it can never get promoted.
+    // Drop anything cancelled while it sat pending, so it cannot be promoted.
     for (auto it = pendingCommands.begin(); it != pendingCommands.end();)
     {
         if (it->second.completed())
@@ -112,10 +108,8 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
         transitionReadyAt = now + sequenceTransitionDelay;
     }
 
-    // Preempt: an interruptable active command steps aside for a strictly
-    // higher priority pending one. It goes back into the pending pool rather
-    // than being dropped, so it resumes right where it left off (same idx
-    // inside its StatefulSequencePlayer) once it's the best candidate again.
+    // An interruptable command steps aside for a strictly higher priority one,
+    // going back into the pending pool so it can resume where it left off.
     if (activeCommand.has_value() && activeCommand->isInterruptable())
     {
         if (const auto challengerId = pickHighestPriorityPendingId(); challengerId.has_value() &&
@@ -130,10 +124,7 @@ void LedSchedulerTask::schedule(TickType_t& nextSequenceTime)
         }
     }
 
-    // Promote the best pending command into the active slot — but only once
-    // the post-transition gap has elapsed. This is what puts a clean ~100ms
-    // dark gap between one command finishing/being preempted and the next
-    // one lighting up, instead of snapping straight from one to the other.
+    // Promote, but only once the transition gap has elapsed.
     if (!activeCommand.has_value() && !pendingCommands.empty())
     {
         if (tickHasPassed(now, transitionReadyAt))
@@ -175,8 +166,7 @@ void LedSchedulerTask::run()
     {
         if (nothingToDo())
         {
-            // Nothing on the strip: sleep until someone queues work rather than
-            // waking a hundred times a second to find the same empty map.
+            // Sleep until someone queues work rather than polling an empty map.
             ulTaskNotifyTake(pdTRUE, idleWait);
             continue;
         }

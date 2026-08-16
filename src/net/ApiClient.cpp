@@ -140,8 +140,7 @@ uint ApiClient::fetch(const ApiResponse& resp, Stream& destination, const ulong 
 {
     HttpClient& downloadStream = resp.body;
 
-    // Fixed size rather than a runtime-sized array: this sits on a 4 KiB task
-    // stack, and a caller-chosen length is a stack overflow waiting to happen.
+    // Fixed size: this sits on a 4 KiB task stack.
     static constexpr size_t bufferSize = 512;
     uint8_t buf[bufferSize];
 

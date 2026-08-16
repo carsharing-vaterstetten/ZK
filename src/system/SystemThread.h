@@ -5,10 +5,9 @@
 
 #include "system/SystemTypes.h"
 
-/// Base for every FreeRTOS task in the firmware.
-///
-/// Subclasses implement setup() and run(). The shutdown handshake is handled
-/// here: run() loops on isRunning(), and readiness is reported once it returns.
+/// Base for every FreeRTOS task. Subclasses implement setup() and run(); the
+/// shutdown handshake is handled here — run() loops on isRunning(), and
+/// readiness is reported once it returns.
 class SystemThread
 {
 public:

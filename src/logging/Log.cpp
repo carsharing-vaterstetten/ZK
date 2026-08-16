@@ -34,9 +34,8 @@ void Log::logMsgln(const String& msg, const LoggingLevel level) const
 {
     TaskHandle_t self = xTaskGetCurrentTaskHandle();
 
-    // Reached only via esp_log firing from inside our own write path. Dropping
-    // the nested line is the only safe option: re-taking `mtx` on this task
-    // deadlocks, and recursing loops until the stack runs out.
+    // Reached when esp_log fires from inside our own write path. Dropping the
+    // nested line is the only option: re-taking mtx here deadlocks.
     if (writerTask.load(std::memory_order_acquire) == self) return;
 
     std::lock_guard lock(mtx);
@@ -71,8 +70,7 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
     Print& p = sink.print.get();
 
     String line;
-    // One allocation for the whole line instead of a realloc per fragment — this
-    // runs on every log call from every task and is a steady source of heap churn.
+    // One allocation instead of a realloc per fragment.
     line.reserve(timestampStr.length() + text.length() + 48);
 
     if (sink.timestamps) line += timestampStr;
@@ -98,8 +96,7 @@ void Log::appendMsgToSink(const LogSink& sink, const String& timestampStr, const
 
     if (written != line.length())
     {
-        // Deliberately not routed back through the logger: the sink we would log
-        // to is the one that just failed.
+        // Not routed through the logger: this sink is the one that just failed.
         Serial.print(COLOR_GRAY "Failed to write '" + line.substring(0, line.length() - 1) + "' to sink '" + sink.name +
             "'" COLOR_RESET "\n");
     }
