@@ -1,21 +1,5 @@
 #include "tasks/CardReaderTask.h"
 
-void CardReaderTask::OnCommand(const SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 std::optional<ScanResult> CardReaderTask::waitForScanResult(const TickType_t timeout) const
 {
     ScanResult result{};
@@ -33,7 +17,7 @@ void CardReaderTask::run()
 {
     ScanResult scanResult{};
 
-    while (m_running)
+    while (isRunning())
     {
         std::optional<uint32_t> uid = cardReader.scan();
 
@@ -47,6 +31,4 @@ void CardReaderTask::run()
         scanResult.ts = xTaskGetTickCount();
         xQueueOverwrite(scanResultQueue, &scanResult);
     }
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

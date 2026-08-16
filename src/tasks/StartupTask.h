@@ -15,7 +15,6 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    void OnCommand(SystemCommand cmd) override;
     std::optional<uint> displayApiProgress(ModemState desiredState, uint32_t hexColor, TickType_t timeoutToReachDesiredState, TickType_t
                                            timeToCompleteDesiredState);
 
@@ -28,8 +27,6 @@ private:
     /// task polls. It only runs during boot, and the rate has to stay fine enough
     /// to catch short-lived states.
     static constexpr TickType_t pollInterval = pdMS_TO_TICKS(10);
-
-    std::atomic<bool> m_running = true;
 
     ModemTask& modem;
     LedSchedulerTask& led;

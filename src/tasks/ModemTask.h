@@ -139,7 +139,6 @@ private:
     /// to be noticed.
     static constexpr TickType_t idlePollInterval = pdMS_TO_TICKS(500);
 
-    std::atomic<bool> m_running = true;
     std::atomic<ModemState> currentState = ModemState::NONE;
 
     /// Queued but not yet completed requests. Backs isWorkingOnTasks(), which

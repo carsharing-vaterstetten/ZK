@@ -21,7 +21,6 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    void OnCommand(SystemCommand cmd) override;
     [[nodiscard]] std::optional<ScanResult> waitForScanResult(TickType_t timeout) const;
 
 protected:
@@ -29,8 +28,6 @@ protected:
     void run() override;
 
 private:
-    std::atomic<bool> m_running = true;
-
     NfcReader& cardReader;
 
     QueueHandle_t scanResultQueue = xQueueCreate(1, sizeof(ScanResult));

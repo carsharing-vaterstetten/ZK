@@ -6,24 +6,6 @@
 
 #include "logging/Loggers.h"
 
-void SystemWatchTask::OnCommand(SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        // Otherwise shutdown would wait out a full reporting interval.
-        if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 void SystemWatchTask::report()
 {
     auto tasks = SystemManager::getAllTasks();
@@ -101,11 +83,9 @@ void SystemWatchTask::setup() {}
 
 void SystemWatchTask::run()
 {
-    while (m_running)
+    while (isRunning())
     {
         report();
         ulTaskNotifyTake(pdTRUE, reportingFrequency);
     }
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

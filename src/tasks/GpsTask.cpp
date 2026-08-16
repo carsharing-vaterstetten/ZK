@@ -13,22 +13,6 @@
 
 enum class MotionState;
 
-void GpsTask::OnCommand(SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 void GpsTask::checkGPS()
 {
     if (LittleFS.totalBytes() - LittleFS.usedBytes() < 128 * 1024)
@@ -70,7 +54,7 @@ void GpsTask::run()
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    while (m_running)
+    while (isRunning())
     {
         if (accessStatus.isLoggedIn())
         {
@@ -87,6 +71,4 @@ void GpsTask::run()
 
         vTaskDelayUntil(&xLastWakeTime, currentGPSPollingTime);
     }
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

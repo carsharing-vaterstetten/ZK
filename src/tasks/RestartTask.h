@@ -14,15 +14,11 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-
-    void OnCommand(SystemCommand cmd) override;
-
 protected:
     void setup() override;
     void run() override;
 
 private:
-
 
     static constexpr ulong dayMillis = 86400000U; // [ms] = 24 * 60 * 60 * 1000 -> a day in milliseconds;
 

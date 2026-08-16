@@ -3,23 +3,6 @@
 #include "hal/KeyControl.h"
 #include "logging/Loggers.h"
 
-
-void KeyControlTask::OnCommand(const SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 bool KeyControlTask::send(const KeyControlCommand cmd)
 {
     if (xQueueSend(cmdQueue, &cmd, enqueueTimeout) == pdTRUE)
@@ -45,7 +28,7 @@ void KeyControlTask::run()
 {
     KeyControlCommand cmd;
 
-    while (m_running)
+    while (isRunning())
     {
         if (xQueueReceive(cmdQueue, &cmd, pdMS_TO_TICKS(500)) == pdFALSE)
             continue;
@@ -60,6 +43,4 @@ void KeyControlTask::run()
             break;
         }
     }
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

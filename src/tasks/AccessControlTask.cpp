@@ -108,7 +108,7 @@ void AccessControlTask::waitForCardRemoval()
 
     bool countdownVisible = false;
 
-    while (m_running)
+    while (isRunning())
     {
         if (const std::optional<ScanResult> scan = cardReader.waitForScanResult(pollInterval))
             lastSeen = scan->ts;
@@ -135,22 +135,6 @@ void AccessControlTask::waitForCardRemoval()
     led.markCommandAsCompleted(progressId);
 }
 
-void AccessControlTask::OnCommand(SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 void AccessControlTask::setup()
 {
     logger.debugln("Card scanner task started");
@@ -158,7 +142,7 @@ void AccessControlTask::setup()
 
 void AccessControlTask::run()
 {
-    while (m_running)
+    while (isRunning())
     {
         const std::optional<ScanResult> scan = cardReader.waitForScanResult(pdMS_TO_TICKS(500));
         if (!scan.has_value()) continue;
@@ -171,6 +155,4 @@ void AccessControlTask::run()
     }
 
     logger.debugln("Card scanner task ended");
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

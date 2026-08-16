@@ -23,8 +23,6 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    void OnCommand(SystemCommand cmd) override;
-
 protected:
     void setup() override;
     void run() override;
@@ -72,8 +70,6 @@ private:
     /// enough that this goes stale, dropping it is correct — the trip is still
     /// recorded, and the user is not left waiting at the car.
     static constexpr TickType_t gpsWakeupTimeToLive = pdMS_TO_TICKS(30000);
-
-    std::atomic<bool> m_running = true;
 
     const RFIDs& rfidsManager;
     TripTracker& tripTracker;

@@ -1,9 +1,14 @@
 #pragma once
 
+#include <atomic>
 #include <Arduino.h>
 
 #include "system/SystemTypes.h"
 
+/// Base for every FreeRTOS task in the firmware.
+///
+/// Subclasses implement setup() and run(). The shutdown handshake is handled
+/// here: run() loops on isRunning(), and readiness is reported once it returns.
 class SystemThread
 {
 public:
@@ -14,8 +19,10 @@ public:
 
     [[nodiscard]] SystemThreadId getId() const;
 
-    // System Manager uses this to inject lifecycle events directly into the task
-    virtual void OnCommand(SystemCommand cmd) = 0;
+    /// Called by SystemManager on the *broadcaster's* thread, not this one, so
+    /// implementations may only touch atomics and thread-safe primitives.
+    /// The default stops the run loop and wakes the task; override to add to it.
+    virtual void OnCommand(SystemCommand cmd);
 
     /// Returns false if the task could not be created (out of heap).
     bool startTask();
@@ -31,10 +38,17 @@ protected:
     UBaseType_t prio;
     const int xCoreID;
 
+    [[nodiscard]] bool isRunning() const { return m_running.load(std::memory_order_relaxed); }
+
+    /// Wakes the task if it is blocked on a notification. Safe before startTask().
+    void notifySelf() const;
+
     // Core lifecycles
     virtual void setup() = 0;
     virtual void run() = 0;
 
 private:
+    std::atomic<bool> m_running{true};
+
     static void TaskHook(void* pvParams);
 };

@@ -66,7 +66,6 @@ private:
     std::shared_ptr<ProgressState> progressState;
 };
 
-
 class LedSchedulerTask : public SystemThread
 {
 public:
@@ -76,8 +75,6 @@ public:
     {
         SystemManager::RegisterThread(this);
     }
-
-    void OnCommand(SystemCommand cmd) override;
 
     void markCommandAsCompleted(uint commandId);
     void updateProgressOfCommand(uint commandId, ProgressState state);
@@ -139,7 +136,6 @@ private:
 
     void updateLed(TickType_t& nextSequenceTime);
 
-    std::atomic<bool> m_running = true;
     std::atomic<uint> m_nextId = 1;
 
     // Commands waiting for their first turn, OR paused mid-sequence after

@@ -5,22 +5,6 @@
 #include "system/SystemManager.h"
 #include "logging/Loggers.h"
 
-void StartupTask::OnCommand(const SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredState, const uint32_t hexColor,
                                                     TickType_t timeoutToReachDesiredState = pdMS_TO_TICKS(5000),
                                                     const TickType_t timeToCompleteDesiredState = pdMS_TO_TICKS(60 * 1000))
@@ -34,14 +18,14 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
 
     while (modem.getCurrentState() != desiredState)
     {
-        if (timedOut() || !m_running) return std::nullopt;
+        if (timedOut() || !isRunning()) return std::nullopt;
         vTaskDelay(pollInterval);
     }
 
     const uint loadCmdId = led.queueLoadingCircle(hexColor);
     while (api.getState() == ApiClientState::None && xTaskGetTickCount() - start < timeoutToReachDesiredState)
     {
-        if (timedOut() || !m_running)
+        if (timedOut() || !isRunning())
         {
             led.markCommandAsCompleted(loadCmdId);
             return std::nullopt;
@@ -55,7 +39,7 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemState desiredStat
 
     start = xTaskGetTickCount();
 
-    while (m_running && modem.getCurrentState() == desiredState && xTaskGetTickCount() - start <
+    while (isRunning() && modem.getCurrentState() == desiredState && xTaskGetTickCount() - start <
         timeToCompleteDesiredState)
     {
         auto [bytesProcessed, bytesTotal] = api.getProgress();
@@ -120,17 +104,17 @@ void StartupTask::run()
     ModemState lastState = ModemState::NONE;
     std::optional<uint> lastLedCommandId = std::nullopt;
 
-    while (m_running)
+    while (isRunning())
     {
         ModemState newState = modem.getCurrentState();
 
-        while (m_running && newState == lastState)
+        while (isRunning() && newState == lastState)
         {
             newState = modem.getCurrentState();
             vTaskDelay(pollInterval);
         }
 
-        if (!m_running) break;
+        if (!isRunning()) break;
 
         if (lastLedCommandId.has_value())
             led.markCommandAsCompleted(lastLedCommandId.value());
@@ -174,6 +158,4 @@ void StartupTask::run()
 
     if (lastLedCommandId.has_value())
         led.markCommandAsCompleted(lastLedCommandId.value());
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

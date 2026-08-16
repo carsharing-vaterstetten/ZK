@@ -13,23 +13,6 @@ namespace
     }
 }
 
-void LedSchedulerTask::OnCommand(SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle); // don't sit out the idle wait
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
-}
-
 uint LedSchedulerTask::queueCommand(LedCmd cmd)
 {
     uint id;
@@ -191,7 +174,7 @@ void LedSchedulerTask::run()
 {
     TickType_t nextSequenceTime = 0;
 
-    while (m_running)
+    while (isRunning())
     {
         if (nothingToDo())
         {
@@ -208,6 +191,4 @@ void LedSchedulerTask::run()
 
     statusLed.stopActiveSequence();
     statusLed.clear();
-
-    SystemManager::ReportReadyForRestart(m_id);
 }

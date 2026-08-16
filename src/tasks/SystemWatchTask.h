@@ -12,14 +12,11 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    void OnCommand(SystemCommand cmd) override;
-
 protected:
     void setup() override;
     void run() override;
 
 private:
-    std::atomic<bool> m_running = true;
     static void report();
 
     constexpr static TickType_t reportingFrequency = pdMS_TO_TICKS(5 * 60 * 1000);

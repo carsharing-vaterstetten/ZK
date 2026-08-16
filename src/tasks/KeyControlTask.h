@@ -12,7 +12,6 @@ enum class KeyControlCommand
     Unlock,
 };
 
-
 class KeyControlTask : public SystemThread
 {
 public:
@@ -21,8 +20,6 @@ public:
     {
         SystemManager::RegisterThread(this);
     }
-
-    void OnCommand(SystemCommand cmd) override;
 
     /// Queues the key sequence. Returns false if it could not be queued, so the
     /// caller can avoid signalling success for something that never ran.
@@ -35,8 +32,6 @@ protected:
 
 private:
     static constexpr TickType_t enqueueTimeout = pdMS_TO_TICKS(1000);
-
-    std::atomic<bool> m_running = true;
 
     KeyControl& keyControl;
 

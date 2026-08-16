@@ -9,7 +9,6 @@ void RestartTask::setup()
     logger.debugln("Restart task started");
 }
 
-
 void RestartTask::run()
 {
     constexpr TickType_t waitForSystemTimeTimeout = pdMS_TO_TICKS(5 * 60 * 1000);
@@ -54,27 +53,9 @@ void RestartTask::run()
          })
         modem.sendRequest(cmd, ModemRequest::noDeadline, shutdownEnqueueTimeout);
 
-
     SystemManager::ReportReadyForRestart(m_id);
 
     SystemManager::TriggerSystemHotRestart();
-}
-
-void RestartTask::OnCommand(SystemCommand cmd)
-{
-    switch (cmd)
-    {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        // Broadcast can arrive before this task has been created.
-        if (m_taskHandle != nullptr) xTaskNotify(m_taskHandle, 0, eSetBits);
-        break;
-    case SystemCommand::EnterLowPower:
-        break;
-    case SystemCommand::ResumeNormalOperation:
-        break;
-    }
 }
 
 ulong RestartTask::calculateTimeTillRestart(const int hour, const int minute, const int second) const

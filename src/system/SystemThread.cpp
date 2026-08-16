@@ -1,6 +1,7 @@
 #include "system/SystemThread.h"
 
 #include "logging/Loggers.h"
+#include "system/SystemManager.h"
 
 
 SystemThread::~SystemThread()
@@ -14,6 +15,26 @@ SystemThread::~SystemThread()
 SystemThreadId SystemThread::getId() const
 {
     return m_id;
+}
+
+void SystemThread::OnCommand(const SystemCommand cmd)
+{
+    switch (cmd)
+    {
+    case SystemCommand::PrepareForHotRestart:
+        m_running.store(false, std::memory_order_relaxed);
+        notifySelf(); // so a task sleeping on a notification doesn't sit out its timeout
+        break;
+    case SystemCommand::None:
+    case SystemCommand::EnterLowPower:
+    case SystemCommand::ResumeNormalOperation:
+        break;
+    }
+}
+
+void SystemThread::notifySelf() const
+{
+    if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
 }
 
 bool SystemThread::startTask()
@@ -45,6 +66,10 @@ void SystemThread::TaskHook(void* pvParams)
     instance->run();
 
     logger.debugln("Task " + String(instance->name) + " ended");
+
+    // Reported here rather than at the end of every run() so no task can forget
+    // and stall the restart handshake until it times out.
+    SystemManager::ReportReadyForRestart(instance->m_id);
 
     instance->m_taskHandle = nullptr;
     vTaskDelete(nullptr);

@@ -21,18 +21,18 @@ ModemTask::~ModemTask()
 
 void ModemTask::OnCommand(const SystemCommand cmd)
 {
+    SystemThread::OnCommand(cmd);
+
     switch (cmd)
     {
-    case SystemCommand::None:
-        break;
-    case SystemCommand::PrepareForHotRestart:
-        m_running = false;
-        break;
     case SystemCommand::EnterLowPower:
         sendRequest(ModemTaskCommand::SleepIfPossible);
         break;
     case SystemCommand::ResumeNormalOperation:
         sendRequest(ModemTaskCommand::Wakeup);
+        break;
+    case SystemCommand::None:
+    case SystemCommand::PrepareForHotRestart:
         break;
     }
 }
@@ -159,7 +159,7 @@ void ModemTask::setup()
 
 void ModemTask::run()
 {
-    while (m_running)
+    while (isRunning())
     {
         ModemRequest request{};
 
@@ -184,8 +184,6 @@ void ModemTask::run()
     }
 
     currentState = ModemState::NONE;
-
-    SystemManager::ReportReadyForRestart(m_id);
 }
 
 void ModemTask::handleRequest(const ModemTaskCommand cmd)
