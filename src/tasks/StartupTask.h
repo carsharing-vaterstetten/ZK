@@ -16,8 +16,9 @@ public:
         SystemManager::RegisterThread(this);
     }
 
-    std::optional<uint> displayApiProgress(ModemCommand desiredState, uint32_t hexColor, TickType_t timeoutToReachDesiredState, TickType_t
-                                           timeToCompleteDesiredState);
+    std::optional<uint> displayApiProgress(ModemCommand desiredState, uint32_t hexColor,
+                                          TickType_t timeoutToReachDesiredState = pdMS_TO_TICKS(5000),
+                                          TickType_t timeToCompleteDesiredState = pdMS_TO_TICKS(60 * 1000));
 
 protected:
     void setup() override;

@@ -17,13 +17,13 @@ RFIDs::RFIDs(const char* filePath, const char* tmpFilePath, const char* gpsFileP
     gpsRfids = std::make_shared<const std::vector<uint32_t>>();
 }
 
-std::shared_ptr<const std::vector<uint32_t>> RFIDs::getUids() const
+RFIDs::UidList RFIDs::getUids() const
 {
     std::lock_guard lock(ramMutex);
     return rfids; // Returns a lightweight copy of the pointer (thread-safe)
 }
 
-std::shared_ptr<const std::vector<uint32_t>> RFIDs::getGPSUids() const
+RFIDs::UidList RFIDs::getGPSUids() const
 {
     std::lock_guard lock(gpsRamMutex);
     return gpsRfids;
@@ -41,88 +41,55 @@ bool RFIDs::RFIDConsentsToGPSTrackingTest(const uint32_t rfid) const
     return std::binary_search(ids->begin(), ids->end(), rfid);
 }
 
-/// Call this function to load the UIDs into RAM to be able to check if a UID is registered.
-/// So always call this on startup and after the file changed on the disk (e.g. after remote download)
-bool RFIDs::loadFromFileToRam()
+/// Reads a UID file into a fresh sorted vector, then swaps it in. Readers hold a
+/// shared_ptr, so one mid-lookup keeps the old vector alive until it is done.
+bool RFIDs::loadUidsToRam(const char* path, UidList& target, std::mutex& targetMutex, const char* label)
 {
-    if (!LittleFS.exists(filePath))
+    if (!LittleFS.exists(path))
     {
-        logger.errorln("Failed to load UIDs to RAM, file does not exist");
+        logger.errorln("Failed to load " + String(label) + " UIDs to RAM, file does not exist");
         return false;
     }
 
-    File f = LittleFS.open(filePath, FILE_READ);
+    File f = LittleFS.open(path, FILE_READ);
 
     if (!f)
     {
-        logger.errorln("Failed to open rfid file for reading");
+        logger.errorln("Failed to open " + String(path) + " for reading");
         return false;
     }
 
-    constexpr uint uidSize = sizeof(uint32_t);
-    const size_t uidsCount = f.size() / uidSize;
+    const size_t uidsCount = f.size() / sizeof(uint32_t);
 
-    // Create a new staging vector completely isolated on the heap
-    auto newVector = std::make_unique<std::vector<uint32_t>>(uidsCount);
-
-    f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
+    auto staged = std::make_shared<std::vector<uint32_t>>(uidsCount);
+    f.read(reinterpret_cast<uint8_t*>(staged->data()), uidsCount * sizeof(uint32_t));
     f.close();
 
-    logger.debugln("Sorting RFIDs...");
+    std::sort(staged->begin(), staged->end()); // binary_search needs this
 
-    std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
+    // Read off the local vector: touching `target` after the lock is released
+    // races with whoever swaps next.
+    const size_t bytes = staged->capacity() * sizeof(uint32_t);
 
-    // ATOMIC SWAP: Update the shared pointer under lock
     {
-        std::lock_guard lock(ramMutex);
-        rfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
+        std::lock_guard lock(targetMutex);
+        target = std::move(staged);
     }
 
-    logger.infoln(
-        "Loaded and sorted " + String(rfids->size()) + " UIDs (consumes " + rfids->capacity() * uidSize + " B)");
+    logger.infoln("Loaded and sorted " + String(uidsCount) + " " + label + " UIDs (consumes " + bytes + " B)");
 
     return true;
 }
 
+/// Call on startup and whenever the file changes on disk (e.g. after a download).
+bool RFIDs::loadFromFileToRam()
+{
+    return loadUidsToRam(filePath, rfids, ramMutex, "RFID");
+}
+
 bool RFIDs::loadFromGpsFileToRam()
 {
-    if (!LittleFS.exists(gpsFilePath))
-    {
-        logger.errorln("Failed to load GPS UIDs to RAM, file does not exist");
-        return false;
-    }
-
-    File f = LittleFS.open(gpsFilePath, FILE_READ);
-
-    if (!f)
-    {
-        logger.errorln("Failed to open rfid gps file for reading");
-        return false;
-    }
-
-    constexpr uint uidSize = sizeof(uint32_t);
-    const size_t uidsCount = f.size() / uidSize;
-
-    // Create a new staging vector completely isolated on the heap
-    auto newVector = std::make_unique<std::vector<uint32_t>>(uidsCount);
-
-    f.read(reinterpret_cast<uint8_t*>(newVector->data()), uidsCount * sizeof(uint32_t));
-    f.close();
-
-    logger.debugln("Sorting RFIDs...");
-
-    std::sort(newVector->begin(), newVector->end()); // it has to be sorted for binary search
-
-    // ATOMIC SWAP: Update the shared pointer under lock
-    {
-        std::lock_guard lock(gpsRamMutex);
-        gpsRfids = std::shared_ptr<const std::vector<uint32_t>>(newVector.release());
-    }
-
-    logger.infoln(
-        "Loaded and sorted " + String(gpsRfids->size()) + " UIDs (consumes " + gpsRfids->capacity() * uidSize + " B)");
-
-    return true;
+    return loadUidsToRam(gpsFilePath, gpsRfids, gpsRamMutex, "GPS consent");
 }
 
 void RFIDs::generateChecksum(uint8_t* out) const

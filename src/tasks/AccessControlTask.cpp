@@ -37,11 +37,8 @@ void AccessControlTask::handleScannedCard(const uint32_t rfidUid)
             modem.sendRequest(ModemCommand::Wakeup, gpsWakeupTimeToLive);
             modem.sendRequest(ModemCommand::EnableGPS, gpsWakeupTimeToLive);
 
-            if (!tripTracker.isTripActive())
-            {
-                tripTracker.startTrip();
+            if (tripTracker.startTrip())
                 logger.infoln("Trip started");
-            }
         }
     }
     else
@@ -58,11 +55,8 @@ void AccessControlTask::handleScannedCard(const uint32_t rfidUid)
 
         logger.infoln("Car locked");
 
-        if (tripTracker.isTripActive())
-        {
-            const float traveledDistance = tripTracker.endTrip();
-            logger.infoln("Trip ended. Traveled distance: " + String(traveledDistance) + " m");
-        }
+        if (const std::optional<float> traveledDistance = tripTracker.endTrip())
+            logger.infoln("Trip ended. Traveled distance: " + String(*traveledDistance) + " m");
     }
 }
 

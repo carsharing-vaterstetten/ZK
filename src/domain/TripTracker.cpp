@@ -6,10 +6,8 @@ static constexpr float EARTH_RADIUS_M = 6'371'000.0f;
 
 
 TripTracker::TripTracker(const float eval_window_secs)
-    : eval_window_secs(eval_window_secs)
+    : eval_window_secs(eval_window_secs > 0.0f ? eval_window_secs : 10.0f)
 {
-    if (eval_window_secs <= 0.0f)
-        throw std::invalid_argument("TripTracker: eval_window_secs must be > 0.");
 }
 
 float TripTracker::haversineDistance(const float lat1, const float lon1, const float lat2, const float lon2)
@@ -146,22 +144,27 @@ MotionState TripTracker::pushData(const GPS_DATA_t& data)
     return last_prediction;
 }
 
-void TripTracker::startTrip()
+bool TripTracker::isTripActive() const
 {
     std::lock_guard lock(algMutex);
-    if (trip_active)
-        throw std::logic_error("TripTracker: cannot start a trip - one is already active.");
+    return trip_active;
+}
+
+bool TripTracker::startTrip()
+{
+    std::lock_guard lock(algMutex);
+    if (trip_active) return false;
 
     trip_active = true;
     trip_distance_m = 0.0f;
     last_trip_sample = std::nullopt;
+    return true;
 }
 
-float TripTracker::endTrip()
+std::optional<float> TripTracker::endTrip()
 {
     std::lock_guard lock(algMutex);
-    if (!trip_active)
-        throw std::logic_error("TripTracker: cannot end a trip - no trip is active.");
+    if (!trip_active) return std::nullopt;
 
     trip_active = false;
     last_trip_sample = std::nullopt;

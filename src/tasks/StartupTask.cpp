@@ -6,8 +6,8 @@
 #include "logging/Loggers.h"
 
 std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredState, const uint32_t hexColor,
-                                                    TickType_t timeoutToReachDesiredState = pdMS_TO_TICKS(5000),
-                                                    const TickType_t timeToCompleteDesiredState = pdMS_TO_TICKS(60 * 1000))
+                                                    const TickType_t timeoutToReachDesiredState,
+                                                    const TickType_t timeToCompleteDesiredState)
 {
     TickType_t start = xTaskGetTickCount();
 

@@ -41,8 +41,11 @@ void GpsTask::checkGPS()
 
 void GpsTask::setup()
 {
-    while (modem.hasPendingWork())
-        vTaskDelay(pdMS_TO_TICKS(100));
+    // Deliberately does not wait for the boot sequence: the request deadline in
+    // checkGPS() already makes a poll issued while the modem is busy expire
+    // instead of queueing up, which is what waiting was reaching for. Waiting on
+    // hasPendingWork() was also unreliable, since this task can reach setup()
+    // before StartupTask has queued its first request.
 }
 
 void GpsTask::run()

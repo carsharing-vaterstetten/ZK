@@ -9,33 +9,35 @@
 
 class ApiClient;
 
-enum class RfidsChecksumResult
-{
-    FILES_ARE_EQUAL,
-    FILES_DIFFER,
-    LOCAL_FILE_DOES_NOT_EXIST,
-    UNEXPECTED_STATUS_CODE,
-};
-
+/// The authorised UID lists, held sorted in RAM for binary search and backed by
+/// files on flash. Lookups run on the card-reader path while downloads replace
+/// the lists from the modem task, so each list is a shared_ptr swapped under its
+/// own mutex: a reader holding the pointer keeps its snapshot alive.
 class RFIDs
 {
 public:
     RFIDs(const char* filePath, const char* tmpFilePath, const char* gpsFilePath, const char* tmpGpsFilePath);
 
     bool isRegisteredRFID(uint32_t rfid) const;
+    bool RFIDConsentsToGPSTrackingTest(uint32_t rfid) const;
+
     void downloadRfidsIfChanged(ApiClient& api);
     bool downloadGPSTrackingConsentedRFIDs(ApiClient& api);
-    bool RFIDConsentsToGPSTrackingTest(uint32_t rfid) const;
+
     bool loadFromFileToRam();
     bool loadFromGpsFileToRam();
 
 protected:
-    std::shared_ptr<const std::vector<uint32_t>> getUids() const;
-    std::shared_ptr<const std::vector<uint32_t>> getGPSUids() const;
+    using UidList = std::shared_ptr<const std::vector<uint32_t>>;
+
+    UidList getUids() const;
+    UidList getGPSUids() const;
     void generateChecksum(uint8_t* out) const;
 
-    std::shared_ptr<const std::vector<uint32_t>> rfids;
-    std::shared_ptr<const std::vector<uint32_t>> gpsRfids;
+    static bool loadUidsToRam(const char* path, UidList& target, std::mutex& targetMutex, const char* label);
+
+    UidList rfids;
+    UidList gpsRfids;
     mutable std::mutex ramMutex;
     mutable std::mutex gpsRamMutex;
 

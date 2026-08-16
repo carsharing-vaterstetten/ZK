@@ -48,10 +48,13 @@ public:
 
     MotionState pushData(const GPS_DATA_t& data);
 
-    void startTrip();
-    float endTrip();
+    /// Both check and act under the lock, so callers do not need to test
+    /// isTripActive() first. Returns false / nullopt when there was nothing to
+    /// do, which is also what a lost race looks like.
+    bool startTrip();
+    std::optional<float> endTrip();
 
-    bool isTripActive() const { return trip_active; }
+    bool isTripActive() const;
 
     static String motionStateToString(const MotionState pred)
     {
