@@ -19,6 +19,8 @@ void CardReaderTask::run()
 
     while (isRunning())
     {
+        feedWatchdog();
+
         std::optional<uint32_t> uid = cardReader.scan();
 
         if (!uid.has_value())

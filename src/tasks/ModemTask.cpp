@@ -113,6 +113,8 @@ void ModemTask::run()
 {
     while (isRunning())
     {
+        feedWatchdog();
+
         ModemRequest request{};
 
         if (xQueueReceive(m_requests, &request, idlePollInterval) != pdTRUE)

@@ -5,6 +5,7 @@
 #include "hal/Modem.h"
 #include "net/ApiClient.h"
 #include "logging/Loggers.h"
+#include "system/Watchdog.h"
 #include "util/Files.h"
 
 Modem::Modem(TinyGsmSim7000& gsmModem, HardwareSerial& hwSerial, const ulong serialBaud,
@@ -306,6 +307,11 @@ bool Modem::connectGPRSAndNetwork(const uint retries) const
 
     for (uint attempt = 0; attempt <= retries; ++attempt)
     {
+        // gprsConnect()/waitForNetwork() each carry their own internal timeout
+        // (commonly tens of seconds) with no loop of ours to hook a feed into
+        // meanwhile, so this loop's top is the only place to reset between them.
+        Watchdog::feed();
+
         logger.infoln("Attempt " + String(attempt + 1) + " of " + String(retries + 1));
 
         if (tryGprsFirst && !gprsSuccess)
@@ -332,6 +338,7 @@ bool Modem::ensureNetworkConnection(const uint maxRetries) const
 
     for (uint attempt = 0; attempt < maxRetries && signalQuality == 99; ++attempt)
     {
+        Watchdog::feed();
         logger.debugln("Waiting for signal...");
         delay(2000);
         signalQuality = gsmModem.getSignalQuality();

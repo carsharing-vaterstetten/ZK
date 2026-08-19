@@ -2,6 +2,7 @@
 
 #include "logging/Loggers.h"
 #include "system/SystemManager.h"
+#include "system/Watchdog.h"
 
 
 SystemThread::~SystemThread()
@@ -37,6 +38,11 @@ void SystemThread::notifySelf() const
     if (m_taskHandle != nullptr) xTaskNotifyGive(m_taskHandle);
 }
 
+void SystemThread::feedWatchdog() const
+{
+    if (m_watchdogCritical) Watchdog::feed();
+}
+
 bool SystemThread::startTask()
 {
     if (xTaskCreatePinnedToCore(TaskHook, name, stackDepth, this, prio, &m_taskHandle, xCoreID) == pdPASS)
@@ -60,12 +66,22 @@ void SystemThread::TaskHook(void* pvParams)
 {
     auto* instance = static_cast<SystemThread*>(pvParams);
 
+    // Subscribed before setup() runs, not just before run(): ModemTask's
+    // worst hang risk is inside setup() (modem.connect(), which has no loop
+    // of its own to feed from), and that stretch needs covering too.
+    if (instance->m_watchdogCritical) Watchdog::watchCurrentTask();
+
     logger.debugln("Task " + String(instance->name) + " started");
 
     instance->setup();
     instance->run();
 
     logger.debugln("Task " + String(instance->name) + " ended");
+
+    // Unsubscribed before the shutdown handshake reports readiness, so a task
+    // that has legitimately stopped resetting the timer can't race the
+    // watchdog into firing mid-restart.
+    if (instance->m_watchdogCritical) Watchdog::unwatchCurrentTask();
 
     // Here rather than at the end of every run(), so no task can forget.
     SystemManager::ReportReadyForRestart(instance->m_id);

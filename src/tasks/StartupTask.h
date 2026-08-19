@@ -36,6 +36,7 @@ private:
     const AccessStatus& accessStatus;
 
     bool timeSynced = false;
+    bool watchdogTightened = false;
 
     /// Non-blocking check for the unix-time result, called on every poll tick
     /// regardless of which state is currently on display.

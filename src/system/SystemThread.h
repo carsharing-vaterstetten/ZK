@@ -11,8 +11,15 @@
 class SystemThread
 {
 public:
-    explicit SystemThread(const SystemThreadId id, const char* name, const uint32_t stackDepth, const ThreadPriority prio,  const int xCoreID) :
-        m_id(id), name(name), stackDepth(stackDepth), prio(static_cast<UBaseType_t>(prio)), xCoreID(xCoreID) {}
+    /// `watchdogCritical` subscribes the task to the hardware task watchdog
+    /// (see system/Watchdog.h) for its entire lifetime, from before setup()
+    /// runs to after run() returns. Reserved for tasks whose hang would strand
+    /// a user or otherwise need a hardware reset to recover from — most tasks
+    /// should leave this false.
+    explicit SystemThread(const SystemThreadId id, const char* name, const uint32_t stackDepth, const ThreadPriority prio,  const int xCoreID,
+                          const bool watchdogCritical = false) :
+        m_id(id), name(name), stackDepth(stackDepth), prio(static_cast<UBaseType_t>(prio)), xCoreID(xCoreID),
+        m_watchdogCritical(watchdogCritical) {}
 
     virtual ~SystemThread();
 
@@ -36,11 +43,17 @@ protected:
     uint32_t stackDepth;
     UBaseType_t prio;
     const int xCoreID;
+    const bool m_watchdogCritical;
 
     [[nodiscard]] bool isRunning() const { return m_running.load(std::memory_order_relaxed); }
 
     /// Wakes the task if it is blocked on a notification. Safe before startTask().
     void notifySelf() const;
+
+    /// Resets the task watchdog on this task's behalf. A no-op if the task was
+    /// not constructed with watchdogCritical = true — safe to call unconditionally
+    /// from run() without checking the flag yourself.
+    void feedWatchdog() const;
 
     // Core lifecycles
     virtual void setup() = 0;

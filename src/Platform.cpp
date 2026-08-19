@@ -2,13 +2,13 @@
 
 #include <esp32-hal.h>
 #include <esp_log.h>
-#include <esp_task_wdt.h>
 #include <LittleFS.h>
 
 #include "config/Config.h"
 #include "config/Intern.h"
 #include "config/user_config.h"
 #include "logging/Loggers.h"
+#include "system/Watchdog.h"
 #include "util/ResetReason.h"
 
 namespace
@@ -27,10 +27,14 @@ namespace
 
 void Platform::begin()
 {
+    // These only ever unsubscribe the idle tasks and the Arduino loop task
+    // (which blocks forever by design — main.cpp's loop() never returns, so
+    // it must never be watched). Named-task subscription is always a separate,
+    // explicit opt-in — see Watchdog::begin() below and SystemThread's
+    // watchdogCritical flag.
     disableCore0WDT();
     disableCore1WDT();
     disableLoopWDT();
-    esp_task_wdt_deinit();
 
     Serial.begin(USB_SERIAL_BAUD);
     while (!Serial) {}
@@ -56,6 +60,13 @@ void Platform::begin()
     logger.infoln("Running firmware version " FIRMWARE_VERSION);
     logger.infoln("CPU0 reset reason: " + ResetReason::describe(rtc_get_reset_reason(0)));
     logger.infoln("CPU1 reset reason: " + ResetReason::describe(rtc_get_reset_reason(1)));
+
+    // After the sinks so its own confirmation line is actually visible, and
+    // after esp_log routing so a failure to start it is captured too. Nothing
+    // watchdog-critical exists yet — Device's tasks aren't constructed until
+    // after Platform::begin() returns — so there's no urgency to start this
+    // any earlier.
+    Watchdog::begin();
 }
 
 const BoardConfig& Platform::selectBoard()

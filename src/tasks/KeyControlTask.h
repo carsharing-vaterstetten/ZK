@@ -16,7 +16,8 @@ class KeyControlTask : public SystemThread
 {
 public:
     explicit KeyControlTask(CarKey& carKey) : SystemThread(SystemThreadId::KeyControlTask, "KEYCTRL", 4096,
-                                                                      ThreadPriority::KeyControlTask, 0), carKey(carKey)
+                                                                      ThreadPriority::KeyControlTask, 0,
+                                                                      /*watchdogCritical=*/true), carKey(carKey)
     {
         SystemManager::RegisterThread(this);
     }

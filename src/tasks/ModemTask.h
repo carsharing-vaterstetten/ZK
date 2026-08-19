@@ -86,7 +86,8 @@ class ModemTask : public SystemThread
 public:
     ModemTask(const LocalConfig& config, RFIDs& rfidsManager, SwappableFile& swLog, Modem& modem,
               GpsLog& gps, ApiClient& api, ImeiStore& imeiStore)
-        : SystemThread(SystemThreadId::ModemTask, "MODEMTSK", 8192, ThreadPriority::ModemTask, 1),
+        : SystemThread(SystemThreadId::ModemTask, "MODEMTSK", 8192, ThreadPriority::ModemTask, 1,
+                       /*watchdogCritical=*/true),
           config(config), modem(modem), rfidsManager(rfidsManager),
           gps(gps), swLog(swLog), api(api), imeiStore(imeiStore)
     {

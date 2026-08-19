@@ -3,6 +3,7 @@
 
 #include "config/user_config.h"
 #include "system/SystemManager.h"
+#include "system/Watchdog.h"
 #include "logging/Loggers.h"
 
 void StartupTask::pollTimeSync()
@@ -172,6 +173,16 @@ void StartupTask::run()
             break;
         default:
             break;
+        }
+
+        // The queued boot batch is sent once, with no deadline, so nothing in
+        // it can be dropped ahead of time — the first time the modem goes idle
+        // genuinely means every boot command has at least been attempted, not
+        // just that this particular poll happened to land between two of them.
+        if (newState == ModemCommand::Ready && !watchdogTightened)
+        {
+            Watchdog::enterSteadyState();
+            watchdogTightened = true;
         }
 
         pollTimeSync();

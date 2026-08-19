@@ -29,6 +29,8 @@ void KeyControlTask::run()
 
     while (isRunning())
     {
+        feedWatchdog();
+
         if (xQueueReceive(cmdQueue, &cmd, pdMS_TO_TICKS(500)) == pdFALSE)
             continue;
 

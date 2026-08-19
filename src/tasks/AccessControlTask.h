@@ -16,7 +16,8 @@ public:
     AccessControlTask(const RFIDs& rfidsManager, TripTracker& tripTracker,
                       KeyControlTask& keyControlTask, AccessStatus& accessStatus,
                       LedSchedulerTask& led, ModemTask& modem, const CardReaderTask& cardReader)
-        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask, 0),
+        : SystemThread(SystemThreadId::AccessControlTask, "ACCTRL", 4096, ThreadPriority::AccessControlTask, 0,
+                       /*watchdogCritical=*/true),
           rfidsManager(rfidsManager),
           tripTracker(tripTracker), keyControlTask(keyControlTask), accessStatus(accessStatus), led(led), modem(modem),
           cardReader(cardReader)

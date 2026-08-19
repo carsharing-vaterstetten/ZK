@@ -15,7 +15,8 @@ class CardReaderTask : public SystemThread
 {
 public:
     explicit CardReaderTask(NfcReader& cardReader) : SystemThread(SystemThreadId::CardReaderTask, "CRS", 4096,
-                                                                         ThreadPriority::CardReaderTask, 0),
+                                                                         ThreadPriority::CardReaderTask, 0,
+                                                                         /*watchdogCritical=*/true),
                                                             cardReader(cardReader)
     {
         SystemManager::RegisterThread(this);

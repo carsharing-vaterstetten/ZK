@@ -104,6 +104,8 @@ void AccessControlTask::waitForCardRemoval()
 
     while (isRunning())
     {
+        feedWatchdog();
+
         if (const std::optional<ScanResult> scan = cardReader.waitForScanResult(pollInterval))
             lastSeen = scan->ts;
 
@@ -138,6 +140,8 @@ void AccessControlTask::run()
 {
     while (isRunning())
     {
+        feedWatchdog();
+
         const std::optional<ScanResult> scan = cardReader.waitForScanResult(pdMS_TO_TICKS(500));
         if (!scan.has_value()) continue;
 
