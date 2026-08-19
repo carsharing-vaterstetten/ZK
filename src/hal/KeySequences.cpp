@@ -9,8 +9,8 @@ void KeySequences::loadSequenceInRAM(const BoardConfig& board)
     std::lock_guard lock(mtx);
 
     static constexpr uint32_t kPulseMs = 200;
-    static constexpr uint32_t kPowerUpMs = 100;
-    static constexpr uint32_t kPowerDownMs = 200;
+    static constexpr uint32_t kPowerUpMs = 300;
+    static constexpr uint32_t kPowerDownMs = 300;
 
     // Extract pin numbers upfront — capture these by value in lambdas
     const uint8_t pinOpen = board.keyOpen;
