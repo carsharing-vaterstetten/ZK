@@ -9,11 +9,26 @@ void StartupTask::pollTimeSync()
 {
     if (timeSynced) return;
 
-    if (const auto result = modem.waitFor(ModemResult::UnixTimestamp, 0))
-    {
-        Time::syncSystemTime(std::get<time_t>(*result));
-        timeSynced = true;
-    }
+    const auto result = modem.waitFor(ModemResult::UnixTimestamp, 0);
+    if (!result.has_value()) return;
+
+    const time_t unixTimestamp = std::get<time_t>(*result);
+    const uint32_t uptimeMs = millis();
+
+    Time::syncSystemTime(unixTimestamp);
+    timeSynced = true;
+
+    // Matches the calibration message the backend's log parser looks for
+    // (app/helpers/log_parser.py: TimeCalibrationMessage / V1_0_0). Every line
+    // logged before this point carries a millis()-since-boot timestamp, since
+    // there was no wall clock yet; the backend retroactively corrects those
+    // using this line's millis-to-unix-time mapping, but only if the format
+    // matches exactly. "v1.0.0" is the calibration message format version, not
+    // the firmware version — it is the only one the backend currently parses.
+    const auto systemTimeMs = static_cast<uint64_t>(unixTimestamp) * 1000ULL;
+    logger.infoln("Time (v1.0.0): millis: " + String(uptimeMs) + " ms, Localtime: " +
+        Time::toIsoString(systemTimeMs) + " UTC, Unix timestamp: " + String(static_cast<long long>(unixTimestamp)) +
+        ", system time: " + String(static_cast<unsigned long long>(systemTimeMs)) + " ms");
 }
 
 std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredState, const uint32_t hexColor,
