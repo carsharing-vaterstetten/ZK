@@ -8,6 +8,19 @@
 #include "domain/RFIDs.h"
 #include "hal/Modem.h"
 
+namespace
+{
+    bool looksLikeImei(const String& s)
+    {
+        if (s.length() != 15) return false;
+
+        for (size_t i = 0; i < s.length(); ++i)
+            if (!isDigit(s[i])) return false;
+
+        return true;
+    }
+}
+
 void ModemTask::OnCommand(const SystemCommand cmd)
 {
     SystemThread::OnCommand(cmd);
@@ -166,6 +179,23 @@ void ModemTask::publishNetworkTime()
     publish(ModemResult::Timestamp, ModemTimestamp{.hour = hour, .minute = minute, .second = second});
 }
 
+void ModemTask::publishImei()
+{
+    String imei = modem.getIMEI();
+
+    for (uint i = 0; i < 10 && !looksLikeImei(imei); ++i)
+    {
+        logger.warningln("Got implausible IMEI '" + imei + "', retrying");
+        vTaskDelay(pdMS_TO_TICKS(50));
+        imei = modem.getIMEI();
+    }
+
+    if (!looksLikeImei(imei))
+        logger.errorln("Still no valid IMEI after retries, using '" + imei + "' anyway");
+
+    imeiStore.setIMEI(imei);
+}
+
 void ModemTask::handleRequest(const ModemCommand cmd)
 {
     switch (cmd)
@@ -216,8 +246,7 @@ void ModemTask::handleRequest(const ModemCommand cmd)
         publishNetworkTime();
         break;
     case ModemCommand::GetImei:
-        // FIXME: where does +CPIN  READY: come from?????????
-        imeiStore.setIMEI(modem.getIMEI());
+        publishImei();
         break;
     case ModemCommand::GetAccessControlSequences: // TODO: implement once feature on server
     case ModemCommand::InitializeModem: // handled once in setup()

@@ -23,7 +23,7 @@ void CardReaderTask::run()
 
         if (!uid.has_value())
         {
-            vTaskDelay(pdMS_TO_TICKS(10));
+            vTaskDelay(pdMS_TO_TICKS(200));
             continue;
         }
 

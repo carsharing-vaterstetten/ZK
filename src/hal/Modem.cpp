@@ -111,6 +111,25 @@ bool Modem::waitForRDY(uint32_t timeout_ms)
      return gsmModem.waitResponse(timeout_ms, "RDY") > 0;
 }
 
+void Modem::drainStaleInput() const
+{
+    // Bounded so a modem that's mid-burst on something unrelated can't turn this
+    // into an unbounded spin; TINY_GSM_RX_BUFFER is already the ceiling on how
+    // much the driver could be holding for us to drain in the first place.
+    size_t drained = 0;
+    while (serial.available() && drained < TINY_GSM_RX_BUFFER)
+    {
+        serial.read();
+        ++drained;
+    }
+}
+
+String Modem::getIMEI() const
+{
+    drainStaleInput();
+    return gsmModem.getIMEI();
+}
+
 bool Modem::connect(const char* simPin, const char* user, const char* password, const char* netApn, const uint retries)
 {
     gprsUser = user;

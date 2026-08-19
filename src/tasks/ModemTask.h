@@ -160,4 +160,12 @@ private:
     /// placeholder values for a while after it comes up.
     void publishUnixTime();
     void publishNetworkTime();
+
+    /// Retries while the answer doesn't look like an IMEI (15 digits) — a stray
+    /// unsolicited line from the modem can otherwise be mistaken for one. Stores
+    /// whatever it has after exhausting retries even if still implausible: this
+    /// is the credential every authenticated request blocks on, and leaving it
+    /// unset would turn a bad IMEI (recoverable — the device still unlocks cars,
+    /// only backend sync fails) into every such request hanging forever instead.
+    void publishImei();
 };

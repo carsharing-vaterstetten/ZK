@@ -59,6 +59,13 @@ protected:
     bool finishInit(const char* simPin, ulong detectedBaud) const;
     void forcePowerCycle() const;
     bool waitForRDY(uint32_t timeout_ms);
+
+    /// Discards bytes already sitting in the UART's RX buffer. Called before any
+    /// command whose response is read by "next line", rather than by matching a
+    /// specific prefix — those are the ones an unconsumed unsolicited line (e.g.
+    /// "+CPIN: READY", which the SIM7000 can emit asynchronously well after
+    /// gsmModem.init() already returned) can get mistaken for the answer to.
+    void drainStaleInput() const;
     static ApiResponse uploadData(ApiClient& api, const char* endpoint, Stream& stream, size_t streamLen);
     static UploadAndRetryResult uploadDataAndRetry(ApiClient& api, const char* endpoint, Stream& stream,
                                                    size_t streamLen, uint retries);
@@ -90,8 +97,5 @@ public:
     [[nodiscard]] time_t getUnixTimestamp() const;
     bool getGPS(GPS_DATA_t& out) const;
 
-    [[nodiscard]] String getIMEI() const
-    {
-        return gsmModem.getIMEI();
-    }
+    [[nodiscard]] String getIMEI() const;
 };
