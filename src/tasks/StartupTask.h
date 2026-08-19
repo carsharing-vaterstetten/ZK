@@ -34,4 +34,19 @@ private:
     LedSchedulerTask& led;
     const ApiClient& api;
     const AccessStatus& accessStatus;
+
+    bool timeSynced = false;
+
+    /// Non-blocking check for the unix-time result, called on every poll tick
+    /// regardless of which state is currently on display.
+    ///
+    /// GetUnixTime is queued once and can complete in a single AT round trip —
+    /// faster than the 10ms state poll can reliably observe on another core.
+    /// Gating the sync on catching that transient state (as the LED cosmetics
+    /// below do) meant it silently never fired: ModemTask had already moved on
+    /// to GetTimestamp by the time this task next checked getCurrentState(). The
+    /// result itself does not have that problem — it sits in its slot until
+    /// consumed rather than being overwritten — so polling for the result
+    /// directly is race-free regardless of state-machine timing.
+    void pollTimeSync();
 };

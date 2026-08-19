@@ -1,6 +1,6 @@
 #pragma once
 
-#define FIRMWARE_VERSION "1.5.1-main"
+#define FIRMWARE_VERSION "2.0.0-main"
 
 #define CONFIG_VERSION "1"
 #define CONFIG_PREFS_NAME "Config v" CONFIG_VERSION

@@ -5,6 +5,17 @@
 #include "system/SystemManager.h"
 #include "logging/Loggers.h"
 
+void StartupTask::pollTimeSync()
+{
+    if (timeSynced) return;
+
+    if (const auto result = modem.waitFor(ModemResult::UnixTimestamp, 0))
+    {
+        Time::syncSystemTime(std::get<time_t>(*result));
+        timeSynced = true;
+    }
+}
+
 std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredState, const uint32_t hexColor,
                                                     const TickType_t timeoutToReachDesiredState,
                                                     const TickType_t timeToCompleteDesiredState)
@@ -18,6 +29,7 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredSt
 
     while (modem.getCurrentState() != desiredState)
     {
+        pollTimeSync();
         if (timedOut() || !isRunning()) return std::nullopt;
         vTaskDelay(pollInterval);
     }
@@ -42,6 +54,8 @@ std::optional<uint> StartupTask::displayApiProgress(const ModemCommand desiredSt
     while (isRunning() && modem.getCurrentState() == desiredState && xTaskGetTickCount() - start <
         timeToCompleteDesiredState)
     {
+        pollTimeSync();
+
         auto [bytesProcessed, bytesTotal] = api.getProgress();
 
         float progress = 0;
@@ -110,6 +124,7 @@ void StartupTask::run()
 
         while (isRunning() && newState == lastState)
         {
+            pollTimeSync();
             newState = modem.getCurrentState();
             vTaskDelay(pollInterval);
         }
@@ -140,20 +155,19 @@ void StartupTask::run()
         case ModemCommand::UploadLog:
             lastLedCommandId = displayApiProgress(newState, 0x0000FF);
             break;
-        case ModemCommand::GetUnixTime:
-            {
-                // Sync time
-                if (const auto result = modem.waitFor(ModemResult::UnixTimestamp, pdMS_TO_TICKS(20000)))
-                    Time::syncSystemTime(std::get<time_t>(*result));
-                break;
-            }
         default:
             break;
         }
 
+        pollTimeSync();
         lastState = newState;
     }
 
     if (lastLedCommandId.has_value())
         led.markCommandAsCompleted(lastLedCommandId.value());
+
+    // Covers the pathological case where every poll point above is skipped
+    // (e.g. the outer loop exits on !isRunning() before ever ticking). Costs
+    // nothing when already synced.
+    pollTimeSync();
 }
