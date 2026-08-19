@@ -45,6 +45,22 @@ public:
         return progress;
     }
 
+    /// Lets a transfer that bypasses fetch()/makeRequest() — e.g.
+    /// Update.writeStream(), which reads the response body straight into flash
+    /// without ever calling into this class — still drive the same progress
+    /// state those do, so StartupTask's LED progress bar reflects it too.
+    void reportExternalProgress(const ApiClientState direction, const size_t bytesProcessed, const size_t bytesTotal)
+    {
+        state = direction;
+        progress.store({bytesProcessed, bytesTotal});
+    }
+
+    /// Clears the state reportExternalProgress set, once that transfer is done.
+    void endExternalTransfer()
+    {
+        state = ApiClientState::None;
+    }
+
 private:
     std::atomic<ApiClientState> state;
     std::atomic<ApiClientProgress> progress;

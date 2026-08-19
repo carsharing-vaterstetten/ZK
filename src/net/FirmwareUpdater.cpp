@@ -49,7 +49,7 @@ bool isUpdateAvailable(const ApiResponse& resp)
     return true;
 }
 
-bool prepareUpdate(const ApiResponse& resp)
+bool prepareUpdate(ApiClient& api, const ApiResponse& resp)
 {
     const size_t updateSize = resp.bodyLength;
     logger.infoln("Update size: " + String(updateSize) + " B");
@@ -74,7 +74,18 @@ bool prepareUpdate(const ApiResponse& resp)
     }
 
     nextDownloadProgressPrint = 0;
-    Update.onProgress(onDownloadProgress);
+
+    // writeFirmware() below reads via Update.writeStream(), not api.fetch(), so
+    // this is the only place progress from the download actually surfaces —
+    // mirror it into the ApiClient state StartupTask polls for the LED bar.
+    api.reportExternalProgress(ApiClientState::Downloading, 0, updateSize);
+
+    Update.onProgress([&api](const size_t progress, const size_t total)
+    {
+        onDownloadProgress(progress, total);
+        api.reportExternalProgress(ApiClientState::Downloading, total - progress, total);
+    });
+
     return true;
 }
 
@@ -111,8 +122,12 @@ void FirmwareUpdater::doUpdateIfAvailable(ApiClient& api)
     if (!resp.valid || !isUpdateAvailable(resp)) return;
     logger.infoln("Performing OTA update");
 
-    if (!prepareUpdate(resp)) return;
-    if (!writeFirmware(resp)) return;
+    if (!prepareUpdate(api, resp)) return;
+
+    const bool writeSuccess = writeFirmware(resp);
+    api.endExternalTransfer(); // stop reporting Downloading whether it succeeded or not
+
+    if (!writeSuccess) return;
     if (!finalizeUpdate()) return;
 
     logger.infoln("Update complete. Requesting restart");
