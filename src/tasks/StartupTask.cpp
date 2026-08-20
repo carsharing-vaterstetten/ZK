@@ -163,8 +163,6 @@ void StartupTask::run()
             lastLedCommandId = displayApiProgress(newState, 0xFF00FF);
             break;
         case ModemCommand::DownloadRfidIfChanged:
-            lastLedCommandId = displayApiProgress(newState, 0xFFA500);
-            break;
         case ModemCommand::DownloadGPSRfids:
             lastLedCommandId = displayApiProgress(newState, 0xFFA500);
             break;
