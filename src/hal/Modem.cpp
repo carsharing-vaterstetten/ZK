@@ -395,9 +395,15 @@ UploadAndRetryResult Modem::uploadDataAndRetry(ApiClient& api, const char* endpo
             return attemptNo == 0 ? UploadAndRetryResult::SUCCESS : UploadAndRetryResult::SUCCESS_AFTER_RETRYING;
         }
 
+        // resp.responseCode is only meaningful when resp.valid — a transport-
+        // level failure (connection dropped, timed out, etc.) always reports
+        // code 0, since it never got far enough to have one; ApiClient logs the
+        // specific reason for that case above this line.
         logger.errorln(
             "Attempt No. " + String(attemptNo + 1) + " of " + String(retries + 1) +
-            " failed at uploading to " + endpoint);
+            " failed at uploading to " + endpoint + " — " +
+            (resp.valid ? "server responded with HTTP " + String(resp.responseCode)
+                        : "no valid response (connection/transport failure — see above)"));
 
         ++attemptNo;
     }
