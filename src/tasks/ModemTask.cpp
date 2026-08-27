@@ -196,6 +196,7 @@ void ModemTask::publishImei()
         logger.errorln("Still no valid IMEI after retries, using '" + imei + "' anyway");
 
     imeiStore.setIMEI(imei);
+    logger.infoln("IMEI: " + imei);
 }
 
 void ModemTask::handleRequest(const ModemCommand cmd)
