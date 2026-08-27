@@ -40,7 +40,7 @@ struct BoardConfig
 // ── Board instances ───────────────────────────────────────────────────────────
 inline constexpr BoardConfig BOARD_REV2 = {
     .hasNFCInterrupt = false, .hasKeyPower = false,
-    .led = 12, .ledCount = 1,
+    .led = 12, .ledCount = 4,
     .modemDtr = 32, .modemRx = 26, .modemTx = 27, .modemPowerOn = 25, .modemPwrKey = 4, .modemPwrKeyPulseWidthMs = 1000, .modemPowerOffPulseWidthMs = 1300,
     .keyOpen = 15, .keyClose = 14, .keyPower = std::nullopt,
     .nfcMosi = 23, .nfcMiso = 19, .nfcClk = 18, .nfcCs = 5, .nfcSpi = HSPI, .nfcIrq = std::nullopt

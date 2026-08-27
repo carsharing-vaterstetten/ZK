@@ -9,6 +9,7 @@
 #include "config/user_config.h"
 #include "logging/Loggers.h"
 #include "system/Watchdog.h"
+#include "util/CrashLog.h"
 #include "util/ResetReason.h"
 
 namespace
@@ -60,6 +61,16 @@ void Platform::begin()
     logger.infoln("Running firmware version " FIRMWARE_VERSION);
     logger.infoln("CPU0 reset reason: " + ResetReason::describe(rtc_get_reset_reason(0)));
     logger.infoln("CPU1 reset reason: " + ResetReason::describe(rtc_get_reset_reason(1)));
+
+    // The two lines above can't tell a crash apart from a normal ESP.restart()
+    // -- both report as "Software reset CPU". This one can.
+    logger.infoln("Reset reason: " + ResetReason::describe(esp_reset_reason()));
+
+    // If the last boot crashed, the panic handler already wrote a core dump to
+    // flash before rebooting -- this is only the read side. Before the sinks
+    // above it would have nowhere to go; before esp_log routing doesn't matter
+    // either way.
+    CrashLog::logAndClearPending();
 
     // After the sinks so its own confirmation line is actually visible, and
     // after esp_log routing so a failure to start it is captured too. Nothing
