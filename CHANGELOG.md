@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.1]
+
+- Crashes are now logged with the affected task, cause, and a backtrace instead of being lost silently
+- File upload failures (logs, GPS data) now log the actual reason (connection lost, timeout, server error, ...)
+  instead of just "failed"
+- Log IMEI again
+
+## [2.0.0]
+
+- Complete code refactor: the firmware is now organized by role (hardware drivers, tasks, domain logic, networking,
+  logging, utilities) instead of one large source tree
+- Firmware is divided into multiple FreeRTOS tasks
+- Firmware update, uploading logs, etc. can be performed in the background while performing gps tracking and
+  unlocking / locking the car
+- Firmware is compatible with HW rev. 2 and 3
+- Added a task watchdog: if the card reader, key control, access control, or modem tasks ever hang, the device now
+  recovers on its own with a reset instead of staying stuck
+- Reworked LED feedback: progress now fills as a bar across the strip, a card left on the reader pulses instead of
+  staying static, and removing it fades the light out
+- Fixed a rare IMEI read corruption that could cause the device to lose backend authentication
+
 ## [1.5.1]
 
 - Bf

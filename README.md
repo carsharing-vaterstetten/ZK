@@ -12,33 +12,33 @@ ein autorisierter Tag erkannt wird, wird der Zugang gewährt oder verweigert.
 
 ### Pinbelegung
 
-Die Pinbelegung kann in [`include/Config.h`](src/config/Config.h) angepasst werden.
+Die Pinbelegung ist je Hardware-Revision in [`src/config/hw_config.h`](src/config/hw_config.h) definiert
+(`BOARD_REV2`, `BOARD_REV3`, …). Welche Revision gebaut wird, legt die PlatformIO-Umgebung in
+[`platformio.ini`](platformio.ini) über `HW_REV` fest.
 
 ## Firmware
 
 ### Installation und Einrichtung
 
-1. **Hardware verbinden**: Verbinden Sie das LILYGO SIM7000G mit dem RFID-Modul gemäß der gewählten Pinbelegung und
-   schließen Sie die Antennen an.
-2. **Software einrichten**: Klonen Sie das Repository und öffnen Sie es in Visual Studio Code mit der
-   PlatformIO-Erweiterung.
-3. **Konfiguration anpassen**: Bearbeiten Sie die `include/Config.h` Datei
-4. **Server einrichten**: Richten Sie einen Server ein, der die RFID-Liste hostet und die Liste über eine
-   HTTPS-Schnittstelle aktualisieren kann.
-5. **Projekt kompilieren und hochladen**: Kompilieren Sie das Projekt und laden Sie es auf das ESP32-Board hoch.
+Die vollständige Anleitung zum Bauen aus dem Quellcode, zum Flashen einer vorkompilierten Firmware und zum
+Registrieren eines Geräts im Backend steht in [`SETUP.md`](SETUP.md).
 
 ### LED Bedeutung
 
-| LED Farbe         | Bedeutung                                                                                                           |
-|-------------------|---------------------------------------------------------------------------------------------------------------------|
-| Weiß              | Das ESP32-Board wurde gerade gestartet und wird initialisiert.                                                      |
-| Lila              | Es wird nach Firmware-Updates gesucht und diese werden ggf. installiert.                                            |
-| Orange            | Die Zugangskarten werden aktualisiert.                                                                              |
-| Blau              | Logs werden auf den Server hochgeladen.                                                                             |
-| Kurz doppelt Grün | Auto aufgeschlossen.                                                                                                |
-| Kurz doppelt Rot  | Auto zugeschlossen.                                                                                                 |
-| Lange (1,5s) Rot  | Gescannte RFID Karte ist nicht autorisiert.                                                                         |
-| Hellblau / Cyan   | Die RFID Karte wurde innerhalb kurzer Zeit mehrfach gescannt. Sobald die LED erlischt, kann erneut gescannt werden. |
+| LED Farbe / Effekt              | Bedeutung                                                                                              |
+|----------------------------------|---------------------------------------------------------------------------------------------------------|
+| Weiß, umlaufend                  | Initialisierung bzw. Verbindungsaufbau zum Modem.                                                       |
+| Lila, Fortschrittsbalken          | Es wird nach einem Firmware-Update gesucht bzw. eines heruntergeladen und installiert.                  |
+| Orange, Fortschrittsbalken        | Die Zugangsliste (RFID) wird aktualisiert.                                                              |
+| Blau, Fortschrittsbalken          | Logs werden auf den Server hochgeladen.                                                                 |
+| Kurz doppelt Grün                | Auto aufgeschlossen.                                                                                    |
+| Kurz doppelt Rot                 | Auto zugeschlossen.                                                                                     |
+| Durchgehend Rot (2s)              | Gescannte RFID-Karte ist nicht autorisiert.                                                             |
+| Cyan, langsam pulsierend          | Die Karte liegt zu lange auf dem Lesegerät – bitte entfernen.                                           |
+| Cyan, langsam ausblendend         | Die Karte wurde entfernt, das Lesegerät ist gleich wieder bereit für die nächste Karte.                 |
+
+Auf Boards mit nur einer LED (HW Rev. 2) läuft der "umlaufende" Effekt als einzelner heller Punkt, der kurz
+aufleuchtet, langsam ausblendet und danach kurz dunkel bleibt, statt tatsächlich um mehrere LEDs zu wandern.
 
 ## Referenzen
 
